@@ -40,7 +40,9 @@ def get_device_status(device_id: str, db: Session = Depends(get_db)):
 
 @router.get("/{device_id}/current-playlist")
 def get_current_playlist(request: Request, device_id: str, db: Session = Depends(get_db)):
-    base_url = str(request.base_url).rstrip("/")
+    scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
+    host = request.headers.get("x-forwarded-host", request.url.netloc)
+    base_url = f"{scheme}://{host}"
     result = PlayerService.get_current_playlist(db, device_id, base_url)
     if not result:
         return Response(status_code=204)
