@@ -1,37 +1,108 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
-import shutil
 import os
 import uuid
+import logging
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Depends, APIRouter
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
+from sqlalchemy.sql import text
+
+from app.core.logging_util import setup_logging, request_id_ctx
+from app.core.config import settings
+from app.database.database import get_db, SessionLocal
 from app.routers.device_router import router as device_router
 from app.routers.media_router import router as media_router
 from app.routers.playlist_router import router as playlist_router
 from app.routers.schedule_router import router as schedule_router
-from app.routers.device_playlist_router import (
-    router as device_playlist_router
-)
+from app.routers.device_playlist_router import router as device_playlist_router
 
-from fastapi.middleware.cors import CORSMiddleware
+# Setup logging immediately
+setup_logging()
+logger = logging.getLogger("api")
+
+# Verify startup configuration checks
+def verify_startup(db_session: Session):
+    logger.info("Running production readiness checks...")
+    settings.validate_production()
+    
+    # 1. Check DB Connection
+    try:
+        db_session.execute(text("SELECT 1"))
+    except Exception as e:
+        logger.critical(f"Startup check failed: Database connection failed: {str(e)}")
+        raise SystemExit(1)
+        
+    # 2. Check Storage Connection (if configured)
+    from app.core.storage import get_storage_provider
+    provider = get_storage_provider()
+    try:
+        provider.verify_connection()
+    except Exception as e:
+        logger.critical(f"Startup check failed: Storage connection failed: {str(e)}")
+        raise SystemExit(1)
+        
+    logger.info("All production readiness checks passed.")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    db = SessionLocal()
+    try:
+        verify_startup(db)
+    finally:
+        db.close()
+    yield
 
 app = FastAPI(
-    title="Digital Signage API"
+    title="Digital Signage API",
+    lifespan=lifespan
 )
 
-allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "")
-origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
+# Request ID Middleware
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    request_id = request.headers.get("X-Request-ID") or uuid.uuid4().hex[:8]
+    token = request_id_ctx.set(request_id)
+    try:
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return response
+    finally:
+        request_id_ctx.reset(token)
 
-# In development, a common pattern is to allow any localhost port. 
-# This handles Vite automatically assigning 5174, 5175, etc.
-# In production, ALLOWED_ORIGIN_REGEX should be explicitly cleared or set to a strict pattern,
-# or relied entirely on ALLOWED_ORIGINS.
-allowed_origin_regex = os.getenv(
-    "ALLOWED_ORIGIN_REGEX", 
-    r"^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$"
-)
+# Global database exception shield
+from sqlalchemy.exc import SQLAlchemyError
+@app.exception_handler(SQLAlchemyError)
+async def sqlalchemy_exception_handler(request: Request, exc: SQLAlchemyError):
+    logger.error(f"SQLAlchemy Database Error: {str(exc)}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An internal database error occurred. Reference ID: " + request_id_ctx.get()}
+    )
 
-# Pass None to Starlette if regex is empty to avoid matching everything if improperly configured
-if not allowed_origin_regex.strip():
+# Generic exception shield
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled Exception: {str(exc)}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An unexpected error occurred. Reference ID: " + request_id_ctx.get()}
+    )
+
+# CORS Configuration
+origins = []
+allowed_origins_env = settings.CORS_ALLOWED_ORIGINS
+if allowed_origins_env:
+    origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
+
+allowed_origin_regex = None
+if settings.APP_ENV == "development":
+    # Allow any localhost/127.0.0.1 port in development mode
+    allowed_origin_regex = r"^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$"
+elif settings.APP_ENV == "production":
+    # Enforce strict origins in production (no regex wildcard allowed)
     allowed_origin_regex = None
 
 app.add_middleware(
@@ -42,6 +113,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Versioned APIs Router
+api_v1_router = APIRouter(prefix="/api/v1")
+api_v1_router.include_router(device_router)
+api_v1_router.include_router(media_router)
+api_v1_router.include_router(playlist_router)
+api_v1_router.include_router(device_playlist_router)
+api_v1_router.include_router(schedule_router)
+app.include_router(api_v1_router)
+
+# Legacy root mounts for backward compatibility
 app.include_router(device_router)
 app.include_router(media_router)
 app.include_router(playlist_router)
@@ -49,7 +131,6 @@ app.include_router(device_playlist_router)
 app.include_router(schedule_router)
 
 MEDIA_FOLDER = "media"
-
 os.makedirs(MEDIA_FOLDER, exist_ok=True)
 
 app.mount(
@@ -412,4 +493,37 @@ def current_ad():
         "current_ad":
             ads[0]
     }
+
+
+@app.get("/health")
+def health_check(db: Session = Depends(get_db)):
+    db_status = "healthy"
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception as e:
+        logger.error(f"Health check failed on database: {str(e)}")
+        db_status = "unhealthy"
+
+    storage_status = "healthy"
+    from app.core.storage import get_storage_provider
+    try:
+        get_storage_provider().verify_connection()
+    except Exception as e:
+        logger.error(f"Health check failed on storage: {str(e)}")
+        storage_status = "unhealthy"
+
+    overall_status = "healthy" if db_status == "healthy" and storage_status == "healthy" else "unhealthy"
+    
+    return {
+        "status": overall_status,
+        "database": db_status,
+        "storage": storage_status,
+        "environment": settings.APP_ENV,
+        "version": "1.0.0"
+    }
+
+
+@app.get("/ready")
+def ready_check():
+    return {"status": "ready"}
     
