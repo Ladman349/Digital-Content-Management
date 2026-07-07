@@ -95,6 +95,7 @@ async def generic_exception_handler(request: Request, exc: Exception):
 origins = [
     "http://localhost:5173",
     "https://ladman349-digital-content-managemen.vercel.app",
+    "https://digital-content-management-two.vercel.app",
 ]
 allowed_origins_env = settings.CORS_ALLOWED_ORIGINS
 if allowed_origins_env:
