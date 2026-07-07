@@ -196,6 +196,7 @@ class PlaylistRepositoryImpl @Inject constructor(
     override fun observeCurrentPlaylist(): Flow<Playlist?> {
         return database.playlistDao().observeActivePlaylist().map { entity ->
             if (entity == null) return@map null
+            android.util.Log.i("PlaylistTrace", "ROOM EMIT playlist=${entity.playlistId} version=${entity.version}")
             val items = database.playlistDao().getMediaItemsForPlaylist(entity.playlistId).map {
                 MediaItem(
                     mediaId = it.mediaId,

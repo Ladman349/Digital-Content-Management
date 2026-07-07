@@ -31,6 +31,7 @@ class PlaylistExecutorImpl @Inject constructor(
     private var loopJob: Job? = null
 
     override fun execute(playlist: Playlist) {
+        android.util.Log.i("PlaylistTrace", "EXECUTE version=${playlist.version}")
         android.util.Log.i("ReadinessTrace", "PlaylistExecutor.execute() called with playlist: ${playlist.playlistId}, version: ${playlist.version}")
         if (playlist.playlistId == currentPlaylistId && playlist.version == currentPlaylistVersion) {
             android.util.Log.i("ReadinessTrace", "PlaylistExecutor: Playlist already active and same version: ${playlist.playlistId}")
@@ -52,6 +53,7 @@ class PlaylistExecutorImpl @Inject constructor(
             } else {
                 currentPlaylistId = playlist.playlistId
                 currentPlaylistVersion = playlist.version
+                android.util.Log.i("PlaylistTrace", "RESTARTING LOOP for version=${playlist.version}")
                 playbackController.setCurrentPlaylistId(playlist.playlistId)
                 eventBus.publish(PlayerEvent.DebugStage("8. PlaylistExecutor starting loop for playlist ${playlist.playlistId}"))
                 startPlaylistLoop(playlist)
@@ -60,6 +62,13 @@ class PlaylistExecutorImpl @Inject constructor(
     }
 
     private fun startPlaylistLoop(playlist: Playlist) {
+        android.util.Log.i(
+            "PlaylistTrace",
+            "START LOOP version=${playlist.version} items=${
+                playlist.items.joinToString { "${it.mediaId}:${it.order}" }
+            }"
+        )
+        android.util.Log.i("PlaylistTrace", "Cancelling existing playback loop")
         loopJob?.cancel()
         loopJob = scope.launch {
             var currentIndex = 0
@@ -88,12 +97,14 @@ class PlaylistExecutorImpl @Inject constructor(
                 
                 val pending = pendingPlaylist
                 if (pending != null) {
+                    android.util.Log.i("PlaylistTrace", "RESTARTING LOOP for version=${pending.version}")
                     logger.i("PlaylistExecutor", "Applying pending playlist: ${pending.playlistId}, version: ${pending.version}")
                     pendingPlaylist = null
                     currentPlaylistId = pending.playlistId
                     currentPlaylistVersion = pending.version
                     playbackController.setCurrentPlaylistId(pending.playlistId)
                     startPlaylistLoop(pending)
+                    android.util.Log.i("PlaylistTrace", "New playback loop launched")
                     break
                 }
                 
