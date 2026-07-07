@@ -18,6 +18,8 @@ import com.digitalsignage.player.presentation.PresentationState
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import coil.load
 import coil.dispose
 import javax.inject.Inject
@@ -93,12 +95,15 @@ class PlaybackActivity : AppCompatActivity() {
                             binding.tvDebugCommand.text = "Command: ${event.command}"
                             binding.tvDebugBaseUrl.text = "BASE_URL: ${com.digitalsignage.player.BuildConfig.BASE_URL}"
                             
-                            // Check cleartext status via ApplicationInfo if possible, but we just print environment
-                            binding.tvDebugCleartext.text = "Env: ${com.digitalsignage.player.BuildConfig.ENVIRONMENT}"
-                            
-                            binding.tvDebugExceptionClass.text = event.exceptionClass
-                            binding.tvDebugExceptionMessage.text = event.exceptionMessage
-                            binding.tvDebugExceptionTrace.text = "Cause: ${event.cause}\n\n${event.stackTrace}"
+                            lifecycleScope.launch(Dispatchers.IO) {
+                                val netTelemetry = getNetworkDiagnostics()
+                                withContext(Dispatchers.Main) {
+                                    binding.tvDebugCleartext.text = netTelemetry.trim()
+                                    binding.tvDebugExceptionClass.text = event.exceptionClass
+                                    binding.tvDebugExceptionMessage.text = event.exceptionMessage
+                                    binding.tvDebugExceptionTrace.text = "Cause: ${event.cause}\n\n${event.stackTrace}"
+                                }
+                            }
                         }
                     }
                     is PlayerEvent.DebugStage -> {
@@ -161,6 +166,49 @@ class PlaybackActivity : AppCompatActivity() {
         MaintenanceDialog(this, runtimeConfigStore) {
             // Success callback - already handled by MaintenanceSessionManager
         }.show()
+    }
+
+    private fun getNetworkDiagnostics(): String {
+        val context = this
+        val sb = java.lang.StringBuilder()
+        try {
+            val cm = context.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+            val activeNetwork = cm.activeNetwork
+            val capabilities = cm.getNetworkCapabilities(activeNetwork)
+            
+            val isConnected = activeNetwork != null
+            val isValidated = capabilities?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
+            
+            sb.append("Network Connected: ").append(if (isConnected) "YES" else "NO").append("\n")
+            sb.append("Internet Validated: ").append(if (isValidated) "YES" else "NO").append("\n")
+            
+            // Wi-Fi SSID
+            val wifiManager = context.applicationContext.getSystemService(android.content.Context.WIFI_SERVICE) as android.net.wifi.WifiManager
+            val wifiInfo = wifiManager.connectionInfo
+            val ssid = wifiInfo?.ssid ?: "<none>"
+            sb.append("Wi-Fi SSID: ").append(ssid).append("\n")
+            
+            // DNS Servers
+            val linkProps = cm.getLinkProperties(activeNetwork)
+            val dnsServers = linkProps?.dnsServers ?: emptyList()
+            sb.append("DNS Servers: ").append(dnsServers.map { it.hostAddress ?: "" }).append("\n")
+            
+            // Try resolving BASE_URL domain
+            val baseUri = java.net.URI(com.digitalsignage.player.BuildConfig.BASE_URL)
+            val host = baseUri.host
+            sb.append("BASE_URL Host: ").append(host).append("\n")
+            if (!host.isNullOrEmpty()) {
+                try {
+                    val resolved = java.net.InetAddress.getAllByName(host)
+                    sb.append("Resolved IP(s): ").append(resolved.map { it.hostAddress ?: "" }).append("\n")
+                } catch (e: Exception) {
+                    sb.append("Resolved IP(s): FAILED (${e.message})\n")
+                }
+            }
+        } catch (e: Exception) {
+            sb.append("Telemetry Err: ").append(e.message).append("\n")
+        }
+        return sb.toString()
     }
 
     private fun renderState(state: PresentationState) {
