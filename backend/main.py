@@ -92,10 +92,16 @@ async def generic_exception_handler(request: Request, exc: Exception):
     )
 
 # CORS Configuration
-origins = []
+origins = [
+    "http://localhost:5173",
+    "https://ladman349-digital-content-managemen.vercel.app",
+]
 allowed_origins_env = settings.CORS_ALLOWED_ORIGINS
 if allowed_origins_env:
-    origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
+    for o in allowed_origins_env.split(","):
+        stripped = o.strip()
+        if stripped and stripped not in origins:
+            origins.append(stripped)
 
 allowed_origin_regex = None
 if settings.APP_ENV == "development":
@@ -107,7 +113,7 @@ elif settings.APP_ENV == "production":
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins if origins else [],
+    allow_origins=origins,
     allow_origin_regex=allowed_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
