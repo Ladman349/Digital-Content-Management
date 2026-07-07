@@ -2,7 +2,15 @@
  * API client to route requests to real FastAPI backend.
  */
 
-export const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+let rawBase = import.meta.env.VITE_API_URL || "http://localhost:8000";
+if (rawBase && !rawBase.startsWith("http://") && !rawBase.startsWith("https://")) {
+  if (rawBase.includes("localhost") || rawBase.includes("127.0.0.1")) {
+    rawBase = `http://${rawBase}`;
+  } else {
+    rawBase = `https://${rawBase}`;
+  }
+}
+export const API_BASE = rawBase;
 
 export const apiClient = {
   get: async <T>(url: string): Promise<T> => {
