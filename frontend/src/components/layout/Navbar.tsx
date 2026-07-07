@@ -14,11 +14,8 @@ import { useNavigate } from "react-router-dom";
 
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import NotificationsRoundedIcon from "@mui/icons-material/NotificationsRounded";
-import DarkModeRoundedIcon from "@mui/icons-material/DarkModeRounded";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
-import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
-import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 
 import SearchBar from "./SearchBar";
 
