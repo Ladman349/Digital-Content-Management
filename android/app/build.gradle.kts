@@ -66,12 +66,28 @@ android {
             dimension = "environment"
             applicationIdSuffix = ".staging"
             versionNameSuffix = "-staging"
-            buildConfigField("String", "BASE_URL", "\"https://staging-api.digitalsignage.com/\"")
+            val stagingHost = localProperties.getProperty("STAGING_API_HOST") ?: System.getenv("STAGING_API_HOST") ?: "staging-api.digitalsignage.com"
+            val stagingPort = localProperties.getProperty("STAGING_API_PORT") ?: System.getenv("STAGING_API_PORT")
+            
+            val url = if (stagingPort.isNullOrEmpty() || stagingPort == "443") {
+                "https://${stagingHost}/"
+            } else {
+                "https://${stagingHost}:${stagingPort}/"
+            }
+            buildConfigField("String", "BASE_URL", "\"$url\"")
             buildConfigField("String", "ENVIRONMENT", "\"staging\"")
         }
         create("prod") {
             dimension = "environment"
-            buildConfigField("String", "BASE_URL", "\"https://api.digitalsignage.com/\"")
+            val prodHost = localProperties.getProperty("PROD_API_HOST") ?: System.getenv("PROD_API_HOST") ?: "api.grovitai.com"
+            val prodPort = localProperties.getProperty("PROD_API_PORT") ?: System.getenv("PROD_API_PORT")
+            
+            val url = if (prodPort.isNullOrEmpty() || prodPort == "443") {
+                "https://${prodHost}/"
+            } else {
+                "https://${prodHost}:${prodPort}/"
+            }
+            buildConfigField("String", "BASE_URL", "\"$url\"")
             buildConfigField("String", "ENVIRONMENT", "\"production\"")
         }
     }

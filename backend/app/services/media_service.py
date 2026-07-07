@@ -1,7 +1,9 @@
 import os
-import shutil
 import uuid
 import time
+import io
+import hashlib
+import logging
 from typing import List
 
 from fastapi import UploadFile, HTTPException
@@ -9,8 +11,10 @@ from sqlalchemy.orm import Session
 from PIL import Image
 
 from app.models.media import Media
-from app.schemas.media import MediaUpdate
+from app.schemas.media import MediaUpdate, MediaResponse
+from app.core.storage import get_storage_provider
 
+logger = logging.getLogger("api")
 
 class MediaService:
 
@@ -40,21 +44,12 @@ class MediaService:
         
         if size > 100 * 1024 * 1024:  # 100MB
             raise HTTPException(status_code=400, detail="File is too large")
-
-        safe_name = os.path.splitext(file.filename)[0].replace(" ", "_")
-        unique_filename = f"{safe_name}_{uuid.uuid4().hex[:8]}{ext}"
         
-        os.makedirs(MediaService.MEDIA_FOLDER, exist_ok=True)
-        file_path = os.path.join(MediaService.MEDIA_FOLDER, unique_filename)
+        file_content = file.file.read()
         
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-            
-        import hashlib
+        # Compute checksum
         sha256 = hashlib.sha256()
-        with open(file_path, "rb") as f:
-            for chunk in iter(lambda: f.read(8192), b""):
-                sha256.update(chunk)
+        sha256.update(file_content)
         checksum = sha256.hexdigest()
             
         dimensions = "Unknown"
@@ -64,7 +59,7 @@ class MediaService:
         if ext in MediaService.IMAGE_EXTENSIONS:
             media_type = "Image"
             try:
-                with Image.open(file_path) as img:
+                with Image.open(io.BytesIO(file_content)) as img:
                     dimensions = f"{img.width}x{img.height}"
             except Exception:
                 dimensions = "Unknown"
@@ -73,13 +68,22 @@ class MediaService:
             dimensions = "1920x1080"
             duration = 120
             
+        safe_name = os.path.splitext(file.filename)[0].replace(" ", "_")
+        unique_filename = f"{safe_name}_{uuid.uuid4().hex[:8]}{ext}"
+        
+        provider = get_storage_provider()
+        logger.info(f"Uploading media filename={file.filename} size={size} provider={provider.__class__.__name__}")
+        
+        storage_uri = provider.upload(file_content, unique_filename, file.content_type)
+        
+        media_id = f"MEDIA-{uuid.uuid4().hex[:8].upper()}"
         new_media = Media(
-            id=f"MEDIA-{uuid.uuid4().hex[:8].upper()}",
+            id=media_id,
             name=file.filename,
             type=media_type,
             category="Announcement",
-            thumbnail=f"http://localhost:8000/uploads/{unique_filename}",
-            originalFile=f"http://localhost:8000/uploads/{unique_filename}",
+            thumbnail=storage_uri,
+            originalFile=storage_uri,
             size=size,
             dimensions=dimensions,
             duration=duration,
@@ -92,6 +96,7 @@ class MediaService:
         db.commit()
         db.refresh(new_media)
         
+        logger.info(f"Media uploaded mediaId={media_id} provider={provider.__class__.__name__} uri={storage_uri}")
         return new_media
 
     @staticmethod
@@ -123,17 +128,38 @@ class MediaService:
         if not media:
             return False
             
-        file_name = media.originalFile.split("/")[-1]
-        path = os.path.join(MediaService.MEDIA_FOLDER, file_name)
+        provider = get_storage_provider()
             
         try:
             db.delete(media)
             db.commit()
+            logger.info(f"Media deleted from database mediaId={media_id}")
         except IntegrityError:
             db.rollback()
             raise HTTPException(status_code=409, detail="Cannot delete media because it is referenced by one or more playlists.")
             
-        if os.path.exists(path):
-            os.remove(path)
+        try:
+            provider.delete(media.originalFile)
+            logger.info(f"Media deleted from storage uri={media.originalFile}")
+        except Exception as e:
+            logger.error(f"Failed to delete media from storage uri={media.originalFile}: {str(e)}")
             
         return True
+
+    @staticmethod
+    def to_response(media: Media) -> MediaResponse:
+        provider = get_storage_provider()
+        return MediaResponse(
+            id=media.id,
+            name=media.name,
+            type=media.type,
+            category=media.category,
+            thumbnail=provider.get_public_url(media.thumbnail),
+            originalFile=provider.get_public_url(media.originalFile),
+            size=media.size,
+            dimensions=media.dimensions,
+            duration=media.duration,
+            uploadedAt=media.uploadedAt,
+            uploadedBy=media.uploadedBy,
+            checksum=media.checksum
+        )
