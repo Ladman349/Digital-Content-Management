@@ -22,8 +22,8 @@ android {
         applicationId = "com.digitalsignage.player"
         minSdk = 28
         targetSdk = 34
-        versionCode = 2
-        versionName = "1.0-debug-build-2"
+        versionCode = 3
+        versionName = "1.0.0"
     }
 
     flavorDimensions += "environment"
@@ -79,7 +79,7 @@ android {
         }
         create("prod") {
             dimension = "environment"
-            val prodHost = localProperties.getProperty("PROD_API_HOST") ?: System.getenv("PROD_API_HOST") ?: "api.grovitai.com"
+            val prodHost = localProperties.getProperty("PROD_API_HOST") ?: System.getenv("PROD_API_HOST") ?: "digital-content-management-production.up.railway.app"
             val prodPort = localProperties.getProperty("PROD_API_PORT") ?: System.getenv("PROD_API_PORT")
             
             val url = if (prodPort.isNullOrEmpty() || prodPort == "443") {
