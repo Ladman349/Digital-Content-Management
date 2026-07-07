@@ -36,6 +36,7 @@ object NetworkModule {
     @Singleton
     fun provideRetrofit(okHttpClient: OkHttpClient): Retrofit {
         android.util.Log.i("StartupTrace", "Trace: Retrofit creation started")
+        android.util.Log.i("StartupTrace", "BASE_URL = ${com.digitalsignage.player.BuildConfig.BASE_URL}")
         
         val moshi = com.squareup.moshi.Moshi.Builder()
             .add(com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory())
