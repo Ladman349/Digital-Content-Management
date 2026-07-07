@@ -22,6 +22,8 @@ import javax.inject.Inject
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 import android.app.Activity
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 interface PlayerOrchestrator {
@@ -52,11 +54,14 @@ class PlayerOrchestratorImpl @Inject constructor(
     private val maintenanceSessionManager: MaintenanceSessionManager
 ) : PlayerOrchestrator {
 
-    private val initializationMutex = kotlinx.coroutines.sync.Mutex()
+    private val initializationMutex = Mutex()
     private var isInitialized = false
 
     private var syncJob: Job? = null
     private var currentActivity: Activity? = null
+
+    private val syncMutex = Mutex()
+    private var pollingJob: Job? = null
 
     override fun initialize() {
         android.util.Log.i("InvestigateReg", "2. PlayerOrchestrator.initialize() entered")
@@ -107,6 +112,7 @@ class PlayerOrchestratorImpl @Inject constructor(
                         stateMachine.transitionTo(PlayerState.SYNCING)
                         executeCommand(PlayerCommand.SyncPlaylist)
                         heartbeatManager.start()
+                        startPolling()
                     } else {
                         logger.i("PlayerFlow", "[TRANSITION] REGISTERING")
                         android.util.Log.i(
@@ -123,6 +129,7 @@ class PlayerOrchestratorImpl @Inject constructor(
                         stateMachine.transitionTo(PlayerState.SYNCING)
                         executeCommand(PlayerCommand.SyncPlaylist)
                         heartbeatManager.start()
+                        startPolling()
                     } else {
                         stateMachine.transitionTo(PlayerState.REGISTERING)
                         executeCommand(PlayerCommand.RegisterDevice)
@@ -153,6 +160,7 @@ class PlayerOrchestratorImpl @Inject constructor(
                         stateMachine.transitionTo(PlayerState.SYNCING)
                         executeCommand(PlayerCommand.SyncPlaylist)
                         heartbeatManager.start()
+                        startPolling()
                     }
 
                     is PlayerEvent.PlaylistUpdated -> {
@@ -206,6 +214,7 @@ class PlayerOrchestratorImpl @Inject constructor(
                             )
                             eventBus.publish(PlayerEvent.DebugStage("CLEAR_REGISTRATION_FROM_HEARTBEAT"))
                             deviceRepository.clearRegistration()
+                            stopPolling()
                             stateMachine.transitionTo(PlayerState.REGISTERING)
                             executeCommand(PlayerCommand.RegisterDevice)
                         }
@@ -220,8 +229,13 @@ class PlayerOrchestratorImpl @Inject constructor(
     private fun observePlaylistChanges() {
         applicationScope.launch {
             playlistRepository.observeCurrentPlaylist().collect { playlist ->
-                if (playlist != null && stateMachine.currentState.value == PlayerState.PLAYING) {
-                    playlistExecutor.execute(playlist)
+                if (playlist != null) {
+                    android.util.Log.i("PlaylistTrace", "ORCHESTRATOR RECEIVED PLAYLIST version=${playlist.version}")
+                    if (stateMachine.currentState.value == PlayerState.PLAYING) {
+                        playlistExecutor.execute(playlist)
+                    } else {
+                        android.util.Log.i("PlaylistTrace", "Orchestrator ignored emit because state is ${stateMachine.currentState.value.name}")
+                    }
                 }
             }
         }
@@ -346,6 +360,53 @@ class PlayerOrchestratorImpl @Inject constructor(
         }
     }
 
+    private companion object {
+        const val PLAYLIST_POLL_INTERVAL_MS = 15_000L
+    }
+
+    private suspend fun attemptSyncSafely() {
+        if (!syncMutex.tryLock()) {
+            android.util.Log.d("SyncTrace", "Sync already in progress, skipping")
+            return
+        }
+
+        try {
+            android.util.Log.i("SyncTrace", "Periodic sync started")
+            attemptSync()
+            android.util.Log.i("SyncTrace", "Periodic sync completed")
+        } catch (e: Exception) {
+            android.util.Log.e("SyncTrace", "Periodic sync failed", e)
+        } finally {
+            syncMutex.unlock()
+        }
+    }
+
+    private fun startPolling() {
+        if (pollingJob?.isActive == true) return
+        pollingJob = applicationScope.launch {
+            while (isActive) {
+                val currentState = stateMachine.currentState.value
+                val isSyncable = when (currentState) {
+                    PlayerState.BOOTING,
+                    PlayerState.REGISTERING,
+                    PlayerState.SYNCING,
+                    PlayerState.ERROR -> false
+                    else -> true
+                }
+                if (isSyncable) {
+                    android.util.Log.i("SyncTrace", "Periodic sync polling triggered in state ${currentState.name}")
+                    attemptSyncSafely()
+                }
+                delay(PLAYLIST_POLL_INTERVAL_MS)
+            }
+        }
+    }
+
+    private fun stopPolling() {
+        pollingJob?.cancel()
+        pollingJob = null
+    }
+
     private suspend fun attemptSync() {
         android.util.Log.i("StartupTrace", "Trace: PlayerOrchestrator.attemptSync() started")
         logger.i("PlayerFlow", "[TRANSITION] SYNCING")
@@ -388,12 +449,14 @@ class PlayerOrchestratorImpl @Inject constructor(
                     )
                     eventBus.publish(PlayerEvent.DebugStage("CLEAR_REGISTRATION_FROM_SYNC"))
                     deviceRepository.clearRegistration()
+                    stopPolling()
                     stateMachine.transitionTo(PlayerState.REGISTERING)
                     executeCommand(PlayerCommand.RegisterDevice)
                 } else if (result.exception is AppError.Retryable) {
                     delay(5000)
                     attemptSync() // Basic retry for sync
                 } else {
+                    stopPolling()
                     stateMachine.transitionToError(result.exception as AppError)
                 }
             }
