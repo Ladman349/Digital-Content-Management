@@ -1,0 +1,22 @@
+# Android
+**/build/
+.gradle/
+.local/
+
+# Android Studio
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+
+# Node dependencies
+node_modules/
+**/node_modules/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
