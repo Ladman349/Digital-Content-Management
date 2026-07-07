@@ -287,19 +287,26 @@ class PlayerOrchestratorImpl @Inject constructor(
                                 result.exception
                             )
                             stateMachine.transitionToError(result.exception as AppError)
-                            if (result.exception is AppError.DebugException) {
-                                val debugExc = result.exception as AppError.DebugException
-                                eventBus.publish(
-                                    PlayerEvent.StartupException(
-                                        state = stateMachine.currentState.value.name,
-                                        command = "RegisterDevice",
-                                        exceptionClass = debugExc.exceptionClass,
-                                        exceptionMessage = debugExc.exceptionMessage,
-                                        stackTrace = debugExc.stackTrace,
-                                        cause = debugExc.causeMessage
-                                    )
+                            
+                            val sw = java.io.StringWriter()
+                            result.exception.printStackTrace(java.io.PrintWriter(sw))
+                            val excClass = if (result.exception is AppError.DebugException) (result.exception as AppError.DebugException).exceptionClass else result.exception::class.java.name
+                            val excMessage = if (result.exception is AppError.DebugException) (result.exception as AppError.DebugException).exceptionMessage else result.exception.message ?: "No message"
+                            val stackTrace = if (result.exception is AppError.DebugException) (result.exception as AppError.DebugException).stackTrace else sw.toString()
+                            val cause = if (result.exception is AppError.DebugException) (result.exception as AppError.DebugException).causeMessage else result.exception.cause?.message
+                            
+                            eventBus.publish(
+                                PlayerEvent.StartupException(
+                                    state = stateMachine.currentState.value.name,
+                                    command = "RegisterDevice",
+                                    exceptionClass = excClass,
+                                    exceptionMessage = excMessage,
+                                    stackTrace = stackTrace,
+                                    cause = cause
                                 )
-                            } else if (result.exception is AppError.Retryable) {
+                            )
+                            
+                            if (result.exception is AppError.Retryable) {
                                 delay(5000)
                                 executeCommand(PlayerCommand.RegisterDevice)
                             }
@@ -442,6 +449,24 @@ class PlayerOrchestratorImpl @Inject constructor(
             }
 
             is Result.Error -> {
+                val sw = java.io.StringWriter()
+                result.exception.printStackTrace(java.io.PrintWriter(sw))
+                val excClass = if (result.exception is AppError.DebugException) (result.exception as AppError.DebugException).exceptionClass else result.exception::class.java.name
+                val excMessage = if (result.exception is AppError.DebugException) (result.exception as AppError.DebugException).exceptionMessage else result.exception.message ?: "No message"
+                val stackTrace = if (result.exception is AppError.DebugException) (result.exception as AppError.DebugException).stackTrace else sw.toString()
+                val cause = if (result.exception is AppError.DebugException) (result.exception as AppError.DebugException).causeMessage else result.exception.cause?.message
+                
+                eventBus.publish(
+                    PlayerEvent.StartupException(
+                        state = stateMachine.currentState.value.name,
+                        command = "SyncPlaylist",
+                        exceptionClass = excClass,
+                        exceptionMessage = excMessage,
+                        stackTrace = stackTrace,
+                        cause = cause
+                    )
+                )
+
                 if (result.exception is AppError.Recoverable) {
                     logger.w(
                         "PlayerFlow",

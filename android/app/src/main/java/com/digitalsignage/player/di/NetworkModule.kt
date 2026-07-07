@@ -1,5 +1,7 @@
 package com.digitalsignage.player.di
 
+import com.digitalsignage.player.data.remote.ApiService
+import com.digitalsignage.player.data.remote.AuthInterceptor
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -10,8 +12,35 @@ import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
-import com.digitalsignage.player.data.remote.ApiService
-import com.digitalsignage.player.data.remote.AuthInterceptor
+
+class NetworkTraceInterceptor : okhttp3.Interceptor {
+    override fun intercept(chain: okhttp3.Interceptor.Chain): okhttp3.Response {
+        val request = chain.request()
+        android.util.Log.i("RegisterTrace", "[NetworkTrace] Outgoing Request: ${request.method} ${request.url}")
+        try {
+            val response = chain.proceed(request)
+            android.util.Log.i("RegisterTrace", "[NetworkTrace] Incoming Response: Code=${response.code} for ${request.url}")
+            return response
+        } catch (e: Exception) {
+            android.util.Log.e("RegisterTrace", "[NetworkTrace] Network Exception for ${request.url}", e)
+            throw e
+        }
+    }
+}
+
+object LoggingDns : okhttp3.Dns {
+    override fun lookup(hostname: String): List<java.net.InetAddress> {
+        android.util.Log.i("RegisterTrace", "[DNSTrace] Resolving hostname: $hostname")
+        try {
+            val addresses = okhttp3.Dns.SYSTEM.lookup(hostname)
+            android.util.Log.i("RegisterTrace", "[DNSTrace] Resolved $hostname to: ${addresses.map { it.hostAddress }}")
+            return addresses
+        } catch (e: Exception) {
+            android.util.Log.e("RegisterTrace", "[DNSTrace] Resolution failed for $hostname", e)
+            throw e
+        }
+    }
+}
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -19,14 +48,15 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(eventBus: com.digitalsignage.player.core.event.PlayerEventBus): OkHttpClient {
-        val customLogger = HttpLoggingInterceptor.Logger { message -> 
-            android.util.Log.i("InvestigateReg", "9. OkHttp: $message")
+    fun provideOkHttpClient(): OkHttpClient {
+        val logging = HttpLoggingInterceptor().apply {
+            level = HttpLoggingInterceptor.Level.BODY
         }
-        val logging = HttpLoggingInterceptor(customLogger).apply { level = HttpLoggingInterceptor.Level.BODY }
         return OkHttpClient.Builder()
             .addInterceptor(logging)
+            .addInterceptor(NetworkTraceInterceptor())
             .addInterceptor(AuthInterceptor())
+            .dns(LoggingDns)
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .build()
