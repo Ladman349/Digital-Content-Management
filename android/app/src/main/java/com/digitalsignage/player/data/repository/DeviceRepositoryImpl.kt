@@ -29,6 +29,7 @@ class DeviceRepositoryImpl @Inject constructor(
     override suspend fun registerDevice(): Result<Boolean> {
         android.util.Log.i("InvestigateReg", "4. DeviceRepositoryImpl.registerDevice() entered")
         android.util.Log.i("StartupTrace", "Trace: DeviceRepositoryImpl.registerDevice() started")
+        android.util.Log.i("NetworkTrace", "Attempting registration against BASE_URL: ${com.digitalsignage.player.BuildConfig.BASE_URL}")
         _registrationState.value = RegistrationState.Registering
         return try {
             val installId = runtimeConfigStore.getOrCreateInstallationId { identityManager.generateAppInstallationId() }
