@@ -1,0 +1,203 @@
+package com.digitalsignage.player.player.playback
+
+import android.content.Context
+import androidx.media3.common.C
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.ExoPlayer
+import com.digitalsignage.player.core.event.PlayerEvent
+import com.digitalsignage.player.core.event.PlayerEventBus
+import com.digitalsignage.player.core.logging.Logger
+import com.digitalsignage.player.domain.model.MediaItem
+import com.digitalsignage.player.domain.model.MediaType
+import com.digitalsignage.player.domain.playback.ContentRenderer
+import com.digitalsignage.player.domain.playback.PlaybackController
+import com.digitalsignage.player.presentation.PlaybackStateStore
+import com.digitalsignage.player.presentation.PresentationState
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.*
+import javax.inject.Inject
+import javax.inject.Singleton
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+
+@Singleton
+class PlaybackControllerImpl @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val eventBus: PlayerEventBus,
+    private val logger: Logger,
+    private val playbackStateStore: PlaybackStateStore
+) : PlaybackController {
+
+    var exoPlayer: ExoPlayer? = null
+        private set
+
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private var activeContinuation: CancellableContinuation<Unit>? = null
+    private var currentRenderer: ContentRenderer? = null
+    private var isPlayingActive = false
+    private var currentMediaId: String? = null
+    private var currentPlaylistId: String? = null
+
+    private val imageRenderer = ImageRendererImpl { file ->
+        playbackStateStore.updateState(PresentationState.Image(file))
+    }
+
+    private val videoRenderer by lazy {
+        VideoRendererImpl(exoPlayer!!) { file ->
+            playbackStateStore.updateState(PresentationState.Video(file))
+        }
+    }
+
+    private val playerListener = object : Player.Listener {
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            val stateStr = when(playbackState) {
+                Player.STATE_IDLE -> "STATE_IDLE"
+                Player.STATE_BUFFERING -> "STATE_BUFFERING"
+                Player.STATE_READY -> "STATE_READY"
+                Player.STATE_ENDED -> "STATE_ENDED"
+                else -> "UNKNOWN"
+            }
+            android.util.Log.i("PlaybackController", "ExoPlayer state: $stateStr")
+            
+            if (playbackState == Player.STATE_ENDED) {
+                val cont = activeContinuation
+                if (cont != null && cont.isActive) {
+                    activeContinuation = null
+                    isPlayingActive = false
+                    cont.resume(Unit)
+                }
+            }
+        }
+
+        override fun onPlayerError(error: PlaybackException) {
+            android.util.Log.e("PlaybackController", "ExoPlayer error occurred", error)
+            val cont = activeContinuation
+            if (cont != null && cont.isActive) {
+                activeContinuation = null
+                isPlayingActive = false
+                cont.resumeWithException(error)
+            }
+        }
+    }
+
+    override fun initialize() {
+        if (exoPlayer != null) return
+
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                DefaultLoadControl.DEFAULT_MIN_BUFFER_MS,
+                DefaultLoadControl.DEFAULT_MAX_BUFFER_MS,
+                DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS,
+                DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS
+            ).build()
+
+        exoPlayer = ExoPlayer.Builder(context)
+            .setLoadControl(loadControl)
+            .build().apply {
+            setWakeMode(C.WAKE_MODE_LOCAL)
+            addListener(playerListener)
+        }
+        eventBus.publish(PlayerEvent.EngineInitialized)
+    }
+
+    override suspend fun playItem(item: MediaItem) = suspendCancellableCoroutine<Unit> { continuation ->
+        activeContinuation = continuation
+        isPlayingActive = true
+        currentMediaId = item.mediaId
+        playbackStateStore.updateState(PresentationState.Loading)
+
+        val startTime = System.currentTimeMillis()
+        scope.launch {
+            logger.i("Heartbeat", "Playback started: ${item.mediaId} ($startTime)")
+        }
+
+        currentRenderer?.stop()
+        
+        val file = item.localFilePath?.let { java.io.File(it) }
+        if (file == null || !file.exists()) {
+            isPlayingActive = false
+            continuation.resumeWithException(Exception("Local file not found at: ${item.localFilePath}"))
+            return@suspendCancellableCoroutine
+        }
+
+        val renderer = when (item.mediaType) {
+            MediaType.IMAGE -> imageRenderer
+            MediaType.VIDEO -> videoRenderer
+            else -> {
+                isPlayingActive = false
+                continuation.resume(Unit)
+                return@suspendCancellableCoroutine
+            }
+        }
+
+        currentRenderer = renderer
+
+        continuation.invokeOnCancellation {
+            renderer.stop()
+            activeContinuation = null
+            isPlayingActive = false
+        }
+
+        try {
+            renderer.render(file)
+            eventBus.publish(PlayerEvent.PlaybackStarted(item.mediaId))
+
+            if (item.mediaType == MediaType.IMAGE) {
+                scope.launch {
+                    delay(item.durationMs)
+                    if (continuation.isActive) {
+                        activeContinuation = null
+                        isPlayingActive = false
+                        
+                        val endTime = System.currentTimeMillis()
+                        logger.i("Heartbeat", "Playback completed (Image): ${item.mediaId} ($endTime)")
+                        
+                        continuation.resume(Unit)
+                    }
+                }
+            } else {
+                scope.launch {
+                    delay(item.durationMs + 10000L)
+                    if (continuation.isActive) {
+                        activeContinuation = null
+                        isPlayingActive = false
+                        logger.w("Heartbeat", "Watchdog triggered. Video playback timed out for ${item.mediaId}")
+                        continuation.resume(Unit)
+                    }
+                }
+            }
+        } catch (t: Throwable) {
+            isPlayingActive = false
+            continuation.resumeWithException(t)
+        }
+    }
+
+    override fun isPlaying(): Boolean = isPlayingActive
+
+    override fun getCurrentMediaId(): String? = currentMediaId
+
+    override fun getCurrentPlaylistId(): String? = currentPlaylistId
+
+    override fun setCurrentPlaylistId(playlistId: String?) {
+        this.currentPlaylistId = playlistId
+    }
+
+    override fun stop() {
+        currentRenderer?.stop()
+        currentRenderer = null
+        isPlayingActive = false
+        currentMediaId = null
+        activeContinuation?.cancel()
+        activeContinuation = null
+        playbackStateStore.updateState(PresentationState.Idle)
+    }
+
+    override fun release() {
+        stop()
+        exoPlayer?.removeListener(playerListener)
+        exoPlayer?.release()
+        exoPlayer = null
+    }
+}

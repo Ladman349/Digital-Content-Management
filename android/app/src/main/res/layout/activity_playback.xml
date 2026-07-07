@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/black">
+
+    <androidx.media3.ui.PlayerView
+        android:id="@+id/playerView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"
+        app:use_controller="false"
+        app:resize_mode="fit" />
+
+    <ImageView
+        android:id="@+id/imageView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitCenter"
+        android:visibility="gone" />
+
+    <ProgressBar
+        android:id="@+id/loadingIndicator"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:indeterminate="true"
+        android:theme="@style/Widget.AppCompat.ProgressBar"
+        android:visibility="visible" />
+
+    <LinearLayout
+        android:id="@+id/idleView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/tvIdleTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="No Content Assigned"
+            android:textColor="@color/white"
+            android:textSize="36sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="12dp" />
+
+        <TextView
+            android:id="@+id/tvIdleSubtitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Waiting for playlist..."
+            android:textColor="#80FFFFFF"
+            android:textSize="20sp" />
+
+    </LinearLayout>
+
+    <!-- Enhanced Debug / Exception Screen -->
+    <ScrollView
+        android:id="@+id/debugExceptionView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#DD000000"
+        android:padding="24dp"
+        android:visibility="gone">
+        
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+            
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="BUILD TEST - JULY 3 - 13:20"
+                android:textColor="#EF5350"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="16dp" />
+
+            <TextView android:id="@+id/tvDebugState" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/white" android:textSize="16sp" android:layout_marginBottom="4dp"/>
+            <TextView android:id="@+id/tvDebugCommand" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/white" android:textSize="16sp" android:layout_marginBottom="4dp"/>
+            <TextView android:id="@+id/tvDebugBaseUrl" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/white" android:textSize="16sp" android:layout_marginBottom="4dp"/>
+            <TextView android:id="@+id/tvDebugRegStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/white" android:textSize="16sp" android:layout_marginBottom="4dp"/>
+            <TextView android:id="@+id/tvDebugDeviceIdStr" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/white" android:textSize="16sp" android:layout_marginBottom="4dp"/>
+            <TextView android:id="@+id/tvDebugCleartext" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/white" android:textSize="16sp" android:layout_marginBottom="4dp"/>
+            <TextView android:id="@+id/tvDebugRetrofit" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/white" android:textSize="16sp" android:layout_marginBottom="16dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="EXCEPTION DETAILS:"
+                android:textColor="#FFEB3B"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="8dp" />
+
+            <TextView android:id="@+id/tvDebugExceptionClass" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#EF9A9A" android:textSize="16sp" android:textStyle="bold" android:layout_marginBottom="4dp"/>
+            <TextView android:id="@+id/tvDebugExceptionMessage" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/white" android:textSize="16sp" android:textStyle="italic" android:layout_marginBottom="12dp"/>
+            <TextView android:id="@+id/tvDebugExceptionTrace" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#B0BEC5" android:textSize="12sp" android:fontFamily="monospace"/>
+            
+        </LinearLayout>
+    </ScrollView>
+
+    <LinearLayout
+        android:id="@+id/debugView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="48dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/tvDebugDeviceId"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/white"
+            android:textSize="20sp"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:id="@+id/tvDebugConnection"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/teal_200"
+            android:textSize="18sp"
+            android:layout_marginBottom="16dp" />
+
+        <View
+            android:layout_width="200dp"
+            android:layout_height="1dp"
+            android:background="#33FFFFFF"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:id="@+id/tvDebugPlaylistName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/white"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:id="@+id/tvDebugPlaylistVersion"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#B0FFFFFF"
+            android:textSize="16sp"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:id="@+id/tvDebugItemCount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#B0FFFFFF"
+            android:textSize="16sp"
+            android:layout_marginBottom="16dp" />
+
+        <View
+            android:layout_width="200dp"
+            android:layout_height="1dp"
+            android:background="#33FFFFFF"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:id="@+id/tvDebugDownloadStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/teal_200"
+            android:textSize="18sp"
+            android:layout_marginBottom="8dp" />
+
+        <ProgressBar
+            android:id="@+id/downloadProgressBar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="300dp"
+            android:layout_height="wrap_content"
+            android:max="100"
+            android:progress="0"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:id="@+id/tvDebugCachedCount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#B0FFFFFF"
+            android:textSize="16sp"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:id="@+id/tvDebugLastSync"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#80FFFFFF"
+            android:textSize="14sp"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:id="@+id/tvDebugError"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#FFFF5252"
+            android:textSize="14sp"
+            android:visibility="gone" />
+
+    </LinearLayout>
+
+</FrameLayout>
