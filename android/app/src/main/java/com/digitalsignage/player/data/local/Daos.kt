@@ -42,6 +42,18 @@ interface PlaylistDao {
         insertPlaylist(playlist)
         insertMediaItems(items)
     }
+
+    @Query("DELETE FROM playlist WHERE playlistId = :playlistId")
+    suspend fun deletePlaylistById(playlistId: String)
+
+    @Query("DELETE FROM media_item WHERE playlistId = :playlistId")
+    suspend fun deleteMediaItemsForPlaylist(playlistId: String)
+
+    @Transaction
+    suspend fun deletePlaylist(playlistId: String) {
+        deleteMediaItemsForPlaylist(playlistId)
+        deletePlaylistById(playlistId)
+    }
 }
 
 @Dao

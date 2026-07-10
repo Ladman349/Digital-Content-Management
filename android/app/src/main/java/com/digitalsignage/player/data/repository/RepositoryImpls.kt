@@ -74,11 +74,22 @@ class PlaylistRepositoryImpl @Inject constructor(
             eventBus.publish(PlayerEvent.DebugStage("--- PLAYLIST SYNC ---"))
             eventBus.publish(PlayerEvent.DebugStage("1. GET /devices/$deviceId/current-playlist returned HTTP ${response.code()}"))
             
-            eventBus.publish(PlayerEvent.DebugStage("A. About to evaluate response.isSuccessful"))
             val isSuccess = response.isSuccessful
-            eventBus.publish(PlayerEvent.DebugStage("B. Finished evaluating response.isSuccessful: $isSuccess"))
             
-            if (isSuccess) {
+            if (response.code() == 204) {
+                logger.i("PlaylistRepository", "204 No Content — no playlist assigned to this device.")
+                android.util.Log.i("SyncTrace", "204 No Content — clearing active playlist")
+                eventBus.publish(PlayerEvent.DebugStage("204 No Content — no active playlist for device"))
+                
+                // Clear active playlist from local DB so player shows idle screen
+                val activePlaylist = database.playlistDao().getPlaylistByState(PlaylistState.ACTIVE)
+                if (activePlaylist != null) {
+                    database.playlistDao().deletePlaylist(activePlaylist.playlistId)
+                    android.util.Log.i("SyncTrace", "Cleared active playlist ${activePlaylist.playlistId} from local DB")
+                }
+                
+                Result.Success(false)
+            } else if (isSuccess) {
                 eventBus.publish(PlayerEvent.DebugStage("C. About to evaluate response.body()"))
                 val body = response.body()
                 eventBus.publish(PlayerEvent.DebugStage("D. Finished evaluating response.body(): isNull=${body == null}"))
