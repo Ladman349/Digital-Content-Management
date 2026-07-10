@@ -70,11 +70,17 @@ class PlayerService:
     ) -> Optional[CurrentPlaylistResponse]:
         device = db.query(Device).filter(Device.id == device_id).first()
         if not device:
+            print(f"[204-DIAG] Device '{device_id}' not found in database.")
             return None
 
         now = datetime.now()
         current_date = now.strftime("%Y-%m-%d")
         current_time = now.strftime("%H:%M")
+
+        print(f"[204-DIAG] ── Resolving playlist for device '{device_id}' ──")
+        print(f"[204-DIAG]   Server clock  : {now.isoformat()} (local time, no tzinfo)")
+        print(f"[204-DIAG]   current_date  : {current_date}")
+        print(f"[204-DIAG]   current_time  : {current_time}")
 
         # Find all active schedules assigned to this device
         # within the current date and time window
@@ -92,11 +98,42 @@ class PlayerService:
             .all()
         )
 
+        # --- diagnostic: also fetch ALL schedules assigned to this device so we can
+        # show why non-matching ones were rejected --------------------------------
+        all_assigned = (
+            db.query(Schedule)
+            .join(ScheduleDevice, Schedule.id == ScheduleDevice.scheduleId)
+            .filter(ScheduleDevice.deviceId == device_id)
+            .all()
+        )
+
+        print(f"[204-DIAG]   Total schedules assigned to device : {len(all_assigned)}")
+        for s in all_assigned:
+            reasons = []
+            if s.status != "Active":
+                reasons.append(f"status='{s.status}' (need 'Active')")
+            if s.startDate > current_date:
+                reasons.append(f"startDate={s.startDate} is in the future")
+            if s.endDate < current_date:
+                reasons.append(f"endDate={s.endDate} is in the past")
+            if s.startTime > current_time:
+                reasons.append(f"startTime={s.startTime} > current_time={current_time}")
+            if s.endTime < current_time:
+                reasons.append(f"endTime={s.endTime} < current_time={current_time}")
+            if reasons:
+                print(f"[204-DIAG]   ✗ Schedule '{s.id}' REJECTED: {'; '.join(reasons)}")
+            else:
+                print(f"[204-DIAG]   ✔ Schedule '{s.id}' PASSED date/time/status filters (repeat={s.repeat}, playlist={s.playlistId})")
+
+        print(f"[204-DIAG]   Schedules passing date+time+status filter : {len(schedules)}")
+
         # Filter by repeat pattern (Weekdays, Weekends, Weekly, Monthly)
-        matching_schedules = [
-            s for s in schedules
-            if _matches_repeat(s.repeat, now, s.startDate)
-        ]
+        matching_schedules = []
+        for s in schedules:
+            if _matches_repeat(s.repeat, now, s.startDate):
+                matching_schedules.append(s)
+            else:
+                print(f"[204-DIAG]   ✗ Schedule '{s.id}' REJECTED by repeat rule: repeat='{s.repeat}', weekday={now.weekday()} (0=Mon)")
 
         # Sort by priority descending — Emergency first, Low last
         matching_schedules.sort(
@@ -108,7 +145,9 @@ class PlayerService:
 
         if matching_schedules:
             playlist_id = matching_schedules[0].playlistId
+            print(f"[204-DIAG]   ✔ Winning schedule '{matching_schedules[0].id}' → playlist '{playlist_id}'")
         else:
+            print(f"[204-DIAG]   No matching schedule. Checking direct device playlist fallback...")
             # Fallback: directly assigned playlist
             device_playlist = (
                 db.query(DevicePlaylist)
@@ -117,6 +156,9 @@ class PlayerService:
             )
             if device_playlist:
                 playlist_id = device_playlist.playlistId
+                print(f"[204-DIAG]   ✔ Fallback direct playlist found: '{playlist_id}'")
+            else:
+                print(f"[204-DIAG]   ✗ No direct playlist assigned either. → 204 No Content")
 
         if not playlist_id:
             return None
