@@ -173,9 +173,16 @@ def home():
 
 
 @app.get("/display", response_class=HTMLResponse)
-def display_page():
+def display_page(orientation: str = "LANDSCAPE"):
+    container_class = "rotated-0"
+    if orientation == "PORTRAIT_RIGHT":
+        container_class = "rotated-90"
+    elif orientation == "PORTRAIT_LEFT":
+        container_class = "rotated-270"
+    elif orientation == "UPSIDE_DOWN":
+        container_class = "rotated-180"
 
-    return """
+    return f"""
 <!DOCTYPE html>
 <html>
 
@@ -185,22 +192,52 @@ def display_page():
 
     <style>
 
-        body {
+        body {{
             margin: 0;
             background: black;
             overflow: hidden;
             width: 100vw;
             height: 100vh;
-        }
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }}
 
-        img,
-        video {
+        #playbackContainer {{
             width: 100vw;
             height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: black;
+        }}
+
+        .rotated-90 {{
+            transform: rotate(90deg);
+            width: 100vh !important;
+            height: 100vw !important;
+        }}
+
+        .rotated-180 {{
+            transform: rotate(180deg);
+            width: 100vw !important;
+            height: 100vh !important;
+        }}
+
+        .rotated-270 {{
+            transform: rotate(270deg);
+            width: 100vh !important;
+            height: 100vw !important;
+        }}
+
+        img,
+        video {{
+            width: 100%;
+            height: 100%;
             object-fit: contain;
             display: none;
             background: black;
-        }
+        }}
 
     </style>
 
@@ -208,14 +245,16 @@ def display_page():
 
 <body>
 
-    <img id="imagePlayer">
+    <div id="playbackContainer" class="{container_class}">
+        <img id="imagePlayer">
 
-    <video
-        id="videoPlayer"
-        autoplay
-        muted
-        playsinline>
-    </video>
+        <video
+            id="videoPlayer"
+            autoplay
+            muted
+            playsinline>
+        </video>
+    </div>
 
     <script>
 
@@ -223,9 +262,9 @@ def display_page():
         let currentIndex = 0;
         let imageTimer = null;
 
-        async function loadAds() {
+        async function loadAds() {{
 
-            try {
+            try {{
 
                 const response =
                     await fetch("/ads");
@@ -237,25 +276,25 @@ def display_page():
 
                 if (
                     currentIndex >= ads.length
-                ) {
+                ) {{
                     currentIndex = 0;
-                }
+                }}
 
-            } catch (error) {
+            }} catch (error) {{
 
                 console.error(
                     "Error loading ads:",
                     error
                 );
 
-            }
-        }
+            }}
+        }}
 
-        function playNext() {
+        function playNext() {{
 
-            if (ads.length === 0) {
+            if (ads.length === 0) {{
                 return;
-            }
+            }}
 
             const item =
                 ads[currentIndex];
@@ -277,9 +316,9 @@ def display_page():
             image.style.display = "none";
             video.style.display = "none";
 
-            if (imageTimer) {
+            if (imageTimer) {{
                 clearTimeout(imageTimer);
-            }
+            }}
 
             const mediaUrl =
                 item.url +
@@ -288,7 +327,7 @@ def display_page():
 
             if (
                 item.type === "image"
-            ) {
+            ) {{
 
                 image.src =
                     mediaUrl;
@@ -302,10 +341,10 @@ def display_page():
                         item.duration || 10000
                     );
 
-            }
+            }}
             else if (
                 item.type === "video"
-            ) {
+            ) {{
 
                 video.src =
                     mediaUrl;
@@ -316,13 +355,13 @@ def display_page():
                 video.load();
 
                 video.play()
-                    .catch(error => {
+                    .catch(error => {{
                         console.error(error);
                         playNext();
-                    });
+                    }});
 
-            }
-        }
+            }}
+        }}
 
         document
             .getElementById(
@@ -333,21 +372,21 @@ def display_page():
                 playNext
             );
 
-        async function start() {
+        async function start() {{
 
             await loadAds();
 
             if (
                 ads.length > 0
-            ) {
+            ) {{
                 playNext();
-            }
+            }}
 
             setInterval(
                 loadAds,
                 30000
             );
-        }
+        }}
 
         start();
 

@@ -167,4 +167,5 @@ class PlayerService:
             playlistVersion=playlist.updatedAt,
             updatedAt=playlist.updatedAt,
             items=response_items,
+            deviceOrientation=device.orientation,
         )

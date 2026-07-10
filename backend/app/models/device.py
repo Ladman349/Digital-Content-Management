@@ -1,5 +1,12 @@
+from enum import Enum
 from sqlalchemy import Column, String, BigInteger, Integer, Float
 from app.database.base import Base
+
+class DeviceOrientation(str, Enum):
+    LANDSCAPE = "LANDSCAPE"
+    PORTRAIT_RIGHT = "PORTRAIT_RIGHT"
+    PORTRAIT_LEFT = "PORTRAIT_LEFT"
+    UPSIDE_DOWN = "UPSIDE_DOWN"
 
 class Device(Base):
     __tablename__ = "devices"
@@ -28,3 +35,5 @@ class Device(Base):
     firmwareVersion = Column(String, nullable=True)
     deviceToken = Column(String, nullable=True)
     androidId = Column(String, nullable=True)
+
+    orientation = Column(String, nullable=False, default=DeviceOrientation.LANDSCAPE.value)

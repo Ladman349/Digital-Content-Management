@@ -20,6 +20,7 @@ class DeviceBase(BaseModel):
     storageTotal: Optional[float] = None
     uptimeSeconds: Optional[int] = None
     firmwareVersion: Optional[str] = None
+    orientation: Optional[str] = "LANDSCAPE"
 
 class DeviceCreate(DeviceBase):
     id: str
@@ -33,6 +34,7 @@ class DeviceUpdate(BaseModel):
     lastSeenMs: Optional[int] = None
     ipAddress: Optional[str] = None
     storage: Optional[str] = None
+    orientation: Optional[str] = None
 
 class DeviceResponse(DeviceBase):
     id: str

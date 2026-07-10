@@ -1,6 +1,6 @@
-export type { Device, DeviceStatus } from "../../types/device";
+export type { Device, DeviceStatus, DeviceOrientation } from "../../types/device";
 
-import type { DeviceStatus } from "../../types/device";
+import type { DeviceStatus, DeviceOrientation } from "../../types/device";
 
 export interface DeviceFormValues {
   id: string;
@@ -8,6 +8,7 @@ export interface DeviceFormValues {
   location: string;
   status: DeviceStatus;
   resolution: string;
+  orientation?: DeviceOrientation;
 }
 
 export type StatusFilter = "All" | DeviceStatus;

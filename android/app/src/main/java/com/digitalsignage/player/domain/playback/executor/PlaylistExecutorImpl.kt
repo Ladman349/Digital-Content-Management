@@ -44,6 +44,12 @@ class PlaylistExecutorImpl @Inject constructor(
             "Execute playlist id=${playlist.playlistId} version=${playlist.version}"
         )
         
+        if (playlist.items.isEmpty()) {
+            logger.i("PlaylistExecutor", "Playlist is empty. Stopping playback immediately.")
+            stop()
+            return
+        }
+        
         scope.launch {
             playbackController.initialize()
             
@@ -74,6 +80,8 @@ class PlaylistExecutorImpl @Inject constructor(
             var currentIndex = 0
             while (isActive) {
                 if (playlist.items.isEmpty()) {
+                    logger.i("PlaylistExecutor", "Playlist items are empty in loop. Stopping controller.")
+                    playbackController.stop()
                     delay(1000)
                     continue
                 }

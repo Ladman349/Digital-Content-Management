@@ -34,3 +34,4 @@ class CurrentPlaylistResponse(BaseModel):
     playlistVersion: int
     updatedAt: int
     items: List[PlaylistItemWithMediaResponse]
+    deviceOrientation: str = "LANDSCAPE"

@@ -12,6 +12,13 @@ import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.DataInputStream
+import java.io.DataOutputStream
+import java.net.DatagramPacket
+import java.net.DatagramSocket
+import java.net.InetAddress
 
 class NetworkTraceInterceptor : okhttp3.Interceptor {
     override fun intercept(chain: okhttp3.Interceptor.Chain): okhttp3.Response {
@@ -29,16 +36,126 @@ class NetworkTraceInterceptor : okhttp3.Interceptor {
 }
 
 object LoggingDns : okhttp3.Dns {
-    override fun lookup(hostname: String): List<java.net.InetAddress> {
+    override fun lookup(hostname: String): List<InetAddress> {
         android.util.Log.i("RegisterTrace", "[DNSTrace] Resolving hostname: $hostname")
         try {
             val addresses = okhttp3.Dns.SYSTEM.lookup(hostname)
             android.util.Log.i("RegisterTrace", "[DNSTrace] Resolved $hostname to: ${addresses.map { it.hostAddress }}")
             return addresses
         } catch (e: Exception) {
-            android.util.Log.e("RegisterTrace", "[DNSTrace] Resolution failed for $hostname", e)
+            android.util.Log.e("RegisterTrace", "[DNSTrace] System resolution failed for $hostname. Trying custom UDP fallbacks...", e)
+            val fallbacks = listOf("8.8.8.8", "1.1.1.1")
+            for (dns in fallbacks) {
+                try {
+                    val resolvedIps = resolveDnsOverUdp(hostname, dns)
+                    if (resolvedIps.isNotEmpty()) {
+                        val addresses = resolvedIps.map { InetAddress.getByName(it) }
+                        android.util.Log.i("RegisterTrace", "[DNSTrace] Custom UDP Resolver ($dns) resolved $hostname to: ${addresses.map { it.hostAddress }}")
+                        return addresses
+                    }
+                } catch (ex: Exception) {
+                    android.util.Log.e("RegisterTrace", "[DNSTrace] Custom UDP Resolver ($dns) failed for $hostname", ex)
+                }
+            }
             throw e
         }
+    }
+
+    private fun resolveDnsOverUdp(domain: String, dnsServerIp: String): List<String> {
+        val ips = mutableListOf<String>()
+        val socket = DatagramSocket()
+        socket.soTimeout = 5000
+        try {
+            val serverAddr = InetAddress.getByName(dnsServerIp)
+            val query = ByteArrayOutputStream()
+            val out = DataOutputStream(query)
+            
+            out.writeShort(0x1234)
+            out.writeShort(0x0100)
+            out.writeShort(0x0001)
+            out.writeShort(0x0000)
+            out.writeShort(0x0000)
+            out.writeShort(0x0000)
+            
+            val parts = domain.split(".")
+            for (part in parts) {
+                val bytes = part.toByteArray(Charsets.UTF_8)
+                out.writeByte(bytes.size)
+                out.write(bytes)
+            }
+            out.writeByte(0x00)
+            
+            out.writeShort(0x0001)
+            out.writeShort(0x0001)
+            
+            val sendData = query.toByteArray()
+            val sendPacket = DatagramPacket(sendData, sendData.size, serverAddr, 53)
+            socket.send(sendPacket)
+            
+            val recvData = ByteArray(1024)
+            val recvPacket = DatagramPacket(recvData, recvData.size)
+            socket.receive(recvPacket)
+            
+            val bin = ByteArrayInputStream(recvData)
+            val din = DataInputStream(bin)
+            
+            val txId = din.readUnsignedShort()
+            val flags = din.readUnsignedShort()
+            val questions = din.readUnsignedShort()
+            val answers = din.readUnsignedShort()
+            val authority = din.readUnsignedShort()
+            val additional = din.readUnsignedShort()
+            
+            for (i in 0 until questions) {
+                var length = din.readUnsignedByte()
+                while (length > 0) {
+                    if ((length and 0xC0) == 0xC0) {
+                        din.readUnsignedByte()
+                        break
+                    }
+                    for (j in 0 until length) {
+                        din.readByte()
+                    }
+                    length = din.readUnsignedByte()
+                }
+                val qtype = din.readUnsignedShort()
+                val qclass = din.readUnsignedShort()
+            }
+            
+            for (i in 0 until answers) {
+                var length = din.readUnsignedByte()
+                while (length > 0) {
+                    if ((length and 0xC0) == 0xC0) {
+                        din.readUnsignedByte()
+                        break
+                    }
+                    for (j in 0 until length) {
+                        din.readByte()
+                    }
+                    length = din.readUnsignedByte()
+                }
+                val type = din.readUnsignedShort()
+                val clazz = din.readUnsignedShort()
+                val ttl = din.readInt()
+                val rdLength = din.readUnsignedShort()
+                
+                if (type == 0x0001 && rdLength == 4) {
+                    val ipBytes = ByteArray(4)
+                    din.readFully(ipBytes)
+                    val ip = InetAddress.getByAddress(ipBytes).hostAddress
+                    if (ip != null) ips.add(ip)
+                } else {
+                    for (j in 0 until rdLength) {
+                        din.readByte()
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            throw e
+        } finally {
+            socket.close()
+        }
+        return ips
     }
 }
 

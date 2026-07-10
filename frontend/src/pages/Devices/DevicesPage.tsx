@@ -137,7 +137,14 @@ export default function DevicesPage() {
 
   const handleEditDevice = useCallback((device: Device) => {
     setFormMode("edit");
-    setFormInitial({ id: device.id, name: device.name, location: device.location, status: device.status, resolution: device.resolution });
+    setFormInitial({
+      id: device.id,
+      name: device.name,
+      location: device.location,
+      status: device.status,
+      resolution: device.resolution,
+      orientation: device.orientation ?? "LANDSCAPE",
+    });
     setFormOpen(true);
   }, []);
 

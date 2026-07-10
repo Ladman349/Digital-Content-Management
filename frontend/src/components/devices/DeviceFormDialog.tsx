@@ -28,6 +28,7 @@ const deviceSchema = z.object({
   location: z.string().min(1, "Location is required").max(64),
   status: z.enum(["Online", "Offline", "Idle"]),
   resolution: z.string().min(1, "Resolution is required"),
+  orientation: z.enum(["LANDSCAPE", "PORTRAIT_RIGHT", "PORTRAIT_LEFT", "UPSIDE_DOWN"]).default("LANDSCAPE"),
 });
 
 const inputSx = {
@@ -51,6 +52,7 @@ const defaultValues: DeviceFormValues = {
   location: "",
   status: "Online",
   resolution: "1920 × 1080",
+  orientation: "LANDSCAPE",
 };
 
 export default function DeviceFormDialog({
@@ -222,6 +224,28 @@ export default function DeviceFormDialog({
               )}
             />
           </Box>
+
+          <Controller
+            name="orientation"
+            control={control}
+            render={({ field }) => (
+              <TextField
+                {...field}
+                select
+                label="Display Orientation"
+                disabled={loading}
+                error={!!errors.orientation}
+                helperText={errors.orientation?.message}
+                fullWidth
+                sx={inputSx}
+              >
+                <MenuItem value="LANDSCAPE">Landscape (0°)</MenuItem>
+                <MenuItem value="PORTRAIT_RIGHT">Portrait Right (90°)</MenuItem>
+                <MenuItem value="UPSIDE_DOWN">Upside Down (180°)</MenuItem>
+                <MenuItem value="PORTRAIT_LEFT">Portrait Left (270°)</MenuItem>
+              </TextField>
+            )}
+          />
         </Box>
       </DialogContent>
 

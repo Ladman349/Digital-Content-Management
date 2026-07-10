@@ -29,10 +29,10 @@ class DownloadManager @Inject constructor(
     private val storageManager: StorageManager,
     private val fileValidator: FileValidator,
     private val eventBus: PlayerEventBus,
-    private val logger: Logger
+    private val logger: Logger,
+    private val client: OkHttpClient
 ) {
     private val scope = CoroutineScope(Dispatchers.IO)
-    private val client = OkHttpClient()
     private val isRunning = java.util.concurrent.atomic.AtomicBoolean(false)
     
     // Future Bandwidth Management Configurations

@@ -1,7 +1,11 @@
 package com.digitalsignage.player.ui
 
+import android.content.Context
 import android.os.Bundle
+import android.os.Environment
 import android.view.KeyEvent
+import java.io.File
+import java.io.FileOutputStream
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -13,8 +17,11 @@ import com.digitalsignage.player.domain.orchestrator.PlayerOrchestrator
 import com.digitalsignage.player.domain.playback.PlaybackController
 import com.digitalsignage.player.player.playback.PlaybackControllerImpl
 import com.digitalsignage.player.data.local.datastore.RuntimeConfigStoreImpl
+import com.digitalsignage.player.data.remote.dto.DeviceOrientation
 import com.digitalsignage.player.presentation.PlaybackViewModel
 import com.digitalsignage.player.presentation.PresentationState
+import android.widget.FrameLayout
+import android.view.Gravity
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -36,10 +43,19 @@ class PlaybackActivity : AppCompatActivity() {
 
     private val viewModel: PlaybackViewModel by viewModels()
 
+    private var currentOrientation: String = DeviceOrientation.LANDSCAPE
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityPlaybackBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        binding.btnCopyDiagnostics.setOnClickListener {
+            copyDiagnosticsToClipboard()
+        }
+        binding.btnSaveDiagnostics.setOnClickListener {
+            saveDiagnosticsToDownloads()
+        }
 
         val exoController = playbackController as? PlaybackControllerImpl
         if (exoController != null) {
@@ -94,14 +110,17 @@ class PlaybackActivity : AppCompatActivity() {
                             binding.tvDebugState.text = "State: ${event.state}"
                             binding.tvDebugCommand.text = "Command: ${event.command}"
                             binding.tvDebugBaseUrl.text = "BASE_URL: ${com.digitalsignage.player.BuildConfig.BASE_URL}"
+                            binding.tvDebugExceptionClass.text = event.exceptionClass
+                            binding.tvDebugExceptionMessage.text = event.exceptionMessage
+                            binding.tvDebugExceptionTrace.text = "Initializing diagnostics framework..."
                             
                             lifecycleScope.launch(Dispatchers.IO) {
-                                val netTelemetry = getNetworkDiagnostics()
-                                withContext(Dispatchers.Main) {
-                                    binding.tvDebugCleartext.text = netTelemetry.trim()
-                                    binding.tvDebugExceptionClass.text = event.exceptionClass
-                                    binding.tvDebugExceptionMessage.text = event.exceptionMessage
-                                    binding.tvDebugExceptionTrace.text = "Cause: ${event.cause}\n\n${event.stackTrace}"
+                                com.digitalsignage.player.core.diagnostics.DiagnosticsFramework.runDiagnostics(this@PlaybackActivity) { report ->
+                                    lastDiagnosticsReport = report
+                                    lifecycleScope.launch(Dispatchers.Main) {
+                                        binding.tvDebugExceptionTrace.text = report
+                                        binding.tvDebugCleartext.text = "Diagnostics run complete."
+                                    }
                                 }
                             }
                         }
@@ -115,6 +134,17 @@ class PlaybackActivity : AppCompatActivity() {
                     else -> {}
                 }
             }
+        }
+
+        lifecycleScope.launch {
+            runtimeConfigStore.deviceOrientation.collect { orientation ->
+                currentOrientation = orientation
+                applyOrientation(orientation)
+            }
+        }
+
+        binding.root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            applyOrientation(currentOrientation)
         }
     }
 
@@ -211,6 +241,40 @@ class PlaybackActivity : AppCompatActivity() {
         return sb.toString()
     }
 
+    private var lastDiagnosticsReport: String = ""
+
+    private fun copyDiagnosticsToClipboard() {
+        if (lastDiagnosticsReport.isEmpty()) return
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        val clip = android.content.ClipData.newPlainText("Diagnostics Report", lastDiagnosticsReport)
+        clipboard.setPrimaryClip(clip)
+        android.widget.Toast.makeText(this, "Diagnostics report copied!", android.widget.Toast.LENGTH_SHORT).show()
+    }
+
+    private fun saveDiagnosticsToDownloads() {
+        if (lastDiagnosticsReport.isEmpty()) return
+        try {
+            val fileName = "diagnostics_report_${System.currentTimeMillis()}.txt"
+            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            var file = File(downloadsDir, fileName)
+            
+            if (!downloadsDir.exists() || !downloadsDir.canWrite()) {
+                val sandboxDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+                if (sandboxDir != null) {
+                    file = File(sandboxDir, fileName)
+                }
+            }
+            
+            FileOutputStream(file).use { fos ->
+                fos.write(lastDiagnosticsReport.toByteArray())
+            }
+            android.widget.Toast.makeText(this, "Report saved: ${file.name}", android.widget.Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            android.util.Log.e("RegisterTrace", "Failed to save diagnostics file", e)
+            android.widget.Toast.makeText(this, "Save failed: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+
     private fun renderState(state: PresentationState) {
         android.util.Log.i("PlaybackActivity", "UI rendering state: ${state::class.java.simpleName}")
         when (state) {
@@ -249,6 +313,38 @@ class PlaybackActivity : AppCompatActivity() {
                 
                 binding.playerView.visibility = android.view.View.VISIBLE
             }
+        }
+    }
+
+    private fun applyOrientation(orientation: String) {
+        val rotationDegrees = when (orientation) {
+            DeviceOrientation.LANDSCAPE -> 0f
+            DeviceOrientation.PORTRAIT_RIGHT -> 90f
+            DeviceOrientation.PORTRAIT_LEFT -> 270f
+            DeviceOrientation.UPSIDE_DOWN -> 180f
+            else -> 0f
+        }
+
+        android.util.Log.i("PlaybackOrientation", "Applied rotation=${rotationDegrees.toInt()}°")
+
+        val playbackRoot = binding.playbackRootContainer
+        playbackRoot.rotation = rotationDegrees
+
+        val containerWidth = binding.root.width
+        val containerHeight = binding.root.height
+
+        if (containerWidth == 0 || containerHeight == 0) return
+
+        val isRotated = rotationDegrees == 90f || rotationDegrees == 270f
+        val desiredWidth = if (isRotated) containerHeight else containerWidth
+        val desiredHeight = if (isRotated) containerWidth else containerHeight
+
+        val lp = playbackRoot.layoutParams as FrameLayout.LayoutParams
+        if (lp.width != desiredWidth || lp.height != desiredHeight) {
+            lp.width = desiredWidth
+            lp.height = desiredHeight
+            lp.gravity = Gravity.CENTER
+            playbackRoot.layoutParams = lp
         }
     }
 }

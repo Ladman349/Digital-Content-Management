@@ -2,13 +2,21 @@ package com.digitalsignage.player.data.remote.dto
 
 import com.squareup.moshi.Json
 
+object DeviceOrientation {
+    const val LANDSCAPE = "LANDSCAPE"
+    const val PORTRAIT_RIGHT = "PORTRAIT_RIGHT"
+    const val PORTRAIT_LEFT = "PORTRAIT_LEFT"
+    const val UPSIDE_DOWN = "UPSIDE_DOWN"
+}
+
 @com.squareup.moshi.JsonClass(generateAdapter = true)
 data class PlaylistSyncResponse(
     @Json(name = "playlistId") val playlistId: String,
     @Json(name = "playlistName") val playlistName: String,
     @Json(name = "playlistVersion") val version: Long,
     @Json(name = "updatedAt") val updatedAt: Long,
-    @Json(name = "items") val items: List<PlaylistItemWithMediaResponse>
+    @Json(name = "items") val items: List<PlaylistItemWithMediaResponse>,
+    @Json(name = "deviceOrientation") val deviceOrientation: String? = DeviceOrientation.LANDSCAPE
 )
 
 @com.squareup.moshi.JsonClass(generateAdapter = true)
