@@ -1,4 +1,5 @@
 export type DeviceStatus = "Online" | "Offline" | "Idle";
+export type DeviceOrientation = "LANDSCAPE" | "PORTRAIT_RIGHT" | "PORTRAIT_LEFT" | "UPSIDE_DOWN";
 
 export interface Device {
   id: string;
@@ -13,4 +14,5 @@ export interface Device {
   currentMediaId?: string | null;
   ipAddress?: string;
   storage?: string;
+  orientation?: DeviceOrientation;
 }

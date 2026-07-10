@@ -104,6 +104,10 @@ class PlaylistRepositoryImpl @Inject constructor(
                     val syncData = adapter.fromJson(rawJson)
                     
                     if (syncData != null) {
+                        val orientation = syncData.deviceOrientation ?: com.digitalsignage.player.data.remote.dto.DeviceOrientation.LANDSCAPE
+                        android.util.Log.i("OrientationSync", "Received orientation=$orientation")
+                        configStore.saveDeviceOrientation(orientation)
+                        
                         android.util.Log.i("PlaylistTrace", "Received playlist version=${syncData.version}, items=${syncData.items.map { it.media.mediaId }}")
                         eventBus.publish(PlayerEvent.DebugStage("3. Parsed Playlist object:\n$syncData"))
                         eventBus.publish(PlayerEvent.DebugStage("3a. Parsed Class: ${syncData::class.java.name}"))

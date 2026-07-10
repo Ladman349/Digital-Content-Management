@@ -582,6 +582,13 @@ export default function DeviceTable({
                       <Typography sx={{ fontSize: 14, fontWeight: 500, color: "#374151" }}>
                         {device.resolution}
                       </Typography>
+                      {device.orientation && device.orientation !== "LANDSCAPE" && (
+                        <Typography sx={{ color: "#64748B", fontSize: 12, mt: 0.5 }}>
+                          {device.orientation === "PORTRAIT_RIGHT" && "Portrait Right"}
+                          {device.orientation === "PORTRAIT_LEFT" && "Portrait Left"}
+                          {device.orientation === "UPSIDE_DOWN" && "Upside Down"}
+                        </Typography>
+                      )}
                     </TableCell>
 
                     <TableCell sx={{ py: 2 }}>

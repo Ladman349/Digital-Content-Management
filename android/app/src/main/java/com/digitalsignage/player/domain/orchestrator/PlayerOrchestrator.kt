@@ -236,6 +236,11 @@ class PlayerOrchestratorImpl @Inject constructor(
                     } else {
                         android.util.Log.i("PlaylistTrace", "Orchestrator ignored emit because state is ${stateMachine.currentState.value.name}")
                     }
+                } else {
+                    android.util.Log.i("PlaylistTrace", "ORCHESTRATOR RECEIVED NULL PLAYLIST. Stopping execution.")
+                    if (stateMachine.currentState.value == PlayerState.PLAYING) {
+                        playlistExecutor.stop()
+                    }
                 }
             }
         }

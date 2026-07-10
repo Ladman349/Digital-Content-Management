@@ -8,6 +8,8 @@ import com.digitalsignage.player.core.config.RuntimeConfigStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.first
+import com.digitalsignage.player.data.remote.dto.DeviceOrientation
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -28,9 +30,11 @@ class RuntimeConfigStoreImpl @Inject constructor(
         val DEPLOYMENT_MODE = stringPreferencesKey("deployment_mode")
         val MAINTENANCE_PIN_HASH = stringPreferencesKey("maintenance_pin_hash")
         val MAINTENANCE_TIMEOUT = longPreferencesKey("maintenance_timeout")
+        val DEVICE_ORIENTATION = stringPreferencesKey("device_orientation")
     }
 
     override val deviceToken: Flow<String?> = context.dataStore.data.map { prefs -> prefs[DEVICE_TOKEN] }
+    val deviceOrientation: Flow<String> = context.dataStore.data.map { prefs -> prefs[DEVICE_ORIENTATION] ?: DeviceOrientation.LANDSCAPE }
     val deviceId: Flow<String?> = context.dataStore.data.map { prefs -> prefs[DEVICE_ID] }
     val installationId: Flow<String?> = context.dataStore.data.map { prefs -> prefs[INSTALLATION_ID] }
     val deploymentMode: Flow<String?> = context.dataStore.data.map { prefs -> prefs[DEPLOYMENT_MODE] }
@@ -70,6 +74,21 @@ class RuntimeConfigStoreImpl @Inject constructor(
     suspend fun savePlaylistETag(etag: String) {
         context.dataStore.edit { prefs ->
             prefs[PLAYLIST_ETAG] = etag
+        }
+    }
+
+    suspend fun saveDeviceOrientation(orientation: String) {
+        try {
+            val current = context.dataStore.data.map { it[DEVICE_ORIENTATION] }.first()
+            if (current != orientation) {
+                context.dataStore.edit { prefs ->
+                    prefs[DEVICE_ORIENTATION] = orientation
+                }
+            }
+        } catch (e: Exception) {
+            context.dataStore.edit { prefs ->
+                prefs[DEVICE_ORIENTATION] = orientation
+            }
         }
     }
     

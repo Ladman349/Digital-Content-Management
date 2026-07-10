@@ -5,20 +5,57 @@
     android:layout_height="match_parent"
     android:background="@color/black">
 
-    <androidx.media3.ui.PlayerView
-        android:id="@+id/playerView"
+    <FrameLayout
+        android:id="@+id/playbackRootContainer"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:visibility="gone"
-        app:use_controller="false"
-        app:resize_mode="fit" />
+        android:layout_gravity="center">
 
-    <ImageView
-        android:id="@+id/imageView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:scaleType="fitCenter"
-        android:visibility="gone" />
+        <androidx.media3.ui.PlayerView
+            android:id="@+id/playerView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone"
+            app:use_controller="false"
+            app:resize_mode="fit" />
+
+        <ImageView
+            android:id="@+id/imageView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitCenter"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/idleView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tvIdleTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="No Content Assigned"
+                android:textColor="@color/white"
+                android:textSize="36sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="12dp" />
+
+            <TextView
+                android:id="@+id/tvIdleSubtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Waiting for playlist..."
+                android:textColor="#80FFFFFF"
+                android:textSize="20sp" />
+
+        </LinearLayout>
+
+    </FrameLayout>
 
     <ProgressBar
         android:id="@+id/loadingIndicator"
@@ -28,35 +65,6 @@
         android:indeterminate="true"
         android:theme="@style/Widget.AppCompat.ProgressBar"
         android:visibility="visible" />
-
-    <LinearLayout
-        android:id="@+id/idleView"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:gravity="center"
-        android:orientation="vertical"
-        android:visibility="gone">
-
-        <TextView
-            android:id="@+id/tvIdleTitle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="No Content Assigned"
-            android:textColor="@color/white"
-            android:textSize="36sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="12dp" />
-
-        <TextView
-            android:id="@+id/tvIdleSubtitle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Waiting for playlist..."
-            android:textColor="#80FFFFFF"
-            android:textSize="20sp" />
-
-    </LinearLayout>
 
     <!-- Enhanced Debug / Exception Screen -->
     <ScrollView
@@ -75,11 +83,31 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="BUILD TEST - JULY 3 - 13:20"
+                android:text="DIAGNOSTICS &amp; TELEMETRY PANEL"
                 android:textColor="#EF5350"
                 android:textSize="24sp"
                 android:textStyle="bold"
                 android:layout_marginBottom="16dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="16dp">
+                
+                <Button
+                    android:id="@+id/btnCopyDiagnostics"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Copy Report"
+                    android:layout_marginRight="12dp" />
+                    
+                <Button
+                    android:id="@+id/btnSaveDiagnostics"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Save to Downloads" />
+            </LinearLayout>
 
             <TextView android:id="@+id/tvDebugState" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/white" android:textSize="16sp" android:layout_marginBottom="4dp"/>
             <TextView android:id="@+id/tvDebugCommand" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/white" android:textSize="16sp" android:layout_marginBottom="4dp"/>
