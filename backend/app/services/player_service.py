@@ -23,7 +23,7 @@ PRIORITY_ORDER = {
 }
 
 
-def _matches_repeat(repeat: str, now: datetime, start_date_str: str) -> bool:
+def _matches_repeat(repeat: str, now: datetime, start_date_val) -> bool:
     """
     Check if the current datetime matches the schedule's repeat pattern.
 
@@ -37,15 +37,21 @@ def _matches_repeat(repeat: str, now: datetime, start_date_str: str) -> bool:
 
     if repeat in ("Once", "Daily"):
         return True
-    elif repeat == "Weekdays":
+
+    if isinstance(start_date_val, str):
+        start_date = datetime.strptime(start_date_val, "%Y-%m-%d").date()
+    elif isinstance(start_date_val, datetime):
+        start_date = start_date_val.date()
+    else:
+        start_date = start_date_val
+
+    if repeat == "Weekdays":
         return weekday < 5
     elif repeat == "Weekends":
         return weekday >= 5
     elif repeat == "Weekly":
-        start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
         return weekday == start_date.weekday()
     elif repeat == "Monthly":
-        start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
         return now.day == start_date.day
 
     return True
@@ -110,16 +116,21 @@ class PlayerService:
         print(f"[204-DIAG]   Total schedules assigned to device : {len(all_assigned)}")
         for s in all_assigned:
             reasons = []
+            s_start_date_str = s.startDate.isoformat() if hasattr(s.startDate, "isoformat") else str(s.startDate)
+            s_end_date_str = s.endDate.isoformat() if hasattr(s.endDate, "isoformat") else str(s.endDate)
+            s_start_time_str = s.startTime.strftime("%H:%M") if hasattr(s.startTime, "strftime") else str(s.startTime)
+            s_end_time_str = s.endTime.strftime("%H:%M") if hasattr(s.endTime, "strftime") else str(s.endTime)
+
             if s.status != "Active":
                 reasons.append(f"status='{s.status}' (need 'Active')")
-            if s.startDate > current_date:
-                reasons.append(f"startDate={s.startDate} is in the future")
-            if s.endDate < current_date:
-                reasons.append(f"endDate={s.endDate} is in the past")
-            if s.startTime > current_time:
-                reasons.append(f"startTime={s.startTime} > current_time={current_time}")
-            if s.endTime < current_time:
-                reasons.append(f"endTime={s.endTime} < current_time={current_time}")
+            if s_start_date_str > current_date:
+                reasons.append(f"startDate={s_start_date_str} is in the future")
+            if s_end_date_str < current_date:
+                reasons.append(f"endDate={s_end_date_str} is in the past")
+            if s_start_time_str > current_time:
+                reasons.append(f"startTime={s_start_time_str} > current_time={current_time}")
+            if s_end_time_str < current_time:
+                reasons.append(f"endTime={s_end_time_str} < current_time={current_time}")
             if reasons:
                 print(f"[204-DIAG]   ✗ Schedule '{s.id}' REJECTED: {'; '.join(reasons)}")
             else:
