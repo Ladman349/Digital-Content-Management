@@ -67,7 +67,10 @@ class PlaybackControllerImpl @Inject constructor(
                     activeContinuation = null
                     isPlayingActive = false
                     scope.launch {
-                        cont.resume(Unit)
+                        delay(500) // 500ms post-roll transition buffer
+                        if (cont.isActive) {
+                            cont.resume(Unit)
+                        }
                     }
                 }
             }
