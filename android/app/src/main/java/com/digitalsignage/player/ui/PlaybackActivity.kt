@@ -301,6 +301,70 @@ class PlaybackActivity : AppCompatActivity() {
                     crossfade(true)
                     placeholder(android.R.color.black)
                     error(android.R.color.black)
+                    listener(
+                        onSuccess = { _, _ ->
+                            val drawable = binding.imageView.drawable
+                            if (drawable is android.graphics.drawable.BitmapDrawable) {
+                                val bitmap = drawable.bitmap
+                                val decodedWidth = bitmap.width
+                                val decodedHeight = bitmap.height
+                                
+                                // Get original size and dimensions using BitmapFactory
+                                val options = android.graphics.BitmapFactory.Options().apply {
+                                    inJustDecodeBounds = true
+                                }
+                                android.graphics.BitmapFactory.decodeFile(state.file.absolutePath, options)
+                                val originalWidth = options.outWidth
+                                val originalHeight = options.outHeight
+                                val fileSize = state.file.length()
+
+                                // Get EXIF orientation tag using built-in SDK ExifInterface
+                                var exifOrientation = "UNKNOWN"
+                                try {
+                                    val exifInterface = android.media.ExifInterface(state.file.absolutePath)
+                                    val orientationAttr = exifInterface.getAttributeInt(
+                                        android.media.ExifInterface.TAG_ORIENTATION,
+                                        android.media.ExifInterface.ORIENTATION_NORMAL
+                                    )
+                                    exifOrientation = when (orientationAttr) {
+                                        android.media.ExifInterface.ORIENTATION_NORMAL -> "NORMAL (1)"
+                                        android.media.ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> "FLIP_HORIZONTAL (2)"
+                                        android.media.ExifInterface.ORIENTATION_ROTATE_180 -> "ROTATE_180 (3)"
+                                        android.media.ExifInterface.ORIENTATION_FLIP_VERTICAL -> "FLIP_VERTICAL (4)"
+                                        android.media.ExifInterface.ORIENTATION_TRANSPOSE -> "TRANSPOSE (5)"
+                                        android.media.ExifInterface.ORIENTATION_ROTATE_90 -> "ROTATE_90 (6)"
+                                        android.media.ExifInterface.ORIENTATION_TRANSVERSE -> "TRANSVERSE (7)"
+                                        android.media.ExifInterface.ORIENTATION_ROTATE_270 -> "ROTATE_270 (8)"
+                                        else -> "UNKNOWN ($orientationAttr)"
+                                    }
+                                } catch (e: Exception) {
+                                    android.util.Log.e("IMAGE_DIAGNOSTICS", "Failed to read EXIF", e)
+                                }
+
+                                android.util.Log.i(
+                                    "IMAGE_DIAGNOSTICS",
+                                    """
+                                    Image Load Success:
+                                      File Path: ${state.file.absolutePath}
+                                      File Size: $fileSize bytes
+                                      Original Dimensions: ${originalWidth}x${originalHeight}
+                                      Decoded Dimensions: ${decodedWidth}x${decodedHeight}
+                                      EXIF Orientation: $exifOrientation
+                                      Coil Auto-rotation check: ${
+                                          if (exifOrientation != "NORMAL (1)" && (originalWidth != decodedWidth || originalHeight != decodedHeight)) {
+                                              "Coil rotated image (Dimensions swapped/changed based on EXIF)"
+                                          } else {
+                                              "No rotation applied (or standard orientation)"
+                                          }
+                                      }
+                                    """.trimIndent()
+                                )
+                            }
+                        },
+                        onError = { _, result ->
+                            android.util.Log.e("IMAGE_DIAGNOSTICS", "Image load failed for ${state.file.absolutePath}", result.throwable)
+                        }
+                    )
                 }
             }
             is PresentationState.Video -> {
