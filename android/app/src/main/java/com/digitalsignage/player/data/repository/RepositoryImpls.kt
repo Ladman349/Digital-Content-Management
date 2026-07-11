@@ -124,7 +124,22 @@ class PlaylistRepositoryImpl @Inject constructor(
                         eventBus.publish(PlayerEvent.DebugStage("3a. Parsed Class: ${syncData::class.java.name}"))
                         eventBus.publish(PlayerEvent.DebugStage("4. playlist.id = ${syncData.playlistId}"))
                         eventBus.publish(PlayerEvent.DebugStage("5. playlist.mediaItems.size = ${syncData.items.size}"))
-                    
+                        val currentActive = database.playlistDao().getPlaylistByState(PlaylistState.ACTIVE)
+                        val currentPending = database.playlistDao().getPlaylistByState(PlaylistState.PENDING)
+                        
+                        val isAlreadyActive = currentActive != null && 
+                                currentActive.playlistId == syncData.playlistId && 
+                                currentActive.version == syncData.version
+                                
+                        val isAlreadyPending = currentPending != null && 
+                                currentPending.playlistId == syncData.playlistId && 
+                                currentPending.version == syncData.version
+                                
+                        if (isAlreadyActive || isAlreadyPending) {
+                            logger.i("PlaylistRepository", "Playlist version ${syncData.version} is already active/pending in DB. Ignoring sync.")
+                            return Result.Success(false)
+                        }
+
                         logger.i("PlaylistRepository", "New playlist version ${syncData.version} received. Saving as PENDING.")
                         
                         val entity = PlaylistEntity(
