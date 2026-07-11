@@ -17,7 +17,8 @@
             android:layout_height="match_parent"
             android:visibility="gone"
             app:use_controller="false"
-            app:resize_mode="fit" />
+            app:resize_mode="fit"
+            app:surface_type="texture_view" />
 
         <ImageView
             android:id="@+id/imageView"
