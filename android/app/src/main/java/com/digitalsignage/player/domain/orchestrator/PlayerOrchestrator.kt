@@ -230,6 +230,7 @@ class PlayerOrchestratorImpl @Inject constructor(
         applicationScope.launch {
             playlistRepository.observeCurrentPlaylist().collect { playlist ->
                 if (playlist != null) {
+                    android.util.Log.d("PLAYER_FLOW", "Orchestrator observed playlist update: ID=${playlist.playlistId}, version=${playlist.version}, currentState=${stateMachine.currentState.value.name}")
                     android.util.Log.i("PlaylistTrace", "ORCHESTRATOR RECEIVED PLAYLIST version=${playlist.version}")
                     if (stateMachine.currentState.value == PlayerState.PLAYING) {
                         playlistExecutor.execute(playlist)
@@ -237,6 +238,7 @@ class PlayerOrchestratorImpl @Inject constructor(
                         android.util.Log.i("PlaylistTrace", "Orchestrator ignored emit because state is ${stateMachine.currentState.value.name}")
                     }
                 } else {
+                    android.util.Log.d("PLAYER_FLOW", "Orchestrator observed NULL playlist update, currentState=${stateMachine.currentState.value.name}")
                     android.util.Log.i("PlaylistTrace", "ORCHESTRATOR RECEIVED NULL PLAYLIST. Stopping execution.")
                     if (stateMachine.currentState.value == PlayerState.PLAYING) {
                         playlistExecutor.stop()

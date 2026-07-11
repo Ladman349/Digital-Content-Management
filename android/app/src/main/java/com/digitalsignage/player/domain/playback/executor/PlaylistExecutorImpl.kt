@@ -33,8 +33,10 @@ class PlaylistExecutorImpl @Inject constructor(
     override fun execute(playlist: Playlist) {
         android.util.Log.i("PlaylistTrace", "EXECUTE version=${playlist.version}")
         android.util.Log.i("ReadinessTrace", "PlaylistExecutor.execute() called with playlist: ${playlist.playlistId}, version: ${playlist.version}")
+        android.util.Log.d("PLAYER_FLOW", "PlaylistExecutor.execute() called: ID=${playlist.playlistId}, version=${playlist.version}")
         if (playlist.playlistId == currentPlaylistId && playlist.version == currentPlaylistVersion) {
             android.util.Log.i("ReadinessTrace", "PlaylistExecutor: Playlist already active and same version: ${playlist.playlistId}")
+            android.util.Log.d("PLAYER_FLOW", "PlaylistExecutor: Playlist version matches current active. Ignoring execute.")
             return
         }
         
@@ -46,6 +48,7 @@ class PlaylistExecutorImpl @Inject constructor(
         
         if (playlist.items.isEmpty()) {
             logger.i("PlaylistExecutor", "Playlist is empty. Stopping playback immediately.")
+            android.util.Log.d("PLAYER_FLOW", "PlaylistExecutor: Empty playlist, calling stop()")
             stop()
             return
         }
@@ -55,6 +58,7 @@ class PlaylistExecutorImpl @Inject constructor(
             
             if (playbackController.isPlaying()) {
                 logger.i("PlaylistExecutor", "Playback is active. Queueing as pending to finish current item.")
+                android.util.Log.d("PLAYER_FLOW", "PlaylistExecutor: Playback is active. Queueing as pendingPlaylist.")
                 pendingPlaylist = playlist
             } else {
                 currentPlaylistId = playlist.playlistId
@@ -62,6 +66,7 @@ class PlaylistExecutorImpl @Inject constructor(
                 android.util.Log.i("PlaylistTrace", "RESTARTING LOOP for version=${playlist.version}")
                 playbackController.setCurrentPlaylistId(playlist.playlistId)
                 eventBus.publish(PlayerEvent.DebugStage("8. PlaylistExecutor starting loop for playlist ${playlist.playlistId}"))
+                android.util.Log.d("PLAYER_FLOW", "PlaylistExecutor: Playback not active, starting loop now.")
                 startPlaylistLoop(playlist)
             }
         }
@@ -81,6 +86,7 @@ class PlaylistExecutorImpl @Inject constructor(
             while (isActive) {
                 if (playlist.items.isEmpty()) {
                     logger.i("PlaylistExecutor", "Playlist items are empty in loop. Stopping controller.")
+                    android.util.Log.d("PLAYER_FLOW", "PlaylistExecutor loop: Playlist items empty, calling playbackController.stop()")
                     playbackController.stop()
                     delay(1000)
                     continue
@@ -95,11 +101,15 @@ class PlaylistExecutorImpl @Inject constructor(
                 
                 try {
                     android.util.Log.i("PlaybackExecutor", "Conductor: playing item ${item.mediaId} index $currentIndex")
+                    android.util.Log.d("PLAYER_FLOW", "PlaylistExecutor loop: Calling playItem for ${item.mediaId} (Order=${item.order})")
                     playbackController.playItem(item)
+                    android.util.Log.d("PLAYER_FLOW", "PlaylistExecutor loop: playItem returned for ${item.mediaId}")
                     android.util.Log.i("PlaybackExecutor", "Conductor: finished item ${item.mediaId}")
                 } catch (e: CancellationException) {
+                    android.util.Log.d("PLAYER_FLOW", "PlaylistExecutor loop: playItem cancelled/interrupted for ${item.mediaId}")
                     throw e
                 } catch (e: Exception) {
+                    android.util.Log.e("PLAYER_FLOW", "PlaylistExecutor loop: playItem failed for ${item.mediaId}", e)
                     logger.e("PlaylistExecutor", "Error playing media ${item.mediaId}, skipping", e)
                 }
                 
@@ -107,6 +117,7 @@ class PlaylistExecutorImpl @Inject constructor(
                 if (pending != null) {
                     android.util.Log.i("PlaylistTrace", "RESTARTING LOOP for version=${pending.version}")
                     logger.i("PlaylistExecutor", "Applying pending playlist: ${pending.playlistId}, version: ${pending.version}")
+                    android.util.Log.d("PLAYER_FLOW", "PlaylistExecutor loop: Applying pendingPlaylist ID=${pending.playlistId}, version=${pending.version}")
                     pendingPlaylist = null
                     currentPlaylistId = pending.playlistId
                     currentPlaylistVersion = pending.version
@@ -123,6 +134,7 @@ class PlaylistExecutorImpl @Inject constructor(
 
     override fun stop() {
         logger.i("PlaylistExecutor", "Stopping playlist execution.")
+        android.util.Log.d("PLAYER_FLOW", "PlaylistExecutor.stop() called. Cancelling loopJob and calling playbackController.stop()")
         loopJob?.cancel()
         currentPlaylistId = null
         currentPlaylistVersion = null
