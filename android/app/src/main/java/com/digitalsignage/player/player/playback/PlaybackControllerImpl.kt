@@ -208,15 +208,29 @@ class PlaybackControllerImpl @Inject constructor(
                             
                             android.util.Log.d("PLAYER", "Watchdog scheduled for ${watchdogDelay}ms (MediaDuration=${finalDurationMs}ms)")
 
-                            delay(watchdogDelay)
-                            if (continuation.isActive) {
-                                val duration = exoPlayer?.duration ?: 0L
-                                val position = exoPlayer?.currentPosition ?: 0L
-                                android.util.Log.w("PLAYER", "WATCHDOG TRIGGERED: Position=$position, Duration=$duration")
-                                activeContinuation = null
-                                isPlayingActive = false
-                                logger.w("Heartbeat", "Watchdog triggered. Video playback timed out for ${item.mediaId} after ${watchdogDelay}ms")
-                                continuation.resume(Unit)
+                            // Launch a position logging loop every second
+                            val positionLoggingJob = launch {
+                                while (isActive && isPlayingActive) {
+                                    delay(1000)
+                                    val currentPos = exoPlayer?.currentPosition ?: 0L
+                                    val totalDur = exoPlayer?.duration ?: 0L
+                                    android.util.Log.d("PLAYER", "PLAYING: MediaID=${item.mediaId}, Position=$currentPos ms, Duration=$totalDur ms")
+                                }
+                            }
+
+                            try {
+                                delay(watchdogDelay)
+                                if (continuation.isActive) {
+                                    val duration = exoPlayer?.duration ?: 0L
+                                    val position = exoPlayer?.currentPosition ?: 0L
+                                    android.util.Log.w("PLAYER", "WATCHDOG TRIGGERED: Position=$position, Duration=$duration")
+                                    activeContinuation = null
+                                    isPlayingActive = false
+                                    logger.w("Heartbeat", "Watchdog triggered. Video playback timed out for ${item.mediaId} after ${watchdogDelay}ms")
+                                    continuation.resume(Unit)
+                                }
+                            } finally {
+                                positionLoggingJob.cancel()
                             }
                         }
                     }
