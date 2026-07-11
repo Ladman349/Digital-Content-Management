@@ -62,8 +62,6 @@ class PlayerOrchestratorImpl @Inject constructor(
 
     private val syncMutex = Mutex()
     private var pollingJob: Job? = null
-    private var lastPlaylistId: String? = null
-    private var lastPlaylistVersion: Long? = null
 
     override fun initialize() {
         android.util.Log.i("InvestigateReg", "2. PlayerOrchestrator.initialize() entered")
@@ -231,37 +229,11 @@ class PlayerOrchestratorImpl @Inject constructor(
     private fun observePlaylistChanges() {
         applicationScope.launch {
             playlistRepository.observeCurrentPlaylist().collect { playlist ->
-                val oldId = lastPlaylistId
-                val oldVersion = lastPlaylistVersion
-                val newId = playlist?.playlistId
-                val newVersion = playlist?.version
-                
-                android.util.Log.i(
-                    "PLAYER_FLOW",
-                    """
-                    Playlist update:
-                      oldId=$oldId
-                      newId=$newId
-                      oldVersion=$oldVersion
-                      newVersion=$newVersion
-                      changed=${oldVersion != newVersion || oldId != newId}
-                    """.trimIndent()
-                )
-                
-                lastPlaylistId = newId
-                lastPlaylistVersion = newVersion
-
                 if (playlist != null) {
-                    android.util.Log.d("PLAYER_FLOW", "Orchestrator observed playlist update: ID=${playlist.playlistId}, version=${playlist.version}, currentState=${stateMachine.currentState.value.name}")
-                    android.util.Log.i("PlaylistTrace", "ORCHESTRATOR RECEIVED PLAYLIST version=${playlist.version}")
                     if (stateMachine.currentState.value == PlayerState.PLAYING) {
                         playlistExecutor.execute(playlist)
-                    } else {
-                        android.util.Log.i("PlaylistTrace", "Orchestrator ignored emit because state is ${stateMachine.currentState.value.name}")
                     }
                 } else {
-                    android.util.Log.d("PLAYER_FLOW", "Orchestrator observed NULL playlist update, currentState=${stateMachine.currentState.value.name}")
-                    android.util.Log.i("PlaylistTrace", "ORCHESTRATOR RECEIVED NULL PLAYLIST. Stopping execution.")
                     if (stateMachine.currentState.value == PlayerState.PLAYING) {
                         playlistExecutor.stop()
                     }

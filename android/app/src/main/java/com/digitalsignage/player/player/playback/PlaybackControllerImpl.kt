@@ -52,43 +52,22 @@ class PlaybackControllerImpl @Inject constructor(
 
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
-            val stateStr = when(playbackState) {
-                Player.STATE_IDLE -> "STATE_IDLE"
-                Player.STATE_BUFFERING -> "STATE_BUFFERING"
-                Player.STATE_READY -> "STATE_READY"
-                Player.STATE_ENDED -> "STATE_ENDED"
-                else -> "UNKNOWN"
-            }
-            android.util.Log.i("PlaybackController", "ExoPlayer state: $stateStr")
-            
-            if (playbackState == Player.STATE_READY) {
-                val duration = exoPlayer?.duration ?: 0L
-                val position = exoPlayer?.currentPosition ?: 0L
-                val width = exoPlayer?.videoSize?.width ?: 0
-                val height = exoPlayer?.videoSize?.height ?: 0
-                android.util.Log.d("PLAYER", "STATE_READY: Position=$position, Duration=$duration, Size=${width}x${height}")
-            }
-            
             if (playbackState == Player.STATE_ENDED) {
-                val duration = exoPlayer?.duration ?: 0L
-                val position = exoPlayer?.currentPosition ?: 0L
-                android.util.Log.d("PLAYER", "STATE_ENDED: Position=$position, Duration=$duration")
-                
                 val cont = activeContinuation
                 if (cont != null && cont.isActive) {
                     activeContinuation = null
                     isPlayingActive = false
+                    val endTime = System.currentTimeMillis()
+                    logger.i("Heartbeat", "Playback completed (Video): $currentMediaId ($endTime)")
                     scope.launch {
-                        if (cont.isActive) {
-                            cont.resume(Unit)
-                        }
+                        cont.resume(Unit)
                     }
                 }
             }
         }
 
         override fun onPlayerError(error: PlaybackException) {
-            android.util.Log.e("PlaybackController", "ExoPlayer error occurred", error)
+            logger.e("PlaybackController", "ExoPlayer error occurred", error)
             val cont = activeContinuation
             if (cont != null && cont.isActive) {
                 activeContinuation = null
@@ -114,27 +93,19 @@ class PlaybackControllerImpl @Inject constructor(
         exoPlayer = ExoPlayer.Builder(context)
             .setLoadControl(loadControl)
             .build().apply {
-            setWakeMode(C.WAKE_MODE_LOCAL)
-            addListener(playerListener)
-        }
+                setWakeMode(C.WAKE_MODE_LOCAL)
+                addListener(playerListener)
+            }
         eventBus.publish(PlayerEvent.EngineInitialized)
     }
 
     override suspend fun playItem(item: MediaItem) {
-        val callerStack = Thread.currentThread().stackTrace
-            .drop(2)
-            .take(5)
-            .joinToString("\n") { "    at ${it.className}.${it.methodName}(${it.fileName}:${it.lineNumber})" }
-        android.util.Log.d("PLAYER", "playItem called for ${item.mediaId} (Duration=${item.durationMs}ms):\n$callerStack")
-        
         isPlayingActive = true
         currentMediaId = item.mediaId
         playbackStateStore.updateState(PresentationState.Loading)
 
         val startTime = System.currentTimeMillis()
-        scope.launch {
-            logger.i("Heartbeat", "Playback started: ${item.mediaId} ($startTime)")
-        }
+        logger.i("Heartbeat", "Playback started: ${item.mediaId} ($startTime)")
 
         currentRenderer?.stop()
         
@@ -156,14 +127,6 @@ class PlaybackControllerImpl @Inject constructor(
         currentRenderer = renderer
 
         try {
-            // Log file details before playback starts
-            val fileSize = file.length()
-            val exists = file.exists()
-            android.util.Log.i(
-                "PLAYER",
-                "PRE-PLAY: MediaID=${item.mediaId}, PlaylistID=$currentPlaylistId, Path=${file.absolutePath}, Exists=$exists, Size=$fileSize bytes, ExpectedDuration=${item.durationMs}ms, ExpectedSHA256=${item.sha256Hash}"
-            )
-
             suspendCancellableCoroutine<Unit> { continuation ->
                 activeContinuation = continuation
                 
@@ -206,31 +169,12 @@ class PlaybackControllerImpl @Inject constructor(
                             // Allow a safe 20 seconds of buffer over the actual duration for slow devices or buffering
                             val watchdogDelay = finalDurationMs + 20000L
                             
-                            android.util.Log.d("PLAYER", "Watchdog scheduled for ${watchdogDelay}ms (MediaDuration=${finalDurationMs}ms)")
-
-                            // Launch a position logging loop every second
-                            val positionLoggingJob = launch {
-                                while (isActive && isPlayingActive) {
-                                    delay(1000)
-                                    val currentPos = exoPlayer?.currentPosition ?: 0L
-                                    val totalDur = exoPlayer?.duration ?: 0L
-                                    android.util.Log.d("PLAYER", "PLAYING: MediaID=${item.mediaId}, Position=$currentPos ms, Duration=$totalDur ms")
-                                }
-                            }
-
-                            try {
-                                delay(watchdogDelay)
-                                if (continuation.isActive) {
-                                    val duration = exoPlayer?.duration ?: 0L
-                                    val position = exoPlayer?.currentPosition ?: 0L
-                                    android.util.Log.w("PLAYER", "WATCHDOG TRIGGERED: Position=$position, Duration=$duration")
-                                    activeContinuation = null
-                                    isPlayingActive = false
-                                    logger.w("Heartbeat", "Watchdog triggered. Video playback timed out for ${item.mediaId} after ${watchdogDelay}ms")
-                                    continuation.resume(Unit)
-                                }
-                            } finally {
-                                positionLoggingJob.cancel()
+                            delay(watchdogDelay)
+                            if (continuation.isActive) {
+                                activeContinuation = null
+                                isPlayingActive = false
+                                logger.w("Heartbeat", "Watchdog triggered. Video playback timed out for ${item.mediaId} after ${watchdogDelay}ms")
+                                continuation.resume(Unit)
                             }
                         }
                     }
@@ -240,13 +184,6 @@ class PlaybackControllerImpl @Inject constructor(
                 }
             }
         } finally {
-            val job = kotlin.coroutines.coroutineContext[Job]
-            val isCancelled = job?.isCancelled == true
-            val activeState = job?.isActive == true
-            android.util.Log.i(
-                "PLAYER_FLOW",
-                "playItem() exiting. isActive=$activeState, isCancelled=$isCancelled"
-            )
             withContext(NonCancellable) {
                 stop()
             }
@@ -265,14 +202,6 @@ class PlaybackControllerImpl @Inject constructor(
 
     override suspend fun stop() {
         withContext(Dispatchers.Main.immediate) {
-            val duration = exoPlayer?.duration ?: 0L
-            val position = exoPlayer?.currentPosition ?: 0L
-            val callerStack = Thread.currentThread().stackTrace
-                .drop(2)
-                .take(5)
-                .joinToString("\n") { "    at ${it.className}.${it.methodName}(${it.fileName}:${it.lineNumber})" }
-            android.util.Log.d("PLAYER", "STOP called: Position=$position, Duration=$duration\n$callerStack")
-            
             currentRenderer?.stop()
             currentRenderer = null
             isPlayingActive = false
