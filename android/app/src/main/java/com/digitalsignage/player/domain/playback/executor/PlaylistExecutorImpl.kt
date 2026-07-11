@@ -31,6 +31,7 @@ class PlaylistExecutorImpl @Inject constructor(
     private var loopJob: Job? = null
 
     override fun execute(playlist: Playlist) {
+        com.digitalsignage.player.core.performance.PerformanceMonitor.onPlaylistSelected()
         if (playlist.playlistId == currentPlaylistId && playlist.version == currentPlaylistVersion) {
             return
         }

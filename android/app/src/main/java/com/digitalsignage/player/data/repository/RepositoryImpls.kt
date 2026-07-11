@@ -43,6 +43,7 @@ class PlaylistRepositoryImpl @Inject constructor(
     }
 
     private suspend fun syncPlaylistInternal(): Result<Boolean> {
+        com.digitalsignage.player.core.performance.PerformanceMonitor.onNetworkSyncTriggered()
         android.util.Log.i("SyncTrace", "Entered syncPlaylistInternal()")
         android.util.Log.i("StartupTrace", "Trace: PlaylistRepositoryImpl.syncPlaylist() started")
         return try {
@@ -178,6 +179,7 @@ class PlaylistRepositoryImpl @Inject constructor(
                         }
                         
                         // Metadata update only in transaction
+                        com.digitalsignage.player.core.performance.PerformanceMonitor.onDbWriteTriggered()
                         database.playlistDao().insertPendingPlaylistTransaction(entity, itemEntities)
                         android.util.Log.i("PlaylistTrace", "Inserted pending playlist")
                         

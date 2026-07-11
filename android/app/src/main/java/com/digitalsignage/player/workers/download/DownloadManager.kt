@@ -197,9 +197,11 @@ class DownloadManager @Inject constructor(
                 outputStream.close()
                 inputStream.close()
                 
+                com.digitalsignage.player.core.performance.PerformanceMonitor.onDbWriteTriggered()
                 database.downloadSessionDao().updateSessionOffset(session.mediaId, totalRead, System.currentTimeMillis())
                 
                 // Validate Size and Hash
+                com.digitalsignage.player.core.performance.PerformanceMonitor.onChecksumTriggered()
                 val isValid = fileValidator.validateFile(
                     file = tempFile,
                     expectedMd5 = session.expectedChecksumMd5,
@@ -209,13 +211,16 @@ class DownloadManager @Inject constructor(
                 
                 if (isValid) {
                     tempFile.renameTo(destFile)
+                    com.digitalsignage.player.core.performance.PerformanceMonitor.onDbWriteTriggered()
                     database.downloadSessionDao().updateSessionState(session.mediaId, DownloadState.COMPLETED, System.currentTimeMillis())
+                    com.digitalsignage.player.core.performance.PerformanceMonitor.onDbWriteTriggered()
                     database.playlistDao().updateMediaDownloadedState(session.mediaId, true, destFile.absolutePath)
                     
                     eventBus.publish(PlayerEvent.DownloadCompleted(session.mediaId))
                     checkPlaylistReadiness()
                 } else {
                     tempFile.delete()
+                    com.digitalsignage.player.core.performance.PerformanceMonitor.onDbWriteTriggered()
                     database.downloadSessionDao().updateSessionOffset(session.mediaId, 0L, System.currentTimeMillis())
                     throw Exception("Checksum or Size validation failed")
                 }
@@ -235,14 +240,18 @@ class DownloadManager @Inject constructor(
     }
     
     private suspend fun checkPlaylistReadiness() {
+        com.digitalsignage.player.core.performance.PerformanceMonitor.onDbReadTriggered()
         val pendingPlaylist = database.playlistDao().getPlaylistByState(PlaylistState.PENDING)
         if (pendingPlaylist != null) {
+            com.digitalsignage.player.core.performance.PerformanceMonitor.onDbReadTriggered()
             val incompleteCount = database.playlistDao().countIncompleteMediaItems(pendingPlaylist.playlistId)
             
             if (incompleteCount == 0) {
                 logger.i("DownloadManager", "All media downloaded. Activating playlist: ${pendingPlaylist.playlistId}")
+                com.digitalsignage.player.core.performance.PerformanceMonitor.onDbWriteTriggered()
                 database.playlistDao().promotePendingToActive(pendingPlaylist.playlistId)
                 
+                com.digitalsignage.player.core.performance.PerformanceMonitor.onDbReadTriggered()
                 val activeItems = database.playlistDao().getMediaItemsForPlaylist(pendingPlaylist.playlistId)
                 storageManager.cleanupOrphans(activeItems.map { it.mediaId })
                 
