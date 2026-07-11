@@ -61,13 +61,22 @@ class PlaybackControllerImpl @Inject constructor(
             }
             android.util.Log.i("PlaybackController", "ExoPlayer state: $stateStr")
             
+            if (playbackState == Player.STATE_READY) {
+                val duration = exoPlayer?.duration ?: 0L
+                val position = exoPlayer?.currentPosition ?: 0L
+                android.util.Log.d("PLAYER", "STATE_READY: Position=$position, Duration=$duration")
+            }
+            
             if (playbackState == Player.STATE_ENDED) {
+                val duration = exoPlayer?.duration ?: 0L
+                val position = exoPlayer?.currentPosition ?: 0L
+                android.util.Log.d("PLAYER", "STATE_ENDED: Position=$position, Duration=$duration")
+                
                 val cont = activeContinuation
                 if (cont != null && cont.isActive) {
                     activeContinuation = null
                     isPlayingActive = false
                     scope.launch {
-                        delay(500) // 500ms post-roll transition buffer
                         if (cont.isActive) {
                             cont.resume(Unit)
                         }
@@ -185,9 +194,14 @@ class PlaybackControllerImpl @Inject constructor(
                     }
                     // Allow a safe 20 seconds of buffer over the actual duration for slow devices or buffering
                     val watchdogDelay = finalDurationMs + 20000L
+                    
+                    android.util.Log.d("PLAYER", "Watchdog scheduled for ${watchdogDelay}ms (MediaDuration=${finalDurationMs}ms)")
 
                     delay(watchdogDelay)
                     if (continuation.isActive) {
+                        val duration = exoPlayer?.duration ?: 0L
+                        val position = exoPlayer?.currentPosition ?: 0L
+                        android.util.Log.w("PLAYER", "WATCHDOG TRIGGERED: Position=$position, Duration=$duration")
                         activeContinuation = null
                         isPlayingActive = false
                         logger.w("Heartbeat", "Watchdog triggered. Video playback timed out for ${item.mediaId} after ${watchdogDelay}ms")
@@ -212,6 +226,10 @@ class PlaybackControllerImpl @Inject constructor(
     }
 
     override fun stop() {
+        val duration = exoPlayer?.duration ?: 0L
+        val position = exoPlayer?.currentPosition ?: 0L
+        android.util.Log.d("PLAYER", "STOP called: Position=$position, Duration=$duration")
+        
         currentRenderer?.stop()
         currentRenderer = null
         isPlayingActive = false
