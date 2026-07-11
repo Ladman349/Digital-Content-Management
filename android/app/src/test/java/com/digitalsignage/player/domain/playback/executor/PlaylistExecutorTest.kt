@@ -37,11 +37,11 @@ class FakePlaybackController : PlaybackController {
         kotlinx.coroutines.delay(100) // Yields and suspends execution to avoid infinite tight loops
     }
 
-    override fun stop() {
+    override suspend fun stop() {
         stopCalled = true
     }
 
-    override fun release() {}
+    override suspend fun release() {}
 
     override fun isPlaying(): Boolean = isPlayingVal
 
@@ -75,7 +75,9 @@ class PlaylistExecutorTest {
 
     @After
     fun tearDown() {
-        executor.stop()
+        kotlinx.coroutines.runBlocking {
+            executor.stop()
+        }
         Dispatchers.resetMain()
     }
 

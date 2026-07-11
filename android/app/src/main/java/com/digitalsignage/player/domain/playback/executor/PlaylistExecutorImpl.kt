@@ -49,7 +49,9 @@ class PlaylistExecutorImpl @Inject constructor(
         if (playlist.items.isEmpty()) {
             logger.i("PlaylistExecutor", "Playlist is empty. Stopping playback immediately.")
             android.util.Log.d("PLAYER_FLOW", "PlaylistExecutor: Empty playlist, calling stop()")
-            stop()
+            scope.launch {
+                stop()
+            }
             return
         }
         
@@ -132,7 +134,7 @@ class PlaylistExecutorImpl @Inject constructor(
         }
     }
 
-    override fun stop() {
+    override suspend fun stop() {
         logger.i("PlaylistExecutor", "Stopping playlist execution.")
         android.util.Log.d("PLAYER_FLOW", "PlaylistExecutor.stop() called. Cancelling loopJob and calling playbackController.stop()")
         loopJob?.cancel()

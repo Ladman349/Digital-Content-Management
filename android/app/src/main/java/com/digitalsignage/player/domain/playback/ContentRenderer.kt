@@ -4,5 +4,5 @@ import java.io.File
 
 interface ContentRenderer {
     fun render(file: File)
-    fun stop()
+    suspend fun stop()
 }

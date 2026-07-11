@@ -9,7 +9,7 @@ class ImageRendererImpl(
     override fun render(file: File) {
         onStateUpdate(file)
     }
-    override fun stop() {
+    override suspend fun stop() {
         // No-op for static images
     }
 }

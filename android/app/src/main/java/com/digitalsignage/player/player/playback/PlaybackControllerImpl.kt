@@ -64,7 +64,9 @@ class PlaybackControllerImpl @Inject constructor(
             if (playbackState == Player.STATE_READY) {
                 val duration = exoPlayer?.duration ?: 0L
                 val position = exoPlayer?.currentPosition ?: 0L
-                android.util.Log.d("PLAYER", "STATE_READY: Position=$position, Duration=$duration")
+                val width = exoPlayer?.videoSize?.width ?: 0
+                val height = exoPlayer?.videoSize?.height ?: 0
+                android.util.Log.d("PLAYER", "STATE_READY: Position=$position, Duration=$duration, Size=${width}x${height}")
             }
             
             if (playbackState == Player.STATE_ENDED) {
@@ -118,14 +120,13 @@ class PlaybackControllerImpl @Inject constructor(
         eventBus.publish(PlayerEvent.EngineInitialized)
     }
 
-    override suspend fun playItem(item: MediaItem) = suspendCancellableCoroutine<Unit> { continuation ->
+    override suspend fun playItem(item: MediaItem) {
         val callerStack = Thread.currentThread().stackTrace
             .drop(2)
             .take(5)
             .joinToString("\n") { "    at ${it.className}.${it.methodName}(${it.fileName}:${it.lineNumber})" }
         android.util.Log.d("PLAYER", "playItem called for ${item.mediaId} (Duration=${item.durationMs}ms):\n$callerStack")
         
-        activeContinuation = continuation
         isPlayingActive = true
         currentMediaId = item.mediaId
         playbackStateStore.updateState(PresentationState.Loading)
@@ -140,8 +141,7 @@ class PlaybackControllerImpl @Inject constructor(
         val file = item.localFilePath?.let { java.io.File(it) }
         if (file == null || !file.exists()) {
             isPlayingActive = false
-            continuation.resumeWithException(Exception("Local file not found at: ${item.localFilePath}"))
-            return@suspendCancellableCoroutine
+            throw Exception("Local file not found at: ${item.localFilePath}")
         }
 
         val renderer = when (item.mediaType) {
@@ -149,75 +149,86 @@ class PlaybackControllerImpl @Inject constructor(
             MediaType.VIDEO -> videoRenderer
             else -> {
                 isPlayingActive = false
-                continuation.resume(Unit)
-                return@suspendCancellableCoroutine
+                return
             }
         }
 
         currentRenderer = renderer
 
-        continuation.invokeOnCancellation {
-            renderer.stop()
-            activeContinuation = null
-            isPlayingActive = false
-        }
-
         try {
-            renderer.render(file)
-            eventBus.publish(PlayerEvent.PlaybackStarted(item.mediaId))
+            // Log file details before playback starts
+            val fileSize = file.length()
+            val exists = file.exists()
+            android.util.Log.i(
+                "PLAYER",
+                "PRE-PLAY: MediaID=${item.mediaId}, PlaylistID=$currentPlaylistId, Path=${file.absolutePath}, Exists=$exists, Size=$fileSize bytes, ExpectedDuration=${item.durationMs}ms, ExpectedSHA256=${item.sha256Hash}"
+            )
 
-            if (item.mediaType == MediaType.IMAGE) {
-                scope.launch {
-                    delay(item.durationMs)
-                    if (continuation.isActive) {
-                        activeContinuation = null
-                        isPlayingActive = false
-                        
-                        val endTime = System.currentTimeMillis()
-                        logger.i("Heartbeat", "Playback completed (Image): ${item.mediaId} ($endTime)")
-                        
-                        continuation.resume(Unit)
-                    }
-                }
-            } else {
-                scope.launch {
-                    // Wait briefly for ExoPlayer to prepare and load duration
-                    var actualDurationMs = 0L
-                    for (i in 1..30) { // check every 100ms for 3 seconds
-                        delay(100)
-                        val duration = exoPlayer?.duration ?: 0L
-                        if (duration > 0 && duration != androidx.media3.common.C.TIME_UNSET) {
-                            actualDurationMs = duration
-                            break
+            suspendCancellableCoroutine<Unit> { continuation ->
+                activeContinuation = continuation
+                
+                try {
+                    renderer.render(file)
+                    eventBus.publish(PlayerEvent.PlaybackStarted(item.mediaId))
+
+                    if (item.mediaType == MediaType.IMAGE) {
+                        scope.launch {
+                            delay(item.durationMs)
+                            if (continuation.isActive) {
+                                activeContinuation = null
+                                isPlayingActive = false
+                                
+                                val endTime = System.currentTimeMillis()
+                                logger.i("Heartbeat", "Playback completed (Image): ${item.mediaId} ($endTime)")
+                                
+                                continuation.resume(Unit)
+                            }
+                        }
+                    } else {
+                        scope.launch {
+                            // Wait briefly for ExoPlayer to prepare and load duration
+                            var actualDurationMs = 0L
+                            for (i in 1..30) { // check every 100ms for 3 seconds
+                                delay(100)
+                                val duration = exoPlayer?.duration ?: 0L
+                                if (duration > 0 && duration != androidx.media3.common.C.TIME_UNSET) {
+                                    actualDurationMs = duration
+                                    break
+                                }
+                            }
+
+                            val finalDurationMs = if (actualDurationMs > 0) {
+                                actualDurationMs
+                            } else {
+                                // Fallback to database duration, but guarantee at least 5 minutes to prevent premature cutoffs
+                                maxOf(item.durationMs, 300000L)
+                            }
+                            // Allow a safe 20 seconds of buffer over the actual duration for slow devices or buffering
+                            val watchdogDelay = finalDurationMs + 20000L
+                            
+                            android.util.Log.d("PLAYER", "Watchdog scheduled for ${watchdogDelay}ms (MediaDuration=${finalDurationMs}ms)")
+
+                            delay(watchdogDelay)
+                            if (continuation.isActive) {
+                                val duration = exoPlayer?.duration ?: 0L
+                                val position = exoPlayer?.currentPosition ?: 0L
+                                android.util.Log.w("PLAYER", "WATCHDOG TRIGGERED: Position=$position, Duration=$duration")
+                                activeContinuation = null
+                                isPlayingActive = false
+                                logger.w("Heartbeat", "Watchdog triggered. Video playback timed out for ${item.mediaId} after ${watchdogDelay}ms")
+                                continuation.resume(Unit)
+                            }
                         }
                     }
-
-                    val finalDurationMs = if (actualDurationMs > 0) {
-                        actualDurationMs
-                    } else {
-                        // Fallback to database duration, but guarantee at least 5 minutes to prevent premature cutoffs
-                        maxOf(item.durationMs, 300000L)
-                    }
-                    // Allow a safe 20 seconds of buffer over the actual duration for slow devices or buffering
-                    val watchdogDelay = finalDurationMs + 20000L
-                    
-                    android.util.Log.d("PLAYER", "Watchdog scheduled for ${watchdogDelay}ms (MediaDuration=${finalDurationMs}ms)")
-
-                    delay(watchdogDelay)
-                    if (continuation.isActive) {
-                        val duration = exoPlayer?.duration ?: 0L
-                        val position = exoPlayer?.currentPosition ?: 0L
-                        android.util.Log.w("PLAYER", "WATCHDOG TRIGGERED: Position=$position, Duration=$duration")
-                        activeContinuation = null
-                        isPlayingActive = false
-                        logger.w("Heartbeat", "Watchdog triggered. Video playback timed out for ${item.mediaId} after ${watchdogDelay}ms")
-                        continuation.resume(Unit)
-                    }
+                } catch (t: Throwable) {
+                    isPlayingActive = false
+                    continuation.resumeWithException(t)
                 }
             }
-        } catch (t: Throwable) {
-            isPlayingActive = false
-            continuation.resumeWithException(t)
+        } finally {
+            withContext(NonCancellable) {
+                stop()
+            }
         }
     }
 
@@ -231,28 +242,31 @@ class PlaybackControllerImpl @Inject constructor(
         this.currentPlaylistId = playlistId
     }
 
-    override fun stop() {
-        val duration = exoPlayer?.duration ?: 0L
-        val position = exoPlayer?.currentPosition ?: 0L
-        val callerStack = Thread.currentThread().stackTrace
-            .drop(2)
-            .take(5)
-            .joinToString("\n") { "    at ${it.className}.${it.methodName}(${it.fileName}:${it.lineNumber})" }
-        android.util.Log.d("PLAYER", "STOP called: Position=$position, Duration=$duration\n$callerStack")
-        
-        currentRenderer?.stop()
-        currentRenderer = null
-        isPlayingActive = false
-        currentMediaId = null
-        activeContinuation?.cancel()
-        activeContinuation = null
-        playbackStateStore.updateState(PresentationState.Idle)
+    override suspend fun stop() {
+        withContext(Dispatchers.Main.immediate) {
+            val duration = exoPlayer?.duration ?: 0L
+            val position = exoPlayer?.currentPosition ?: 0L
+            val callerStack = Thread.currentThread().stackTrace
+                .drop(2)
+                .take(5)
+                .joinToString("\n") { "    at ${it.className}.${it.methodName}(${it.fileName}:${it.lineNumber})" }
+            android.util.Log.d("PLAYER", "STOP called: Position=$position, Duration=$duration\n$callerStack")
+            
+            currentRenderer?.stop()
+            currentRenderer = null
+            isPlayingActive = false
+            currentMediaId = null
+            activeContinuation = null
+            playbackStateStore.updateState(PresentationState.Idle)
+        }
     }
 
-    override fun release() {
-        stop()
-        exoPlayer?.removeListener(playerListener)
-        exoPlayer?.release()
-        exoPlayer = null
+    override suspend fun release() {
+        withContext(Dispatchers.Main.immediate) {
+            stop()
+            exoPlayer?.removeListener(playerListener)
+            exoPlayer?.release()
+            exoPlayer = null
+        }
     }
 }
