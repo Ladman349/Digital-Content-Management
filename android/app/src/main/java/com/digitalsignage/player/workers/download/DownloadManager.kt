@@ -193,18 +193,13 @@ class DownloadManager @Inject constructor(
                         }
                     }
                 }
-                android.util.Log.i("DownloadTrace", "Step: read loop finished")
                 outputStream.flush()
                 outputStream.close()
                 inputStream.close()
                 
                 database.downloadSessionDao().updateSessionOffset(session.mediaId, totalRead, System.currentTimeMillis())
-                android.util.Log.d("DownloadManager", "Bytes downloaded: $totalRead")
                 
                 // Validate Size and Hash
-                val actualSize = tempFile.length()
-                android.util.Log.i("DOWNLOAD", "ExpectedSize=$expectedSize ActualSize=$actualSize")
-                
                 val isValid = fileValidator.validateFile(
                     file = tempFile,
                     expectedMd5 = session.expectedChecksumMd5,
@@ -213,19 +208,15 @@ class DownloadManager @Inject constructor(
                 )
                 
                 if (isValid) {
-                    android.util.Log.d("DownloadManager", "Checksum verified successfully")
                     tempFile.renameTo(destFile)
-                    android.util.Log.d("DownloadManager", "Marking download complete")
                     database.downloadSessionDao().updateSessionState(session.mediaId, DownloadState.COMPLETED, System.currentTimeMillis())
                     database.playlistDao().updateMediaDownloadedState(session.mediaId, true, destFile.absolutePath)
                     
-                    eventBus.publish(PlayerEvent.DebugStage("5a. Download SUCCESS for ${session.url}"))
                     eventBus.publish(PlayerEvent.DownloadCompleted(session.mediaId))
                     checkPlaylistReadiness()
                 } else {
                     tempFile.delete()
                     database.downloadSessionDao().updateSessionOffset(session.mediaId, 0L, System.currentTimeMillis())
-                    eventBus.publish(PlayerEvent.DebugStage("5b. Download FAILED validation for ${session.url}"))
                     throw Exception("Checksum or Size validation failed")
                 }
             } else {
@@ -244,40 +235,19 @@ class DownloadManager @Inject constructor(
     }
     
     private suspend fun checkPlaylistReadiness() {
-        android.util.Log.i("ReadinessTrace", "checkPlaylistReadiness() called")
         val pendingPlaylist = database.playlistDao().getPlaylistByState(PlaylistState.PENDING)
         if (pendingPlaylist != null) {
-            android.util.Log.i("ReadinessTrace", "Found PENDING playlist: ${pendingPlaylist.playlistId}")
             val incompleteCount = database.playlistDao().countIncompleteMediaItems(pendingPlaylist.playlistId)
-            android.util.Log.i("ReadinessTrace", "Incomplete media items count: $incompleteCount")
             
             if (incompleteCount == 0) {
                 logger.i("DownloadManager", "All media downloaded. Activating playlist: ${pendingPlaylist.playlistId}")
-                android.util.Log.i("ReadinessTrace", "Archiving active and activating pending playlist")
                 database.playlistDao().promotePendingToActive(pendingPlaylist.playlistId)
-                android.util.Log.i("PlaylistTrace", "Promoting pending playlist to ACTIVE")
                 
                 val activeItems = database.playlistDao().getMediaItemsForPlaylist(pendingPlaylist.playlistId)
-                android.util.Log.i("ReadinessTrace", "Fetched ${activeItems.size} active media items")
-                
-                // Add debug loop for disk check
-                activeItems.forEach { item ->
-                    val file = item.localFilePath?.let { File(it) } ?: File(storageManager.getMediaDirectory(), item.mediaId)
-                    android.util.Log.i("ReadinessTrace", "Disk check - item: ${item.mediaId}, exists: ${file.exists()}, length: ${file.length()}")
-                }
-                
                 storageManager.cleanupOrphans(activeItems.map { it.mediaId })
-                android.util.Log.i("ReadinessTrace", "Cleaned up orphans")
                 
-                eventBus.publish(PlayerEvent.DebugStage("6. All downloads complete. PlaylistReady emitted!"))
-                android.util.Log.i("ReadinessTrace", "Publishing PlaylistReady")
                 eventBus.publish(PlayerEvent.PlaylistReady)
-            } else {
-                android.util.Log.i("ReadinessTrace", "Condition failed: incompleteCount ($incompleteCount) != 0")
-                eventBus.publish(PlayerEvent.DebugStage("6. Downloads still pending. Incomplete count: $incompleteCount"))
             }
-        } else {
-            android.util.Log.i("ReadinessTrace", "Condition failed: pendingPlaylist is null")
         }
     }
 }
