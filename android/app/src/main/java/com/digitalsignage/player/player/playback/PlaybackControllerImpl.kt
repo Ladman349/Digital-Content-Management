@@ -119,6 +119,12 @@ class PlaybackControllerImpl @Inject constructor(
     }
 
     override suspend fun playItem(item: MediaItem) = suspendCancellableCoroutine<Unit> { continuation ->
+        val callerStack = Thread.currentThread().stackTrace
+            .drop(2)
+            .take(5)
+            .joinToString("\n") { "    at ${it.className}.${it.methodName}(${it.fileName}:${it.lineNumber})" }
+        android.util.Log.d("PLAYER", "playItem called for ${item.mediaId} (Duration=${item.durationMs}ms):\n$callerStack")
+        
         activeContinuation = continuation
         isPlayingActive = true
         currentMediaId = item.mediaId
@@ -228,7 +234,11 @@ class PlaybackControllerImpl @Inject constructor(
     override fun stop() {
         val duration = exoPlayer?.duration ?: 0L
         val position = exoPlayer?.currentPosition ?: 0L
-        android.util.Log.d("PLAYER", "STOP called: Position=$position, Duration=$duration")
+        val callerStack = Thread.currentThread().stackTrace
+            .drop(2)
+            .take(5)
+            .joinToString("\n") { "    at ${it.className}.${it.methodName}(${it.fileName}:${it.lineNumber})" }
+        android.util.Log.d("PLAYER", "STOP called: Position=$position, Duration=$duration\n$callerStack")
         
         currentRenderer?.stop()
         currentRenderer = null
