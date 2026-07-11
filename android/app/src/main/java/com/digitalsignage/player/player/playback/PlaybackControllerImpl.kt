@@ -240,6 +240,13 @@ class PlaybackControllerImpl @Inject constructor(
                 }
             }
         } finally {
+            val job = kotlin.coroutines.coroutineContext[Job]
+            val isCancelled = job?.isCancelled == true
+            val activeState = job?.isActive == true
+            android.util.Log.i(
+                "PLAYER_FLOW",
+                "playItem() exiting. isActive=$activeState, isCancelled=$isCancelled"
+            )
             withContext(NonCancellable) {
                 stop()
             }
