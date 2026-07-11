@@ -30,6 +30,12 @@ interface PlaylistDao {
     
     @Query("UPDATE playlist SET state = 'ACTIVE' WHERE playlistId = :playlistId AND state = 'PENDING'")
     suspend fun activatePendingPlaylist(playlistId: String)
+
+    @Transaction
+    suspend fun promotePendingToActive(playlistId: String) {
+        archiveActivePlaylist()
+        activatePendingPlaylist(playlistId)
+    }
     
     @Query("UPDATE media_item SET isDownloaded = :isDownloaded, localFilePath = :filePath WHERE mediaId = :mediaId")
     suspend fun updateMediaDownloadedState(mediaId: String, isDownloaded: Boolean, filePath: String)

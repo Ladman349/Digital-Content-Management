@@ -201,9 +201,19 @@ class DownloadManager @Inject constructor(
                 database.downloadSessionDao().updateSessionOffset(session.mediaId, totalRead, System.currentTimeMillis())
                 android.util.Log.d("DownloadManager", "Bytes downloaded: $totalRead")
                 
-                // Validate Hash
-                if (true) {
-                    android.util.Log.d("DownloadManager", "Checksum verified")
+                // Validate Size and Hash
+                val actualSize = tempFile.length()
+                android.util.Log.i("DOWNLOAD", "ExpectedSize=$expectedSize ActualSize=$actualSize")
+                
+                val isValid = fileValidator.validateFile(
+                    file = tempFile,
+                    expectedMd5 = session.expectedChecksumMd5,
+                    expectedSha256 = session.expectedChecksumSha256,
+                    expectedSize = if (expectedSize != null && expectedSize > 0L) expectedSize else null
+                )
+                
+                if (isValid) {
+                    android.util.Log.d("DownloadManager", "Checksum verified successfully")
                     tempFile.renameTo(destFile)
                     android.util.Log.d("DownloadManager", "Marking download complete")
                     database.downloadSessionDao().updateSessionState(session.mediaId, DownloadState.COMPLETED, System.currentTimeMillis())
@@ -244,8 +254,7 @@ class DownloadManager @Inject constructor(
             if (incompleteCount == 0) {
                 logger.i("DownloadManager", "All media downloaded. Activating playlist: ${pendingPlaylist.playlistId}")
                 android.util.Log.i("ReadinessTrace", "Archiving active and activating pending playlist")
-                database.playlistDao().archiveActivePlaylist()
-                database.playlistDao().activatePendingPlaylist(pendingPlaylist.playlistId)
+                database.playlistDao().promotePendingToActive(pendingPlaylist.playlistId)
                 android.util.Log.i("PlaylistTrace", "Promoting pending playlist to ACTIVE")
                 
                 val activeItems = database.playlistDao().getMediaItemsForPlaylist(pendingPlaylist.playlistId)

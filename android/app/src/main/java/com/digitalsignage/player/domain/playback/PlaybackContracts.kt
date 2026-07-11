@@ -5,7 +5,7 @@ import com.digitalsignage.player.domain.model.Playlist
 // Orchestration Layer (Domain)
 interface PlaylistExecutor {
     fun execute(playlist: Playlist)
-    fun stop()
+    suspend fun stop()
 }
 
 // Hardware-agnostic Engine Contract (Player layer contract exposed to Domain)
@@ -14,8 +14,8 @@ interface PlaylistExecutor {
 interface PlaybackController {
     fun initialize()
     suspend fun playItem(item: com.digitalsignage.player.domain.model.MediaItem)
-    fun stop()
-    fun release()
+    suspend fun stop()
+    suspend fun release()
     fun isPlaying(): Boolean
     fun getCurrentMediaId(): String?
     fun getCurrentPlaylistId(): String?

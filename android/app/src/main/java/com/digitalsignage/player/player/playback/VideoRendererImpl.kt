@@ -1,5 +1,7 @@
 package com.digitalsignage.player.player.playback
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import android.os.Handler
 import android.os.Looper
 import androidx.media3.common.MediaItem as ExoMediaItem
@@ -36,18 +38,10 @@ class VideoRendererImpl(
         exoPlayer.play()
     }
 
-    override fun stop() {
-        if (Looper.myLooper() == Looper.getMainLooper()) {
-            stopInternal()
-        } else {
-            mainHandler.post {
-                stopInternal()
-            }
+    override suspend fun stop() {
+        withContext(Dispatchers.Main.immediate) {
+            exoPlayer.stop()
+            exoPlayer.clearMediaItems()
         }
-    }
-
-    private fun stopInternal() {
-        exoPlayer.stop()
-        exoPlayer.clearMediaItems()
     }
 }
