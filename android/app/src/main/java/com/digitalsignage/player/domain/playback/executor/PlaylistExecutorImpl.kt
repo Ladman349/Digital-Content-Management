@@ -75,13 +75,14 @@ class PlaylistExecutorImpl @Inject constructor(
     }
 
     private fun startPlaylistLoop(playlist: Playlist) {
+        val callerStack = Thread.currentThread().stackTrace
+            .drop(2)
+            .take(15)
+            .joinToString("\n") { "    at ${it.className}.${it.methodName}(${it.fileName}:${it.lineNumber})" }
         android.util.Log.i(
-            "PlaylistTrace",
-            "START LOOP version=${playlist.version} items=${
-                playlist.items.joinToString { "${it.mediaId}:${it.order}" }
-            }"
+            "CANCEL_SOURCE",
+            "Cancelling loopJob inside startPlaylistLoop for playlistId=${playlist.playlistId}, version=${playlist.version}. Caller stack:\n$callerStack"
         )
-        android.util.Log.i("PlaylistTrace", "Cancelling existing playback loop")
         loopJob?.cancel()
         loopJob = scope.launch {
             var currentIndex = 0
@@ -136,7 +137,14 @@ class PlaylistExecutorImpl @Inject constructor(
 
     override suspend fun stop() {
         logger.i("PlaylistExecutor", "Stopping playlist execution.")
-        android.util.Log.d("PLAYER_FLOW", "PlaylistExecutor.stop() called. Cancelling loopJob and calling playbackController.stop()")
+        val callerStack = Thread.currentThread().stackTrace
+            .drop(2)
+            .take(15)
+            .joinToString("\n") { "    at ${it.className}.${it.methodName}(${it.fileName}:${it.lineNumber})" }
+        android.util.Log.i(
+            "CANCEL_SOURCE",
+            "Cancelling loopJob inside stop() of PlaylistExecutor. Caller stack:\n$callerStack"
+        )
         loopJob?.cancel()
         currentPlaylistId = null
         currentPlaylistVersion = null
