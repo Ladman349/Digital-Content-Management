@@ -3,15 +3,25 @@ package com.digitalsignage.player.core.performance
 import android.content.Context
 import android.util.Log
 import com.digitalsignage.player.BuildConfig
+import kotlinx.coroutines.*
+
+data class TimelineEvent(
+    val timestamp: Long,
+    val type: String,
+    val details: String
+)
 
 object PerformanceMonitor {
     private const val TAG = "PERF_MONITOR"
     
-    // Enable flag
     val isEnabled = BuildConfig.DEBUG
 
-    // Device Signature (logged once)
     private var isDeviceSignatureLogged = false
+
+    // Rolling history variables
+    private val eventHistory = java.util.ArrayDeque<TimelineEvent>()
+    private val lock = Any()
+    private var pollerJob: Job? = null
 
     // State timings
     var playlistSelectedTime = 0L
@@ -52,6 +62,39 @@ object PerformanceMonitor {
     var dbWritesDuringPlayback = 0
     var dbReadsDuringPlayback = 0
 
+    fun recordEvent(type: String, details: String) {
+        if (!isEnabled) return
+        val now = System.currentTimeMillis()
+        synchronized(lock) {
+            eventHistory.addLast(TimelineEvent(now, type, details))
+            while (eventHistory.isNotEmpty() && (now - eventHistory.first.timestamp > 10000L)) {
+                eventHistory.removeFirst()
+            }
+        }
+    }
+
+    fun startPoller(scope: CoroutineScope, getBufferedDuration: () -> Long) {
+        if (!isEnabled) return
+        pollerJob?.cancel()
+        pollerJob = scope.launch(Dispatchers.Default) {
+            while (isActive) {
+                delay(500)
+                if (isPlaybackActive) {
+                    val freeMem = Runtime.getRuntime().freeMemory() / (1024 * 1024)
+                    val totalMem = Runtime.getRuntime().totalMemory() / (1024 * 1024)
+                    val cpuTime = android.os.Process.getElapsedCpuTime()
+                    val bufferedDur = getBufferedDuration()
+                    recordEvent("HEARTBEAT", "JVM Free: ${freeMem}MB/Total: ${totalMem}MB, CPU Process: ${cpuTime}ms, Buffer: ${bufferedDur}ms")
+                }
+            }
+        }
+    }
+
+    fun stopPoller() {
+        pollerJob?.cancel()
+        pollerJob = null
+    }
+
     fun logDeviceSignatureOnce(context: Context) {
         if (!isEnabled || isDeviceSignatureLogged) return
         isDeviceSignatureLogged = true
@@ -90,6 +133,7 @@ object PerformanceMonitor {
     fun onPlaylistSelected() {
         if (!isEnabled) return
         playlistSelectedTime = System.currentTimeMillis()
+        recordEvent("PLAYLIST", "Selected playlist")
         Log.d(TAG, "EVENT: Playlist selected at $playlistSelectedTime ms")
     }
 
@@ -127,27 +171,32 @@ object PerformanceMonitor {
         currentBitrate = 0
 
         isPlaybackActive = true
+        recordEvent("PLAYBACK", "playItem() entered for $filename")
         Log.d(TAG, "EVENT: playItem() entered for $filename at $playItemTime ms")
     }
 
     fun onFileLookupStarted() {
         if (!isEnabled) return
         fileLookupStartTime = System.currentTimeMillis()
+        recordEvent("FILE_IO", "Lookup started")
     }
 
     fun onFileLookupCompleted() {
         if (!isEnabled) return
         fileLookupCompleteTime = System.currentTimeMillis()
+        recordEvent("FILE_IO", "Lookup completed (took ${fileLookupCompleteTime - fileLookupStartTime} ms)")
     }
 
     fun onSetMediaItem() {
         if (!isEnabled) return
         setMediaItemTime = System.currentTimeMillis()
+        recordEvent("RENDERER", "setMediaItem() called")
     }
 
     fun onPrepare() {
         if (!isEnabled) return
         prepareTime = System.currentTimeMillis()
+        recordEvent("RENDERER", "prepare() called")
     }
 
     fun onStateBuffering() {
@@ -157,6 +206,7 @@ object PerformanceMonitor {
             stateBufferingTime = now
         }
         lastBufferingStarted = now
+        recordEvent("STATE_CHANGE", "STATE_BUFFERING")
     }
 
     fun onStateReady() {
@@ -169,17 +219,20 @@ object PerformanceMonitor {
             totalBufferingDuration += (now - lastBufferingStarted)
             lastBufferingStarted = 0L
         }
+        recordEvent("STATE_CHANGE", "STATE_READY")
     }
 
     fun onFirstFrameRendered() {
         if (!isEnabled) return
         firstFrameTime = System.currentTimeMillis()
+        recordEvent("RENDERER", "First video frame rendered")
     }
 
     fun onPositionChanged(pos: Long) {
         if (!isEnabled) return
         if (firstMotionTime == 0L && pos > 0L) {
             firstMotionTime = System.currentTimeMillis()
+            recordEvent("RENDERER", "First motion detected at pos=$pos ms")
             Log.d(TAG, "EVENT: First motion detected at pos=$pos ms")
             printPerformanceReport()
         }
@@ -189,12 +242,14 @@ object PerformanceMonitor {
         if (!isEnabled) return
         decoderInitDuration = durationMs
         decoderInitCount++
+        recordEvent("DECODER", "Initialized: $name (took $durationMs ms)")
         Log.i(TAG, "DECODER: Video decoder initialized: $name (took $durationMs ms)")
     }
 
     fun onDecoderReleased(name: String) {
         if (!isEnabled) return
         decoderReleaseCount++
+        recordEvent("DECODER", "Released: $name")
         Log.i(TAG, "DECODER: Video decoder released: $name")
     }
 
@@ -204,6 +259,7 @@ object PerformanceMonitor {
         currentHeight = height
         currentCodec = mime
         currentBitrate = bitrate
+        recordEvent("DECODER", "Format changed: ${width}x${height}, mime: $mime, bitrate: $bitrate")
     }
 
     fun onFrameDropped() {
@@ -211,25 +267,50 @@ object PerformanceMonitor {
         droppedFramesCount++
     }
 
+    fun onDroppedVideoFrames(droppedFrames: Int, elapsedMs: Long, playbackPositionMs: Long) {
+        if (!isEnabled) return
+        val now = System.currentTimeMillis()
+        
+        val reportBuilder = StringBuilder()
+        reportBuilder.append("\n==================================================\n")
+        reportBuilder.append("⚠️ HITCH DETECTED at Playback Position: $playbackPositionMs ms\n")
+        reportBuilder.append("Dropped Frames: $droppedFrames, Elapsed since last render: $elapsedMs ms\n")
+        reportBuilder.append("Rolling 10-Second Timeline of Events:\n")
+        
+        synchronized(lock) {
+            val currentHistory = ArrayList(eventHistory)
+            for (event in currentHistory) {
+                val relativeTimeMs = event.timestamp - now
+                reportBuilder.append(String.format("  [%6d ms] %-15s : %s\n", relativeTimeMs, event.type, event.details))
+            }
+        }
+        reportBuilder.append("==================================================\n")
+        Log.w(TAG, reportBuilder.toString())
+    }
+
     fun onNetworkSyncTriggered() {
+        recordEvent("SYNC", "Sync triggered")
         if (isEnabled && isPlaybackActive) {
             networkSyncsDuringPlayback++
         }
     }
 
     fun onChecksumTriggered() {
+        recordEvent("CHECKSUM", "Checksum verification triggered")
         if (isEnabled && isPlaybackActive) {
             checksumsDuringPlayback++
         }
     }
 
     fun onDbWriteTriggered() {
+        recordEvent("DB_WRITE", "DB write triggered")
         if (isEnabled && isPlaybackActive) {
             dbWritesDuringPlayback++
         }
     }
 
     fun onDbReadTriggered() {
+        recordEvent("DB_READ", "DB read triggered")
         if (isEnabled && isPlaybackActive) {
             dbReadsDuringPlayback++
         }
@@ -238,6 +319,8 @@ object PerformanceMonitor {
     fun onPlaybackExited() {
         if (!isEnabled) return
         isPlaybackActive = false
+        recordEvent("PLAYBACK", "playItem() exited")
+        stopPoller()
     }
 
     private fun printPerformanceReport() {
