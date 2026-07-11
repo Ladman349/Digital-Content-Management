@@ -66,7 +66,9 @@ class PlaybackControllerImpl @Inject constructor(
                 if (cont != null && cont.isActive) {
                     activeContinuation = null
                     isPlayingActive = false
-                    cont.resume(Unit)
+                    scope.launch {
+                        cont.resume(Unit)
+                    }
                 }
             }
         }
@@ -77,7 +79,9 @@ class PlaybackControllerImpl @Inject constructor(
             if (cont != null && cont.isActive) {
                 activeContinuation = null
                 isPlayingActive = false
-                cont.resumeWithException(error)
+                scope.launch {
+                    cont.resumeWithException(error)
+                }
             }
         }
     }
