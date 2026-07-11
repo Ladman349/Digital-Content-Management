@@ -44,6 +44,7 @@ class PlaylistRepositoryImpl @Inject constructor(
 
     private suspend fun syncPlaylistInternal(): Result<Boolean> {
         com.digitalsignage.player.core.performance.PerformanceMonitor.onNetworkSyncTriggered()
+        com.digitalsignage.player.core.performance.PerformanceMonitor.recordEvent("SYNC", "syncPlaylistInternal() started")
         android.util.Log.i("SyncTrace", "Entered syncPlaylistInternal()")
         android.util.Log.i("StartupTrace", "Trace: PlaylistRepositoryImpl.syncPlaylist() started")
         return try {
@@ -138,6 +139,7 @@ class PlaylistRepositoryImpl @Inject constructor(
                                 
                         if (isAlreadyActive || isAlreadyPending) {
                             logger.i("PlaylistRepository", "Playlist version ${syncData.version} is already active/pending in DB. Ignoring sync.")
+                            com.digitalsignage.player.core.performance.PerformanceMonitor.recordEvent("SYNC", "Sync bypassed: version ${syncData.version} matches active/pending")
                             return Result.Success(false)
                         }
 
@@ -200,23 +202,30 @@ class PlaylistRepositoryImpl @Inject constructor(
                         
                         eventBus.publish(PlayerEvent.DebugStage("enqueueDownloads() returned successfully"))
                         
+                        com.digitalsignage.player.core.performance.PerformanceMonitor.recordEvent("SYNC", "Sync completed: saved pending version ${syncData.version}")
                         Result.Success(true)
                     } else {
+                        com.digitalsignage.player.core.performance.PerformanceMonitor.recordEvent("SYNC", "Sync failed: syncData null")
                         Result.Error(AppError.Retryable("Parsed syncData is null"))
                     }
                 } else {
+                    com.digitalsignage.player.core.performance.PerformanceMonitor.recordEvent("SYNC", "Sync failed: empty body")
                     Result.Error(AppError.Retryable("Empty response body"))
                 }
             } else if (response.code() == 304) {
                 logger.i("PlaylistRepository", "Playlist not modified. ETag ${currentETag} is up to date.")
+                com.digitalsignage.player.core.performance.PerformanceMonitor.recordEvent("SYNC", "Sync not modified (304)")
                 Result.Success(false)
             } else if (response.code() == 401 || response.code() == 404) {
                 logger.e("PlaylistRepository", "Device not found or unauthorized: ${response.code()}")
+                com.digitalsignage.player.core.performance.PerformanceMonitor.recordEvent("SYNC", "Sync failed: unauthorized/not found (${response.code()})")
                 Result.Error(AppError.Recoverable("Device unauthorized or not found: ${response.code()}"))
             } else {
+                com.digitalsignage.player.core.performance.PerformanceMonitor.recordEvent("SYNC", "Sync failed: server error (${response.code()})")
                 Result.Error(AppError.Retryable("Failed to fetch playlist: ${response.code()}"))
             }
         } catch (e: Exception) {
+            com.digitalsignage.player.core.performance.PerformanceMonitor.recordEvent("SYNC", "Sync exception: ${e.message}")
             logger.e("PlaylistRepository", "Exception during sync", e)
             val sw = java.io.StringWriter()
             e.printStackTrace(java.io.PrintWriter(sw))

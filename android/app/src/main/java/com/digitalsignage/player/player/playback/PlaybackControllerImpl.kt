@@ -144,6 +144,11 @@ class PlaybackControllerImpl @Inject constructor(
                         repeat(droppedFrames) {
                             com.digitalsignage.player.core.performance.PerformanceMonitor.onFrameDropped()
                         }
+                        com.digitalsignage.player.core.performance.PerformanceMonitor.onDroppedVideoFrames(
+                            droppedFrames,
+                            elapsedMs,
+                            eventTime.currentPlaybackPositionMs
+                        )
                     }
                 })
             }
@@ -154,6 +159,12 @@ class PlaybackControllerImpl @Inject constructor(
         val filename = item.localFilePath?.let { java.io.File(it).name } ?: "UNKNOWN"
         val fileLength = item.localFilePath?.let { java.io.File(it).length() } ?: 0L
         com.digitalsignage.player.core.performance.PerformanceMonitor.onPlayItemEntered(item.mediaId, filename, fileLength, item.durationMs)
+        
+        // Start periodic poller for rolling timeline
+        com.digitalsignage.player.core.performance.PerformanceMonitor.startPoller(scope) {
+            exoPlayer?.totalBufferedDuration ?: 0L
+        }
+        
         isPlayingActive = true
         currentMediaId = item.mediaId
         playbackStateStore.updateState(PresentationState.Loading)

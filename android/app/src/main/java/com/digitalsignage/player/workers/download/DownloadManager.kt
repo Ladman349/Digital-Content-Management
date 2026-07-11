@@ -202,12 +202,14 @@ class DownloadManager @Inject constructor(
                 
                 // Validate Size and Hash
                 com.digitalsignage.player.core.performance.PerformanceMonitor.onChecksumTriggered()
+                com.digitalsignage.player.core.performance.PerformanceMonitor.recordEvent("CHECKSUM", "Start validation for ${session.mediaId}")
                 val isValid = fileValidator.validateFile(
                     file = tempFile,
                     expectedMd5 = session.expectedChecksumMd5,
                     expectedSha256 = session.expectedChecksumSha256,
                     expectedSize = if (expectedSize != null && expectedSize > 0L) expectedSize else null
                 )
+                com.digitalsignage.player.core.performance.PerformanceMonitor.recordEvent("CHECKSUM", "Completed validation for ${session.mediaId}. Result: $isValid")
                 
                 if (isValid) {
                     tempFile.renameTo(destFile)
