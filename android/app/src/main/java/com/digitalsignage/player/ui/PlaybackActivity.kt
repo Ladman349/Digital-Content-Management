@@ -383,8 +383,8 @@ class PlaybackActivity : AppCompatActivity() {
     private fun applyOrientation(orientation: String) {
         val rotationDegrees = when (orientation) {
             DeviceOrientation.LANDSCAPE -> 0f
-            DeviceOrientation.PORTRAIT_RIGHT -> 90f
-            DeviceOrientation.PORTRAIT_LEFT -> 270f
+            DeviceOrientation.PORTRAIT_RIGHT -> 270f
+            DeviceOrientation.PORTRAIT_LEFT -> 90f
             DeviceOrientation.UPSIDE_DOWN -> 180f
             else -> 0f
         }
