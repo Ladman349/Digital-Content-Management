@@ -174,7 +174,12 @@ class PlaybackControllerImpl @Inject constructor(
                         }
                     }
 
-                    val finalDurationMs = if (actualDurationMs > 0) actualDurationMs else item.durationMs
+                    val finalDurationMs = if (actualDurationMs > 0) {
+                        actualDurationMs
+                    } else {
+                        // Fallback to database duration, but guarantee at least 5 minutes to prevent premature cutoffs
+                        maxOf(item.durationMs, 300000L)
+                    }
                     // Allow a safe 20 seconds of buffer over the actual duration for slow devices or buffering
                     val watchdogDelay = finalDurationMs + 20000L
 
