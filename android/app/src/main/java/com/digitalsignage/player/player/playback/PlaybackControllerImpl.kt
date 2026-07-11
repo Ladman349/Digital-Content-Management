@@ -163,11 +163,26 @@ class PlaybackControllerImpl @Inject constructor(
                 }
             } else {
                 scope.launch {
-                    delay(item.durationMs + 10000L)
+                    // Wait briefly for ExoPlayer to prepare and load duration
+                    var actualDurationMs = 0L
+                    for (i in 1..30) { // check every 100ms for 3 seconds
+                        delay(100)
+                        val duration = exoPlayer?.duration ?: 0L
+                        if (duration > 0 && duration != androidx.media3.common.C.TIME_UNSET) {
+                            actualDurationMs = duration
+                            break
+                        }
+                    }
+
+                    val finalDurationMs = if (actualDurationMs > 0) actualDurationMs else item.durationMs
+                    // Allow a safe 20 seconds of buffer over the actual duration for slow devices or buffering
+                    val watchdogDelay = finalDurationMs + 20000L
+
+                    delay(watchdogDelay)
                     if (continuation.isActive) {
                         activeContinuation = null
                         isPlayingActive = false
-                        logger.w("Heartbeat", "Watchdog triggered. Video playback timed out for ${item.mediaId}")
+                        logger.w("Heartbeat", "Watchdog triggered. Video playback timed out for ${item.mediaId} after ${watchdogDelay}ms")
                         continuation.resume(Unit)
                     }
                 }
