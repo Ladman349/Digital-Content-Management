@@ -52,6 +52,14 @@ class PlaybackControllerImpl @Inject constructor(
 
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
+            when (playbackState) {
+                Player.STATE_BUFFERING -> {
+                    com.digitalsignage.player.core.performance.PerformanceMonitor.onStateBuffering()
+                }
+                Player.STATE_READY -> {
+                    com.digitalsignage.player.core.performance.PerformanceMonitor.onStateReady()
+                }
+            }
             if (playbackState == Player.STATE_ENDED) {
                 val cont = activeContinuation
                 if (cont != null && cont.isActive) {
@@ -64,6 +72,10 @@ class PlaybackControllerImpl @Inject constructor(
                     }
                 }
             }
+        }
+
+        override fun onRenderedFirstFrame() {
+            com.digitalsignage.player.core.performance.PerformanceMonitor.onFirstFrameRendered()
         }
 
         override fun onPlayerError(error: PlaybackException) {
@@ -95,11 +107,53 @@ class PlaybackControllerImpl @Inject constructor(
             .build().apply {
                 setWakeMode(C.WAKE_MODE_LOCAL)
                 addListener(playerListener)
+                addAnalyticsListener(object : androidx.media3.exoplayer.analytics.AnalyticsListener {
+                    override fun onVideoDecoderInitialized(
+                        eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                        decoderName: String,
+                        initializationDurationMs: Long
+                    ) {
+                        com.digitalsignage.player.core.performance.PerformanceMonitor.onDecoderInitialized(initializationDurationMs, decoderName)
+                    }
+
+                    override fun onVideoDecoderReleased(
+                        eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                        decoderName: String
+                    ) {
+                        com.digitalsignage.player.core.performance.PerformanceMonitor.onDecoderReleased(decoderName)
+                    }
+
+                    override fun onVideoInputFormatChanged(
+                        eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                        format: androidx.media3.common.Format,
+                        decoderReuseEvaluation: androidx.media3.exoplayer.DecoderReuseEvaluation?
+                    ) {
+                        com.digitalsignage.player.core.performance.PerformanceMonitor.onVideoInputFormatChanged(
+                            format.width,
+                            format.height,
+                            format.sampleMimeType ?: "UNKNOWN",
+                            format.bitrate
+                        )
+                    }
+
+                    override fun onDroppedVideoFrames(
+                        eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                        droppedFrames: Int,
+                        elapsedMs: Long
+                    ) {
+                        repeat(droppedFrames) {
+                            com.digitalsignage.player.core.performance.PerformanceMonitor.onFrameDropped()
+                        }
+                    }
+                })
             }
         eventBus.publish(PlayerEvent.EngineInitialized)
     }
 
     override suspend fun playItem(item: MediaItem) {
+        val filename = item.localFilePath?.let { java.io.File(it).name } ?: "UNKNOWN"
+        val fileLength = item.localFilePath?.let { java.io.File(it).length() } ?: 0L
+        com.digitalsignage.player.core.performance.PerformanceMonitor.onPlayItemEntered(item.mediaId, filename, fileLength, item.durationMs)
         isPlayingActive = true
         currentMediaId = item.mediaId
         playbackStateStore.updateState(PresentationState.Loading)
@@ -109,11 +163,14 @@ class PlaybackControllerImpl @Inject constructor(
 
         currentRenderer?.stop()
         
+        com.digitalsignage.player.core.performance.PerformanceMonitor.onFileLookupStarted()
         val file = item.localFilePath?.let { java.io.File(it) }
         if (file == null || !file.exists()) {
+            com.digitalsignage.player.core.performance.PerformanceMonitor.onFileLookupCompleted()
             isPlayingActive = false
             throw Exception("Local file not found at: ${item.localFilePath}")
         }
+        com.digitalsignage.player.core.performance.PerformanceMonitor.onFileLookupCompleted()
 
         val renderer = when (item.mediaType) {
             MediaType.IMAGE -> imageRenderer
@@ -148,6 +205,15 @@ class PlaybackControllerImpl @Inject constructor(
                             }
                         }
                     } else {
+                        // Monitor currentPosition for first motion
+                        scope.launch {
+                            while (isActive && isPlayingActive && com.digitalsignage.player.core.performance.PerformanceMonitor.firstMotionTime == 0L) {
+                                val pos = exoPlayer?.currentPosition ?: 0L
+                                com.digitalsignage.player.core.performance.PerformanceMonitor.onPositionChanged(pos)
+                                delay(10)
+                            }
+                        }
+
                         scope.launch {
                             // Wait briefly for ExoPlayer to prepare and load duration
                             var actualDurationMs = 0L
@@ -184,6 +250,7 @@ class PlaybackControllerImpl @Inject constructor(
                 }
             }
         } finally {
+            com.digitalsignage.player.core.performance.PerformanceMonitor.onPlaybackExited()
             withContext(NonCancellable) {
                 stop()
             }

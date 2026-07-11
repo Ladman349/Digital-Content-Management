@@ -33,7 +33,9 @@ class VideoRendererImpl(
             .setUri(android.net.Uri.fromFile(file))
             .build()
             
+        com.digitalsignage.player.core.performance.PerformanceMonitor.onSetMediaItem()
         exoPlayer.setMediaItem(exoItem)
+        com.digitalsignage.player.core.performance.PerformanceMonitor.onPrepare()
         exoPlayer.prepare()
         exoPlayer.play()
     }

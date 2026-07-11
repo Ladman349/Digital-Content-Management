@@ -47,6 +47,7 @@ class PlaybackActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        com.digitalsignage.player.core.performance.PerformanceMonitor.logDeviceSignatureOnce(this)
         binding = ActivityPlaybackBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
