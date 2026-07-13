@@ -39,6 +39,26 @@ class PlaybackControllerImpl @Inject constructor(
     private var isPlayingActive = false
     private var currentMediaId: String? = null
     private var currentPlaylistId: String? = null
+    private var pollerJob: Job? = null
+
+    private fun startPoller() {
+        if (!com.digitalsignage.player.core.performance.PerformanceMonitor.isEnabled) return
+        pollerJob?.cancel()
+        pollerJob = scope.launch(Dispatchers.Main.immediate) {
+            while (isActive) {
+                delay(500)
+                if (isPlayingActive) {
+                    val bufferedDur = exoPlayer?.totalBufferedDuration ?: 0L
+                    com.digitalsignage.player.core.performance.PerformanceMonitor.recordHeartbeat(bufferedDur)
+                }
+            }
+        }
+    }
+
+    private fun stopPoller() {
+        pollerJob?.cancel()
+        pollerJob = null
+    }
 
     private val imageRenderer = ImageRendererImpl { file ->
         playbackStateStore.updateState(PresentationState.Image(file))
@@ -209,9 +229,7 @@ class PlaybackControllerImpl @Inject constructor(
         com.digitalsignage.player.core.performance.PerformanceMonitor.onPlayItemEntered(item.mediaId, filename, fileLength, item.durationMs)
         
         // Start periodic poller for rolling timeline
-        com.digitalsignage.player.core.performance.PerformanceMonitor.startPoller(scope) {
-            exoPlayer?.totalBufferedDuration ?: 0L
-        }
+        startPoller()
         
         isPlayingActive = true
         currentMediaId = item.mediaId
@@ -337,6 +355,7 @@ class PlaybackControllerImpl @Inject constructor(
 
     override suspend fun stop() {
         withContext(Dispatchers.Main.immediate) {
+            stopPoller()
             currentRenderer?.stop()
             currentRenderer = null
             isPlayingActive = false
