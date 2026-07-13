@@ -36,6 +36,22 @@ class NetworkTraceInterceptor : okhttp3.Interceptor {
 }
 
 object LoggingDns : okhttp3.Dns {
+    private val bootstrapClient by lazy {
+        okhttp3.OkHttpClient.Builder()
+            .dns(object : okhttp3.Dns {
+                override fun lookup(hostname: String): List<InetAddress> {
+                    return when (hostname) {
+                        "dns.google" -> listOf(InetAddress.getByName("8.8.8.8"), InetAddress.getByName("8.8.4.4"))
+                        "cloudflare-dns.com" -> listOf(InetAddress.getByName("1.1.1.1"), InetAddress.getByName("1.0.0.1"))
+                        else -> okhttp3.Dns.SYSTEM.lookup(hostname)
+                    }
+                }
+            })
+            .connectTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+    }
+
     override fun lookup(hostname: String): List<InetAddress> {
         android.util.Log.i("RegisterTrace", "[DNSTrace] Resolving hostname: $hostname")
         try {
@@ -43,7 +59,22 @@ object LoggingDns : okhttp3.Dns {
             android.util.Log.i("RegisterTrace", "[DNSTrace] Resolved $hostname to: ${addresses.map { it.hostAddress }}")
             return addresses
         } catch (e: Exception) {
-            android.util.Log.e("RegisterTrace", "[DNSTrace] System resolution failed for $hostname. Trying custom UDP fallbacks...", e)
+            android.util.Log.e("RegisterTrace", "[DNSTrace] System resolution failed for $hostname. Trying custom DoH fallbacks...", e)
+            val providers = listOf("google", "cloudflare")
+            for (provider in providers) {
+                try {
+                    val resolvedIps = resolveDnsOverHttps(hostname, provider)
+                    if (resolvedIps.isNotEmpty()) {
+                        val addresses = resolvedIps.map { InetAddress.getByName(it) }
+                        android.util.Log.i("RegisterTrace", "[DNSTrace] DoH ($provider) resolved $hostname to: ${addresses.map { it.hostAddress }}")
+                        return addresses
+                    }
+                } catch (ex: Exception) {
+                    android.util.Log.e("RegisterTrace", "[DNSTrace] DoH ($provider) failed for $hostname", ex)
+                }
+            }
+
+            android.util.Log.e("RegisterTrace", "[DNSTrace] DoH resolution failed for $hostname. Trying custom UDP fallbacks...", e)
             val fallbacks = listOf("8.8.8.8", "1.1.1.1")
             for (dns in fallbacks) {
                 try {
@@ -57,7 +88,37 @@ object LoggingDns : okhttp3.Dns {
                     android.util.Log.e("RegisterTrace", "[DNSTrace] Custom UDP Resolver ($dns) failed for $hostname", ex)
                 }
             }
-            throw e
+            throw java.net.UnknownHostException("Failed to resolve $hostname using all methods")
+        }
+    }
+
+    private fun resolveDnsOverHttps(hostname: String, provider: String): List<String> {
+        val url = when (provider) {
+            "google" -> "https://dns.google/resolve?name=$hostname&type=A"
+            "cloudflare" -> "https://cloudflare-dns.com/dns-query?name=$hostname&type=A"
+            else -> return emptyList()
+        }
+        
+        val requestBuilder = okhttp3.Request.Builder().url(url)
+        if (provider == "cloudflare") {
+            requestBuilder.addHeader("Accept", "application/dns-json")
+        }
+        
+        val request = requestBuilder.build()
+        bootstrapClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return emptyList()
+            val body = response.body?.string() ?: return emptyList()
+            
+            val ips = mutableListOf<String>()
+            val pattern = java.util.regex.Pattern.compile("\"data\"\\s*:\\s*\"([^\"]+)\"")
+            val matcher = pattern.matcher(body)
+            while (matcher.find()) {
+                val ip = matcher.group(1)
+                if (ip != null && ip.matches(Regex("\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}"))) {
+                    ips.add(ip)
+                }
+            }
+            return ips
         }
     }
 
