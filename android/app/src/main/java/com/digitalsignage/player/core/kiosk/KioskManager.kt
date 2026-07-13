@@ -68,11 +68,21 @@ class KioskManager @Inject constructor(
         }
         
         val mode = getDeploymentMode()
-        logger.i("KioskManager", "Enabling Kiosk with DeploymentMode: $mode")
+        val deviceOwner = isDeviceOwner()
+        val deploymentMode = mode.name
+        val activityName = activity::class.java.simpleName
+        val lockTaskSupported = true
+        val orientationVal = if (activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) {
+            "Landscape"
+        } else {
+            "Portrait"
+        }
+
+        logger.i("KioskTrace", "LockTask Details: Device Owner = $deviceOwner, LockTask Supported = $lockTaskSupported, Deployment Mode = $deploymentMode, Current Activity = $activityName, Current Orientation = $orientationVal")
         
         when (mode) {
             DeploymentMode.DEVELOPMENT -> {
-                logger.i("KioskManager", "DEVELOPMENT mode: Kiosk disabled.")
+                logger.i("KioskTrace", "Kiosk mode (LockTask) unavailable: DEVELOPMENT mode is active")
                 isKioskEngaged = false
             }
             DeploymentMode.TESTING -> {
@@ -80,12 +90,13 @@ class KioskManager @Inject constructor(
                 try {
                     activity.startLockTask()
                     isKioskEngaged = true
+                    logger.i("KioskTrace", "Lock Task entered")
                 } catch (e: Exception) {
-                    logger.e("KioskManager", "Failed to engage Screen Pinning", e)
+                    logger.e("KioskTrace", "Lock Task unavailable: startLockTask() threw exception", e)
                 }
             }
             DeploymentMode.PRODUCTION -> {
-                if (isDeviceOwner()) {
+                if (deviceOwner) {
                     logger.i("KioskManager", "PRODUCTION mode: Engaging Device Owner LockTask.")
                     try {
                         // Whitelist the app for LockTask
@@ -96,17 +107,19 @@ class KioskManager @Inject constructor(
                         }
                         activity.startLockTask()
                         isKioskEngaged = true
+                        logger.i("KioskTrace", "Lock Task entered")
                     } catch (e: Exception) {
-                        logger.e("KioskManager", "Failed to engage Device Owner LockTask", e)
+                        logger.e("KioskTrace", "Lock Task unavailable: Device Owner startLockTask() threw exception", e)
                     }
                 } else {
-                    logger.e("KioskManager", "PRODUCTION mode requested, but app is NOT Device Owner. Publishing DeviceNotProvisioned.")
+                    logger.w("KioskTrace", "Lock Task unavailable: PRODUCTION mode requested, but app is NOT Device Owner. Publishing DeviceNotProvisioned.")
                     eventBus.publish(PlayerEvent.DeviceNotProvisioned)
                     try {
                         activity.startLockTask()
                         isKioskEngaged = true
+                        logger.i("KioskTrace", "Lock Task entered (Screen Pinning fallback)")
                     } catch (e: Exception) {
-                        logger.e("KioskManager", "Failed to engage Screen Pinning fallback", e)
+                        logger.e("KioskTrace", "Lock Task unavailable: Screen Pinning fallback threw exception", e)
                     }
                 }
             }
@@ -118,6 +131,7 @@ class KioskManager @Inject constructor(
         try {
             activity.stopLockTask()
             isKioskEngaged = false
+            logger.i("KioskTrace", "Lock Task exited")
         } catch (e: Exception) {
             logger.e("KioskManager", "Failed to stop LockTask", e)
         }

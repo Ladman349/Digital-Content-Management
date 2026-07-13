@@ -40,7 +40,11 @@ class BootReceiver : BroadcastReceiver() {
             intent.action == Intent.ACTION_LOCKED_BOOT_COMPLETED ||
             intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
             
-            logger.i("BootReceiver", "Received boot/update intent: ${intent.action}")
+            val prefs = context.getSharedPreferences("boot_stats", Context.MODE_PRIVATE)
+            val currentCount = prefs.getInt("boot_count", 0) + 1
+            prefs.edit().putInt("boot_count", currentCount).apply()
+            
+            logger.i("KioskTrace", "Boot Completed: Intent Action = ${intent.action}, Device Boot Count = $currentCount, Launching PlaybackActivity")
             
             val pendingResult = goAsync()
             // Publish Boot event to the system

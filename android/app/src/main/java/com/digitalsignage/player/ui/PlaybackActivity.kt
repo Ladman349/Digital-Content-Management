@@ -30,6 +30,9 @@ import kotlinx.coroutines.Dispatchers
 import coil.load
 import coil.dispose
 import javax.inject.Inject
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 
 @AndroidEntryPoint
 class PlaybackActivity : AppCompatActivity() {
@@ -45,11 +48,44 @@ class PlaybackActivity : AppCompatActivity() {
 
     private var currentOrientation: String = DeviceOrientation.LANDSCAPE
 
+    private val screenEventsReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: android.content.Intent) {
+            android.util.Log.i("KioskTrace", "Screen wake event detected: ${intent.action}")
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         com.digitalsignage.player.core.performance.PerformanceMonitor.logDeviceSignatureOnce(this)
         binding = ActivityPlaybackBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        // Keep display awake
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        binding.root.keepScreenOn = true
+        android.util.Log.i("KioskTrace", "KEEP_SCREEN_ON enabled")
+
+        // Keep above lockscreen
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+        } else {
+            @Suppress("DEPRECATION")
+            window.addFlags(
+                android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+            )
+        }
+
+        // Register screen event receiver
+        val filter = android.content.IntentFilter().apply {
+            addAction(android.content.Intent.ACTION_SCREEN_ON)
+            addAction(android.content.Intent.ACTION_USER_PRESENT)
+        }
+        registerReceiver(screenEventsReceiver, filter)
+
+        // Hide system UI immediately
+        hideSystemUI()
 
         binding.btnCopyDiagnostics.setOnClickListener {
             copyDiagnosticsToClipboard()
@@ -154,6 +190,36 @@ class PlaybackActivity : AppCompatActivity() {
         playerOrchestrator.attachActivity(this)
     }
 
+    override fun onResume() {
+        super.onResume()
+        android.util.Log.i("KioskTrace", "Activity resumed: restoring KEEP_SCREEN_ON and immersive mode")
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        binding.root.keepScreenOn = true
+        hideSystemUI()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        android.util.Log.i("KioskTrace", "Window focus changed: hasFocus=$hasFocus")
+        if (hasFocus) {
+            hideSystemUI()
+        }
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        android.util.Log.i("KioskTrace", "Configuration changed")
+        hideSystemUI()
+    }
+
+    private fun hideSystemUI() {
+        android.util.Log.i("KioskTrace", "Immersive mode entered/restored")
+        val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
+        windowInsetsController.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
+    }
+
     override fun onStop() {
         super.onStop()
         playerOrchestrator.detachActivity()
@@ -161,6 +227,11 @@ class PlaybackActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        try {
+            unregisterReceiver(screenEventsReceiver)
+        } catch (e: Exception) {
+            // ignore if not registered
+        }
         binding.playerView.player = null
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
             playbackController.release()
