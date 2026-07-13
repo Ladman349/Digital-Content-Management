@@ -86,7 +86,8 @@
             android:name=".ui.PlaybackActivity"
             android:exported="false"
             android:screenOrientation="landscape"
-            android:keepScreenOn="true" />
+            android:keepScreenOn="true"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|keyboard|navigation|uiMode|layoutDirection" />
 
     </application>
 </manifest>
