@@ -162,6 +162,9 @@ class PlaybackActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         binding.playerView.player = null
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+            playbackController.release()
+        }
     }
 
     override fun onUserInteraction() {
