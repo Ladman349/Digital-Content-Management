@@ -209,7 +209,11 @@ class PlaybackControllerImpl @Inject constructor(
         val startTime = System.currentTimeMillis()
         logger.i("Heartbeat", "Playback started: ${item.mediaId} ($startTime)")
 
-        currentRenderer?.stop()
+        val isVideoToVideo = currentRenderer == videoRenderer && item.mediaType == MediaType.VIDEO
+        
+        if (!isVideoToVideo) {
+            currentRenderer?.stop()
+        }
         
         com.digitalsignage.player.core.performance.PerformanceMonitor.onFileLookupStarted()
         val file = item.localFilePath?.let { java.io.File(it) }
