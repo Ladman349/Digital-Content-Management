@@ -105,20 +105,6 @@ class PlaybackControllerImpl @Inject constructor(
                 val currentUri = mediaItem.localConfiguration?.uri?.toString() ?: "NONE"
                 com.digitalsignage.player.core.performance.PerformanceMonitor.onMediaTransition(count, currentIndex, currentUri)
                 
-                if (count > 1) {
-                    exoPlayer?.removeMediaItem(0)
-                }
-
-                val cont = activeContinuation
-                if (cont != null && cont.isActive) {
-                    activeContinuation = null
-                    isPlayingActive = false
-                    val endTime = System.currentTimeMillis()
-                    logger.i("Heartbeat", "Playback completed via transition (Video): $currentMediaId ($endTime)")
-                    scope.launch {
-                        cont.resume(Unit)
-                    }
-                }
                 currentMediaId = transitionedMediaId
             }
         }
@@ -205,22 +191,7 @@ class PlaybackControllerImpl @Inject constructor(
     }
 
     override fun preloadItem(item: MediaItem) {
-        if (item.mediaType != MediaType.VIDEO) return
-        val file = item.localFilePath?.let { java.io.File(it) }
-        if (file == null || !file.exists()) return
-
-        scope.launch(Dispatchers.Main.immediate) {
-            val count = exoPlayer?.mediaItemCount ?: 0
-            if (count == 1) {
-                val nextExoItem = androidx.media3.common.MediaItem.Builder()
-                    .setMediaId(item.mediaId)
-                    .setUri(android.net.Uri.fromFile(file))
-                    .build()
-                exoPlayer?.addMediaItem(nextExoItem)
-                logger.i("PlaybackController", "Preloaded next video item: ${item.mediaId}")
-                com.digitalsignage.player.core.performance.PerformanceMonitor.recordEvent("PLAYBACK", "Preloaded next video item: ${item.mediaId}")
-            }
-        }
+        logger.i("PlaybackController", "Preloading disabled (Option A)")
     }
 
     override suspend fun playItem(item: MediaItem) {
@@ -238,11 +209,7 @@ class PlaybackControllerImpl @Inject constructor(
         val startTime = System.currentTimeMillis()
         logger.i("Heartbeat", "Playback started: ${item.mediaId} ($startTime)")
 
-        val isAlreadyPlaying = item.mediaType == MediaType.VIDEO && exoPlayer?.currentMediaItem?.mediaId == item.mediaId && exoPlayer?.isPlaying == true
-        
-        if (!isAlreadyPlaying) {
-            currentRenderer?.stop()
-        }
+        currentRenderer?.stop()
         
         com.digitalsignage.player.core.performance.PerformanceMonitor.onFileLookupStarted()
         val file = item.localFilePath?.let { java.io.File(it) }
@@ -269,13 +236,8 @@ class PlaybackControllerImpl @Inject constructor(
                 activeContinuation = continuation
                 
                 try {
-                    if (!isAlreadyPlaying) {
-                        renderer.render(file)
-                        eventBus.publish(PlayerEvent.PlaybackStarted(item.mediaId))
-                    } else {
-                        playbackStateStore.updateState(PresentationState.Video(file))
-                        eventBus.publish(PlayerEvent.PlaybackStarted(item.mediaId))
-                    }
+                    renderer.render(file)
+                    eventBus.publish(PlayerEvent.PlaybackStarted(item.mediaId))
 
                     if (item.mediaType == MediaType.IMAGE) {
                         scope.launch {
