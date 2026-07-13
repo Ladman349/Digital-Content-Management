@@ -81,6 +81,10 @@ class PlaybackControllerImpl @Inject constructor(
                 com.digitalsignage.player.core.performance.PerformanceMonitor.recordEvent("PLAYBACK", "ExoPlayer transitioned to mediaItem: $transitionedMediaId, reason: $reason")
                 
                 val count = exoPlayer?.mediaItemCount ?: 0
+                val currentIndex = exoPlayer?.currentMediaItemIndex ?: 0
+                val currentUri = mediaItem.localConfiguration?.uri?.toString() ?: "NONE"
+                com.digitalsignage.player.core.performance.PerformanceMonitor.onMediaTransition(count, currentIndex, currentUri)
+                
                 if (count > 1) {
                     exoPlayer?.removeMediaItem(0)
                 }

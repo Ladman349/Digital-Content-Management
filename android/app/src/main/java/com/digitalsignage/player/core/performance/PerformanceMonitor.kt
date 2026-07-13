@@ -316,6 +316,12 @@ object PerformanceMonitor {
         }
     }
 
+    fun onMediaTransition(playlistSize: Int, currentMediaIndex: Int, currentMediaUri: String) {
+        if (!isEnabled) return
+        recordEvent("TRANSITION", "Playlist Size: $playlistSize, Index: $currentMediaIndex, URI: $currentMediaUri")
+        Log.i(TAG, "TRANSITION: Playlist Size: $playlistSize, Index: $currentMediaIndex, URI: $currentMediaUri")
+    }
+
     fun onPlaybackExited() {
         if (!isEnabled) return
         isPlaybackActive = false
