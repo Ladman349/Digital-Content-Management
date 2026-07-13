@@ -34,16 +34,27 @@ class VideoRendererImpl(
             .build()
             
         com.digitalsignage.player.core.performance.PerformanceMonitor.onSetMediaItem()
+        android.util.Log.i("LIFECYCLE_TRACE", "BEFORE setMediaItem()")
         exoPlayer.setMediaItem(exoItem)
+        android.util.Log.i("LIFECYCLE_TRACE", "AFTER setMediaItem()")
+        
         com.digitalsignage.player.core.performance.PerformanceMonitor.onPrepare()
+        android.util.Log.i("LIFECYCLE_TRACE", "BEFORE prepare()")
         exoPlayer.prepare()
+        android.util.Log.i("LIFECYCLE_TRACE", "AFTER prepare()")
+        
         exoPlayer.play()
     }
 
     override suspend fun stop() {
         withContext(Dispatchers.Main.immediate) {
+            android.util.Log.i("LIFECYCLE_TRACE", "BEFORE stop()")
             exoPlayer.stop()
+            android.util.Log.i("LIFECYCLE_TRACE", "AFTER stop()")
+            
+            android.util.Log.i("LIFECYCLE_TRACE", "BEFORE clearMediaItems()")
             exoPlayer.clearMediaItems()
+            android.util.Log.i("LIFECYCLE_TRACE", "AFTER clearMediaItems()")
         }
     }
 }
