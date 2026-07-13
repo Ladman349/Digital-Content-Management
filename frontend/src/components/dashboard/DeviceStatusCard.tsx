@@ -1,5 +1,5 @@
 import { useSnackbar } from "notistack";
-import { Box, Divider, Typography, CircularProgress } from "@mui/material";
+import { Box, Divider, Typography, CircularProgress, Tooltip } from "@mui/material";
 import { useEffect, useState } from "react";
 import DashboardCard from "../common/DashboardCard";
 import { DeviceService } from "../../services/DeviceService";
@@ -7,16 +7,7 @@ import type { Device } from "../../types/device";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import PauseCircleRoundedIcon from "@mui/icons-material/PauseCircleRounded";
 import CloudOffRoundedIcon from "@mui/icons-material/CloudOffRounded";
-
-function formatRelativeTime(heartbeatAt?: number | null): string {
-  if (!heartbeatAt) return "Never";
-  const seconds = Math.floor((Date.now() - heartbeatAt) / 1000);
-  if (seconds < 10) return "Just now";
-  if (seconds < 60) return `${seconds}s ago`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  return `${Math.floor(seconds / 86400)}d ago`;
-}
+import { getRelativeTime, formatDateTime } from "../../utils/date";
 
 export default function DeviceStatusCard() {
   const { enqueueSnackbar } = useSnackbar();
@@ -62,9 +53,11 @@ export default function DeviceStatusCard() {
                 <Box sx={{ display: "flex", color }}>{icon}</Box>
                 <Typography sx={{ fontWeight: 600, fontSize: 14 }}>{device.name}</Typography>
               </Box>
-              <Typography sx={{ color: "#94A3B8", fontSize: 13 }}>
-                {formatRelativeTime((device as any).heartbeatAt || device.lastSeenMs)}
-              </Typography>
+              <Tooltip title={formatDateTime((device as any).heartbeatAt || device.lastSeenMs)} arrow>
+                <Typography sx={{ color: "#94A3B8", fontSize: 13, cursor: "help", borderBottom: "1px dashed #CBD5E1" }}>
+                  {getRelativeTime((device as any).heartbeatAt || device.lastSeenMs)}
+                </Typography>
+              </Tooltip>
             </Box>
             {index < group.length - 1 && <Divider sx={{ my: 0.5 }} />}
           </Box>

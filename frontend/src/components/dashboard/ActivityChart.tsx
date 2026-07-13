@@ -1,5 +1,5 @@
 import { useSnackbar } from "notistack";
-import { Box, Typography, CircularProgress, Divider } from "@mui/material";
+import { Box, Typography, CircularProgress, Divider, Tooltip } from "@mui/material";
 import { useEffect, useState } from "react";
 import DashboardCard from "../common/DashboardCard";
 import { DeviceService } from "../../services/DeviceService";
@@ -10,14 +10,7 @@ import TvRoundedIcon from "@mui/icons-material/TvRounded";
 import PlaylistPlayRoundedIcon from "@mui/icons-material/PlaylistPlayRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import PermMediaRoundedIcon from "@mui/icons-material/PermMediaRounded";
-
-function formatRelativeTime(ms: number): string {
-  const seconds = Math.floor((Date.now() - ms) / 1000);
-  if (seconds < 60) return "Just now";
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  return `${Math.floor(seconds / 86400)}d ago`;
-}
+import { getRelativeTime, formatDateTime } from "../../utils/date";
 
 interface ActivityEvent {
   id: string;
@@ -125,9 +118,11 @@ export default function ActivityChart() {
                   </Box>
                   <Typography sx={{ fontWeight: 500, fontSize: 14 }}>{event.description}</Typography>
                 </Box>
-                <Typography sx={{ color: "#94A3B8", fontSize: 13, whiteSpace: "nowrap", ml: 2 }}>
-                  {formatRelativeTime(event.timestamp)}
-                </Typography>
+                <Tooltip title={formatDateTime(event.timestamp)} arrow>
+                  <Typography sx={{ color: "#94A3B8", fontSize: 13, whiteSpace: "nowrap", ml: 2, cursor: "help", borderBottom: "1px dashed #CBD5E1" }}>
+                    {getRelativeTime(event.timestamp)}
+                  </Typography>
+                </Tooltip>
               </Box>
               {index < events.length - 1 && <Divider />}
             </Box>
