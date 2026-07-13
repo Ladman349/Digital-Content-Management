@@ -1,6 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy.orm import Session
+from app.core.time_util import now_ist
 
 from app.models.device import Device
 from app.models.schedule import Schedule
@@ -79,14 +80,17 @@ class PlayerService:
             print(f"[204-DIAG] Device '{device_id}' not found in database.")
             return None
 
-        now = datetime.now()
+        utc_now = datetime.now(timezone.utc)
+        now = now_ist()
         current_date = now.strftime("%Y-%m-%d")
         current_time = now.strftime("%H:%M")
 
         print(f"[204-DIAG] ── Resolving playlist for device '{device_id}' ──")
-        print(f"[204-DIAG]   Server clock  : {now.isoformat()} (local time, no tzinfo)")
+        print(f"[204-DIAG]   UTC clock     : {utc_now.isoformat()}")
+        print(f"[204-DIAG]   IST clock     : {now.isoformat()}")
         print(f"[204-DIAG]   current_date  : {current_date}")
         print(f"[204-DIAG]   current_time  : {current_time}")
+        print(f"[204-DIAG]   timezone      : Asia/Kolkata")
 
         # Find all active schedules assigned to this device
         # within the current date and time window
