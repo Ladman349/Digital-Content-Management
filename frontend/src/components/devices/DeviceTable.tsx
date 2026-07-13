@@ -37,6 +37,7 @@ import TvRoundedIcon from "@mui/icons-material/TvRounded";
 import EmptyState from "../common/EmptyState";
 import StatusChip, { statusToVariant } from "../common/StatusChip";
 import type { Device, SortDirection, SortField } from "./types";
+import { getRelativeTime, formatDateTime } from "../../utils/date";
 
 interface Props {
   devices: Device[];
@@ -163,9 +164,11 @@ function DeviceMobileCard({
               <Typography sx={{ color: "#94A3B8", fontSize: 11, fontWeight: 600, textTransform: "uppercase" }}>
                 Last Seen
               </Typography>
-              <Typography sx={{ fontSize: 13, color: "#64748B", mt: 0.25 }}>
-                {device.lastSeen}
-              </Typography>
+              <Tooltip title={formatDateTime(device.lastSeenMs)} arrow>
+                <Typography sx={{ fontSize: 13, color: "#64748B", mt: 0.25, cursor: "help", display: "inline-block", borderBottom: "1px dashed #CBD5E1" }}>
+                  {getRelativeTime(device.lastSeenMs)}
+                </Typography>
+              </Tooltip>
             </Box>
           </Box>
 
@@ -592,9 +595,11 @@ export default function DeviceTable({
                     </TableCell>
 
                     <TableCell sx={{ py: 2 }}>
-                      <Typography sx={{ color: "#64748B", fontSize: 14 }}>
-                        {device.lastSeen}
-                      </Typography>
+                      <Tooltip title={formatDateTime(device.lastSeenMs)} arrow>
+                        <Typography sx={{ color: "#64748B", fontSize: 14, display: "inline-block", cursor: "help", borderBottom: "1px dashed #CBD5E1" }}>
+                          {getRelativeTime(device.lastSeenMs)}
+                        </Typography>
+                      </Tooltip>
                     </TableCell>
 
                     <TableCell align="right" sx={{ py: 2 }}>

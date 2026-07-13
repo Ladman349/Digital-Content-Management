@@ -10,6 +10,7 @@ import FilterListOffRoundedIcon from "@mui/icons-material/FilterListOffRounded";
 import type { MediaItem } from "../../types/media";
 import { formatBytes, formatDuration } from "./utils";
 import EmptyState from "../common/EmptyState";
+import { formatDate } from "../../utils/date";
 
 interface Props {
   items: MediaItem[];
@@ -51,11 +52,7 @@ function MediaCard({
   onDelete: (item: MediaItem) => void;
 }) {
   const isVideo = item.type === "Video";
-  const dateStr = new Date(item.uploadedAt).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  const dateStr = formatDate(item.uploadedAt);
 
   return (
     <Paper

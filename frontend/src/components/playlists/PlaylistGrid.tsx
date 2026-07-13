@@ -12,6 +12,7 @@ import type { Playlist, PlaylistStatus } from "../../types/playlist";
 import type { MediaItem } from "../../types/media";
 import { formatDuration } from "./utils";
 import EmptyState from "../common/EmptyState";
+import { formatDate } from "../../utils/date";
 interface Props {
   mediaItems: MediaItem[];
   playlists: Playlist[];
@@ -43,11 +44,7 @@ function PlaylistCard({
   onPreview: (playlist: Playlist) => void;
   onDelete: (playlist: Playlist) => void;
 }) {
-  const dateStr = new Date(playlist.updatedAt).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  const dateStr = formatDate(playlist.updatedAt);
 
   // Fetch thumbnails for up to the first 3 items
   const thumbnails = playlist.items.slice(0, 3).map((item) => {

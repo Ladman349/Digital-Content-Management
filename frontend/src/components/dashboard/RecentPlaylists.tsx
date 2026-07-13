@@ -1,19 +1,11 @@
 import { useSnackbar } from "notistack";
-import { Box, Chip, Divider, Typography, CircularProgress } from "@mui/material";
+import { Box, Chip, Divider, Typography, CircularProgress, Tooltip } from "@mui/material";
 import { useEffect, useState } from "react";
 import PlaylistPlayRoundedIcon from "@mui/icons-material/PlaylistPlayRounded";
 import DashboardCard from "../common/DashboardCard";
 import { PlaylistService } from "../../services/PlaylistService";
 import type { Playlist } from "../../types/playlist";
-
-function formatRelativeTime(ms: number): string {
-  if (!ms) return "Never";
-  const seconds = Math.floor((Date.now() - ms) / 1000);
-  if (seconds < 60) return "Just now";
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  return `${Math.floor(seconds / 86400)}d ago`;
-}
+import { getRelativeTime, formatDateTime } from "../../utils/date";
 
 export default function RecentPlaylists() {
   const { enqueueSnackbar } = useSnackbar();
@@ -73,7 +65,12 @@ export default function RecentPlaylists() {
                   <Box>
                     <Typography sx={{ fontWeight: 700 }}>{playlist.name}</Typography>
                     <Typography sx={{ color: "#94A3B8", fontSize: 13, mt: 0.3 }}>
-                      {playlist.items?.length || 0} items • {formatRelativeTime(playlist.updatedAt)}
+                      {playlist.items?.length || 0} items •{" "}
+                      <Tooltip title={formatDateTime(playlist.updatedAt)} arrow>
+                        <span style={{ cursor: "help", borderBottom: "1px dashed #CBD5E1" }}>
+                          {getRelativeTime(playlist.updatedAt)}
+                        </span>
+                      </Tooltip>
                     </Typography>
                   </Box>
                 </Box>
