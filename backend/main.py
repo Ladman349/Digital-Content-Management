@@ -96,6 +96,7 @@ origins = [
     "http://localhost:5173",
     "https://ladman349-digital-content-managemen.vercel.app",
     "https://digital-content-management-two.vercel.app",
+    "https://dcm.grovitai.com",
 ]
 allowed_origins_env = settings.CORS_ALLOWED_ORIGINS
 if allowed_origins_env:
