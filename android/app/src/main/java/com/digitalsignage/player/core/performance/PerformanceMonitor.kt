@@ -73,26 +73,12 @@ object PerformanceMonitor {
         }
     }
 
-    fun startPoller(scope: CoroutineScope, getBufferedDuration: () -> Long) {
+    fun recordHeartbeat(bufferedDurationMs: Long) {
         if (!isEnabled) return
-        pollerJob?.cancel()
-        pollerJob = scope.launch(Dispatchers.Default) {
-            while (isActive) {
-                delay(500)
-                if (isPlaybackActive) {
-                    val freeMem = Runtime.getRuntime().freeMemory() / (1024 * 1024)
-                    val totalMem = Runtime.getRuntime().totalMemory() / (1024 * 1024)
-                    val cpuTime = android.os.Process.getElapsedCpuTime()
-                    val bufferedDur = getBufferedDuration()
-                    recordEvent("HEARTBEAT", "JVM Free: ${freeMem}MB/Total: ${totalMem}MB, CPU Process: ${cpuTime}ms, Buffer: ${bufferedDur}ms")
-                }
-            }
-        }
-    }
-
-    fun stopPoller() {
-        pollerJob?.cancel()
-        pollerJob = null
+        val freeMem = Runtime.getRuntime().freeMemory() / (1024 * 1024)
+        val totalMem = Runtime.getRuntime().totalMemory() / (1024 * 1024)
+        val cpuTime = android.os.Process.getElapsedCpuTime()
+        recordEvent("HEARTBEAT", "JVM Free: ${freeMem}MB/Total: ${totalMem}MB, CPU Process: ${cpuTime}ms, Buffer: ${bufferedDurationMs}ms")
     }
 
     fun logDeviceSignatureOnce(context: Context) {
@@ -326,7 +312,6 @@ object PerformanceMonitor {
         if (!isEnabled) return
         isPlaybackActive = false
         recordEvent("PLAYBACK", "playItem() exited")
-        stopPoller()
     }
 
     private fun printPerformanceReport() {
