@@ -444,8 +444,12 @@ class PlayerOrchestratorImpl @Inject constructor(
                 if (wasUpdated) {
                     eventBus.publish(PlayerEvent.PlaylistUpdated)
                 } else {
-                    // Not modified, ready for playback
-                    eventBus.publish(PlayerEvent.PlaylistReady)
+                    // Only publish PlaylistReady if we are not already in active playback
+                    if (stateMachine.currentState.value != PlayerState.PLAYING) {
+                        eventBus.publish(PlayerEvent.PlaylistReady)
+                    } else {
+                        logger.i("Orchestrator", "Playlist sync completed with no updates. Playback is already active, ignoring transition.")
+                    }
                 }
             }
 
