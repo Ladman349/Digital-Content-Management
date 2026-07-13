@@ -37,6 +37,10 @@ class FakePlaybackController : PlaybackController {
         kotlinx.coroutines.delay(100) // Yields and suspends execution to avoid infinite tight loops
     }
 
+    override fun preloadItem(item: MediaItem) {
+        // Mock no-op for tests
+    }
+
     override suspend fun stop() {
         stopCalled = true
     }

@@ -14,6 +14,7 @@ interface PlaylistExecutor {
 interface PlaybackController {
     fun initialize()
     suspend fun playItem(item: com.digitalsignage.player.domain.model.MediaItem)
+    fun preloadItem(item: com.digitalsignage.player.domain.model.MediaItem)
     suspend fun stop()
     suspend fun release()
     fun isPlaying(): Boolean
