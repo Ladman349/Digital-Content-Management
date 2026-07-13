@@ -74,6 +74,31 @@ class PlaybackControllerImpl @Inject constructor(
             }
         }
 
+        override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
+            if (mediaItem != null) {
+                val transitionedMediaId = mediaItem.mediaId
+                logger.i("PlaybackController", "ExoPlayer transitioned to mediaItem: $transitionedMediaId, reason: $reason")
+                com.digitalsignage.player.core.performance.PerformanceMonitor.recordEvent("PLAYBACK", "ExoPlayer transitioned to mediaItem: $transitionedMediaId, reason: $reason")
+                
+                val count = exoPlayer?.mediaItemCount ?: 0
+                if (count > 1) {
+                    exoPlayer?.removeMediaItem(0)
+                }
+
+                val cont = activeContinuation
+                if (cont != null && cont.isActive) {
+                    activeContinuation = null
+                    isPlayingActive = false
+                    val endTime = System.currentTimeMillis()
+                    logger.i("Heartbeat", "Playback completed via transition (Video): $currentMediaId ($endTime)")
+                    scope.launch {
+                        cont.resume(Unit)
+                    }
+                }
+                currentMediaId = transitionedMediaId
+            }
+        }
+
         override fun onRenderedFirstFrame() {
             com.digitalsignage.player.core.performance.PerformanceMonitor.onFirstFrameRendered()
         }
@@ -155,6 +180,25 @@ class PlaybackControllerImpl @Inject constructor(
         eventBus.publish(PlayerEvent.EngineInitialized)
     }
 
+    override fun preloadItem(item: MediaItem) {
+        if (item.mediaType != MediaType.VIDEO) return
+        val file = item.localFilePath?.let { java.io.File(it) }
+        if (file == null || !file.exists()) return
+
+        scope.launch(Dispatchers.Main.immediate) {
+            val count = exoPlayer?.mediaItemCount ?: 0
+            if (count == 1) {
+                val nextExoItem = androidx.media3.common.MediaItem.Builder()
+                    .setMediaId(item.mediaId)
+                    .setUri(android.net.Uri.fromFile(file))
+                    .build()
+                exoPlayer?.addMediaItem(nextExoItem)
+                logger.i("PlaybackController", "Preloaded next video item: ${item.mediaId}")
+                com.digitalsignage.player.core.performance.PerformanceMonitor.recordEvent("PLAYBACK", "Preloaded next video item: ${item.mediaId}")
+            }
+        }
+    }
+
     override suspend fun playItem(item: MediaItem) {
         val filename = item.localFilePath?.let { java.io.File(it).name } ?: "UNKNOWN"
         val fileLength = item.localFilePath?.let { java.io.File(it).length() } ?: 0L
@@ -172,7 +216,11 @@ class PlaybackControllerImpl @Inject constructor(
         val startTime = System.currentTimeMillis()
         logger.i("Heartbeat", "Playback started: ${item.mediaId} ($startTime)")
 
-        currentRenderer?.stop()
+        val isAlreadyPlaying = item.mediaType == MediaType.VIDEO && exoPlayer?.currentMediaItem?.mediaId == item.mediaId && exoPlayer?.isPlaying == true
+        
+        if (!isAlreadyPlaying) {
+            currentRenderer?.stop()
+        }
         
         com.digitalsignage.player.core.performance.PerformanceMonitor.onFileLookupStarted()
         val file = item.localFilePath?.let { java.io.File(it) }
@@ -199,8 +247,13 @@ class PlaybackControllerImpl @Inject constructor(
                 activeContinuation = continuation
                 
                 try {
-                    renderer.render(file)
-                    eventBus.publish(PlayerEvent.PlaybackStarted(item.mediaId))
+                    if (!isAlreadyPlaying) {
+                        renderer.render(file)
+                        eventBus.publish(PlayerEvent.PlaybackStarted(item.mediaId))
+                    } else {
+                        playbackStateStore.updateState(PresentationState.Video(file))
+                        eventBus.publish(PlayerEvent.PlaybackStarted(item.mediaId))
+                    }
 
                     if (item.mediaType == MediaType.IMAGE) {
                         scope.launch {
