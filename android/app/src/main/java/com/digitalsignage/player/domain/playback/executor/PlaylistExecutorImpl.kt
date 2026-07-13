@@ -79,11 +79,12 @@ class PlaylistExecutorImpl @Inject constructor(
                 }
                 
                 val item = playlist.items[currentIndex]
-                val nextIndex = (currentIndex + 1) % playlist.items.size
-                val nextItem = playlist.items[nextIndex]
-                if (nextItem.mediaType == com.digitalsignage.player.domain.model.MediaType.VIDEO && playlist.items.size > 1) {
-                    playbackController.preloadItem(nextItem)
-                }
+                // Preloading disabled (Option A)
+                // val nextIndex = (currentIndex + 1) % playlist.items.size
+                // val nextItem = playlist.items[nextIndex]
+                // if (nextItem.mediaType == com.digitalsignage.player.domain.model.MediaType.VIDEO && playlist.items.size > 1) {
+                //     playbackController.preloadItem(nextItem)
+                // }
                 
                 try {
                     playbackController.playItem(item)

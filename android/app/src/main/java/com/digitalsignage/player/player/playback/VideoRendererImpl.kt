@@ -48,9 +48,13 @@ class VideoRendererImpl(
 
     override suspend fun stop() {
         withContext(Dispatchers.Main.immediate) {
-            android.util.Log.i("LIFECYCLE_TRACE", "BEFORE pause()")
-            exoPlayer.pause()
-            android.util.Log.i("LIFECYCLE_TRACE", "AFTER pause()")
+            android.util.Log.i("LIFECYCLE_TRACE", "BEFORE stop()")
+            exoPlayer.stop()
+            android.util.Log.i("LIFECYCLE_TRACE", "AFTER stop()")
+            
+            android.util.Log.i("LIFECYCLE_TRACE", "BEFORE clearMediaItems()")
+            exoPlayer.clearMediaItems()
+            android.util.Log.i("LIFECYCLE_TRACE", "AFTER clearMediaItems()")
         }
     }
 }
