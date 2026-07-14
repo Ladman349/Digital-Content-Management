@@ -45,6 +45,7 @@ class PlaybackActivity : AppCompatActivity() {
     @Inject lateinit var runtimeConfigStore: RuntimeConfigStoreImpl
     @Inject lateinit var otaUpdateManager: com.digitalsignage.player.core.ota.manager.OtaUpdateManager
     @Inject lateinit var apkDownloadManager: com.digitalsignage.player.core.ota.downloader.ApkDownloadManager
+    @Inject lateinit var otaInstallManager: com.digitalsignage.player.core.ota.installer.OtaInstallManager
 
     private val viewModel: PlaybackViewModel by viewModels()
 
@@ -94,6 +95,48 @@ class PlaybackActivity : AppCompatActivity() {
         }
         binding.btnSaveDiagnostics.setOnClickListener {
             saveDiagnosticsToDownloads()
+        }
+        binding.btnTriggerInstall.setOnClickListener {
+            android.util.Log.i("KioskTrace", "[OTA] Trigger Install clicked. Initiating manual installation pre-checks...")
+            otaInstallManager.install()
+        }
+
+        // Collect and trace installation states
+        lifecycleScope.launch {
+            otaInstallManager.installState.collect { state ->
+                when (state) {
+                    is com.digitalsignage.player.core.ota.installer.InstallResult.Idle -> {
+                        android.util.Log.i("KioskTrace", "[OTA] Installation State: Idle")
+                    }
+                    is com.digitalsignage.player.core.ota.installer.InstallResult.Preparing -> {
+                        android.util.Log.i("KioskTrace", "[OTA] Installation State: Preparing")
+                    }
+                    is com.digitalsignage.player.core.ota.installer.InstallResult.Validating -> {
+                        android.util.Log.i("KioskTrace", "[OTA] Installation State: Validating package identity and signatures")
+                    }
+                    is com.digitalsignage.player.core.ota.installer.InstallResult.Installing -> {
+                        android.util.Log.i("KioskTrace", "[OTA] Installation State: Triggering package installation")
+                    }
+                    is com.digitalsignage.player.core.ota.installer.InstallResult.InstallCommitted -> {
+                        android.util.Log.i("KioskTrace", "[OTA] Installation State: Install Session Committed. Waiting for callback...")
+                    }
+                    is com.digitalsignage.player.core.ota.installer.InstallResult.Installed -> {
+                        android.util.Log.i("KioskTrace", "[OTA] Installation State: Installation Completed successfully!")
+                    }
+                    is com.digitalsignage.player.core.ota.installer.InstallResult.RequiresUserConfirmation -> {
+                        android.util.Log.w("KioskTrace", "[OTA] Installation State: Requires user confirmation to proceed.")
+                    }
+                    is com.digitalsignage.player.core.ota.installer.InstallResult.WaitingForReboot -> {
+                        android.util.Log.i("KioskTrace", "[OTA] Installation State: Waiting for device reboot/package replacement.")
+                    }
+                    is com.digitalsignage.player.core.ota.installer.InstallResult.Cancelled -> {
+                        android.util.Log.i("KioskTrace", "[OTA] Installation State: Cancelled.")
+                    }
+                    is com.digitalsignage.player.core.ota.installer.InstallResult.Failed -> {
+                        android.util.Log.e("KioskTrace", "[OTA] Installation State: Failed (reason: ${state.reason})")
+                    }
+                }
+            }
         }
 
         val exoController = playbackController as? PlaybackControllerImpl

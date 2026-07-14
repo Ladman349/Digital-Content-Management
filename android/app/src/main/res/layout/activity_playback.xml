@@ -107,7 +107,14 @@
                     android:id="@+id/btnSaveDiagnostics"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Save to Downloads" />
+                    android:text="Save to Downloads"
+                    android:layout_marginRight="12dp" />
+
+                <Button
+                    android:id="@+id/btnTriggerInstall"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Trigger Install" />
             </LinearLayout>
 
             <TextView android:id="@+id/tvDebugState" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/white" android:textSize="16sp" android:layout_marginBottom="4dp"/>
