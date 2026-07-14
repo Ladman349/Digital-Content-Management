@@ -1,4 +1,4 @@
-import { Box, Button, InputAdornment, TextField, Typography, Paper } from "@mui/material";
+import { Box, IconButton, InputAdornment, TextField, Typography, Paper } from "@mui/material";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import PlayCircleOutlineRoundedIcon from "@mui/icons-material/PlayCircleOutlineRounded";
@@ -19,7 +19,7 @@ export default function PlaylistMediaDrawer({ mediaItems, onAdd }: Props) {
   return (
     <Box sx={{ display: "flex", flexDirection: "column", height: "100%", bgcolor: "#F8FAFC", borderLeft: "1px solid #E2E8F0" }}>
       <Box sx={{ p: 2, borderBottom: "1px solid #E2E8F0", bgcolor: "#fff" }}>
-        <Typography sx={{ fontWeight: 700, fontSize: 16, mb: 2 }}>Media Library</Typography>
+        <Typography sx={{ fontWeight: 700, fontSize: 16, mb: 1.5, color: "#1E293B" }}>Media Library</Typography>
         <TextField
           placeholder="Search media..."
           size="small"
@@ -35,25 +35,32 @@ export default function PlaylistMediaDrawer({ mediaItems, onAdd }: Props) {
         />
       </Box>
 
-      <Box sx={{ p: 2, flexGrow: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 1.5 }}>
+      <Box sx={{ p: 1.5, flexGrow: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 1 }}>
         {filtered.map(media => (
           <Paper
             key={media.id}
             elevation={0}
             sx={{
               display: "flex",
-              flexDirection: "column",
-              borderRadius: "12px",
+              alignItems: "center",
+              p: 1,
+              borderRadius: "10px",
               border: "1px solid #E2E8F0",
-              overflow: "hidden",
+              bgcolor: "#fff",
+              gap: 1.5,
+              "&:hover": { borderColor: "#CBD5E1" }
             }}
           >
+            {/* Thumbnail Image */}
             <Box
               sx={{
-                height: 100,
+                width: 64,
+                height: 48,
+                borderRadius: "6px",
                 backgroundImage: `url(${media.thumbnail})`,
                 backgroundSize: "cover",
                 backgroundPosition: "center",
+                flexShrink: 0,
                 position: "relative",
               }}
             >
@@ -66,30 +73,38 @@ export default function PlaylistMediaDrawer({ mediaItems, onAdd }: Props) {
                     alignItems: "center",
                     justifyContent: "center",
                     bgcolor: "rgba(0,0,0,0.3)",
+                    borderRadius: "6px",
                   }}
                 >
-                  <PlayCircleOutlineRoundedIcon sx={{ color: "#fff", fontSize: 24 }} />
+                  <PlayCircleOutlineRoundedIcon sx={{ color: "#fff", fontSize: 16 }} />
                 </Box>
               )}
             </Box>
-            <Box sx={{ p: 1.5 }}>
-              <Typography sx={{ fontWeight: 600, fontSize: 13, color: "#1E293B", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", mb: 0.5 }}>
+
+            {/* Media Metadata */}
+            <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+              <Typography noWrap sx={{ fontWeight: 600, fontSize: 13, color: "#1E293B", mb: 0.2 }}>
                 {media.name}
               </Typography>
-              <Typography sx={{ fontSize: 11, color: "#64748B", mb: 1.5 }}>
+              <Typography sx={{ fontSize: 11, color: "#64748B" }}>
                 {media.type} • {media.category}
               </Typography>
-              <Button
-                fullWidth
-                variant="outlined"
-                size="small"
-                startIcon={<AddRoundedIcon />}
-                onClick={() => onAdd(media)}
-                sx={{ borderRadius: "8px", textTransform: "none", fontWeight: 600 }}
-              >
-                Add to Sequence
-              </Button>
             </Box>
+
+            {/* Add Action Button */}
+            <IconButton
+              size="small"
+              onClick={() => onAdd(media)}
+              sx={{
+                color: "#10B981",
+                bgcolor: "#ECFDF5",
+                "&:hover": { bgcolor: "#D1FAE5" },
+                borderRadius: "8px",
+                p: 0.8
+              }}
+            >
+              <AddRoundedIcon sx={{ fontSize: 18 }} />
+            </IconButton>
           </Paper>
         ))}
 
