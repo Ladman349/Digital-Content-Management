@@ -57,81 +57,114 @@ export default function PlaylistTimeline({
             elevation={0}
             sx={{
               display: "flex",
-              alignItems: "center",
+              flexDirection: { xs: "column", sm: "row" },
+              alignItems: { xs: "stretch", sm: "center" },
               p: 1.5,
               borderRadius: "12px",
               border: "1px solid #EEF2F7",
               bgcolor: "#fff",
-              gap: 2,
+              gap: { xs: 1.5, sm: 2 },
             }}
           >
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, color: "#CBD5E1" }}>
-              <IconButton size="small" disabled={isFirst} onClick={() => onMoveUp(index)}>
-                <ArrowUpwardRoundedIcon sx={{ fontSize: 16 }} />
-              </IconButton>
-              <IconButton size="small" disabled={isLast} onClick={() => onMoveDown(index)}>
-                <ArrowDownwardRoundedIcon sx={{ fontSize: 16 }} />
-              </IconButton>
-            </Box>
+            {/* Upper row: Thumbnail + Details + Delete (Mobile only) */}
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexGrow: 1, minWidth: 0 }}>
+              {/* Vertical Reorder Arrows (Desktop only) */}
+              <Box sx={{ display: { xs: "none", sm: "flex" }, flexDirection: "column", gap: 0.5, color: "#CBD5E1" }}>
+                <IconButton size="small" disabled={isFirst} onClick={() => onMoveUp(index)}>
+                  <ArrowUpwardRoundedIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+                <IconButton size="small" disabled={isLast} onClick={() => onMoveDown(index)}>
+                  <ArrowDownwardRoundedIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </Box>
 
-            <Box
-              sx={{
-                width: 80,
-                height: 56,
-                borderRadius: "8px",
-                backgroundImage: `url(${media.thumbnail})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-                flexShrink: 0,
-                position: "relative",
-              }}
-            >
-              {media.type === "Video" && (
-                <Box
-                  sx={{
-                    position: "absolute",
-                    inset: 0,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    bgcolor: "rgba(0,0,0,0.3)",
-                    borderRadius: "8px",
-                  }}
-                >
-                  <PlayCircleOutlineRoundedIcon sx={{ color: "#fff", fontSize: 20 }} />
-                </Box>
-              )}
-            </Box>
-
-            <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-              <Typography sx={{ fontWeight: 600, fontSize: 14, color: "#1E293B", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {media.name}
-              </Typography>
-              <Typography sx={{ fontSize: 12, color: "#64748B" }}>
-                {media.type} • {media.category}
-              </Typography>
-            </Box>
-
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              <Typography sx={{ fontSize: 12, color: "#64748B", fontWeight: 500 }}>
-                Duration (s):
-              </Typography>
-              <TextField
-                type="number"
-                size="small"
-                value={item.duration}
-                onChange={(e) => onUpdateDuration(index, parseInt(e.target.value) || 0)}
+              <Box
                 sx={{
                   width: 80,
-                  "& .MuiOutlinedInput-root": { borderRadius: "8px" },
-                  "& input": { textAlign: "center", py: 1 },
+                  height: 56,
+                  borderRadius: "8px",
+                  backgroundImage: `url(${media.thumbnail})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  flexShrink: 0,
+                  position: "relative",
                 }}
-              />
+              >
+                {media.type === "Video" && (
+                  <Box
+                    sx={{
+                      position: "absolute",
+                      inset: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      bgcolor: "rgba(0,0,0,0.3)",
+                      borderRadius: "8px",
+                    }}
+                  >
+                    <PlayCircleOutlineRoundedIcon sx={{ color: "#fff", fontSize: 20 }} />
+                  </Box>
+                )}
+              </Box>
+
+              <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                <Typography sx={{ fontWeight: 600, fontSize: 14, color: "#1E293B", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {media.name}
+                </Typography>
+                <Typography sx={{ fontSize: 12, color: "#64748B" }}>
+                  {media.type} • {media.category}
+                </Typography>
+              </Box>
+
+              {/* Delete Icon (Mobile only) */}
+              <IconButton onClick={() => onRemove(index)} sx={{ display: { xs: "inline-flex", sm: "none" }, color: "#EF4444", "&:hover": { bgcolor: "#FEF2F2" } }}>
+                <DeleteOutlineRoundedIcon />
+              </IconButton>
             </Box>
 
-            <IconButton onClick={() => onRemove(index)} sx={{ color: "#EF4444", "&:hover": { bgcolor: "#FEF2F2" } }}>
-              <DeleteOutlineRoundedIcon />
-            </IconButton>
+            {/* Lower row / Actions row (Mobile & Desktop) */}
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 2,
+                borderTop: { xs: "1px solid #F1F5F9", sm: "none" },
+                pt: { xs: 1.5, sm: 0 },
+              }}
+            >
+              {/* Horizontal Reorder Arrows (Mobile only) */}
+              <Box sx={{ display: { xs: "flex", sm: "none" }, alignItems: "center", gap: 1 }}>
+                <IconButton size="small" disabled={isFirst} onClick={() => onMoveUp(index)}>
+                  <ArrowUpwardRoundedIcon sx={{ fontSize: 18 }} />
+                </IconButton>
+                <IconButton size="small" disabled={isLast} onClick={() => onMoveDown(index)}>
+                  <ArrowDownwardRoundedIcon sx={{ fontSize: 18 }} />
+                </IconButton>
+              </Box>
+
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, ml: { xs: "auto", sm: 0 } }}>
+                <Typography sx={{ fontSize: 12, color: "#64748B", fontWeight: 500 }}>
+                  Duration (s):
+                </Typography>
+                <TextField
+                  type="number"
+                  size="small"
+                  value={item.duration}
+                  onChange={(e) => onUpdateDuration(index, parseInt(e.target.value) || 0)}
+                  sx={{
+                    width: 80,
+                    "& .MuiOutlinedInput-root": { borderRadius: "8px" },
+                    "& input": { textAlign: "center", py: 1 },
+                  }}
+                />
+              </Box>
+
+              {/* Delete Icon (Desktop only) */}
+              <IconButton onClick={() => onRemove(index)} sx={{ display: { xs: "none", sm: "inline-flex" }, color: "#EF4444", "&:hover": { bgcolor: "#FEF2F2" } }}>
+                <DeleteOutlineRoundedIcon />
+              </IconButton>
+            </Box>
           </Paper>
         );
       })}
