@@ -12,17 +12,20 @@ interface Props {
   title: string;
   path: string;
   icon: SvgIconComponent;
+  onClick?: () => void;
 }
 
 export default function SidebarItem({
   title,
   path,
   icon: Icon,
+  onClick,
 }: Props) {
   return (
     <ListItemButton
       component={NavLink}
       to={path}
+      onClick={onClick}
       sx={{
         mx: 2,
         mb: 1,

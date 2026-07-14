@@ -15,9 +15,19 @@ import Logo from "./Logo";
 import SidebarItem from "./SidebarItem";
 import { navigationItems } from "../../constants/navigation";
 
-const drawerWidth = 300;
+export const DRAWER_WIDTH = 280;
 
-export default function Sidebar({ open = true }: { open?: boolean }) {
+export default function Sidebar({
+  open = true,
+  variant = "permanent",
+  onClose,
+  onItemClick,
+}: {
+  open?: boolean;
+  variant?: "permanent" | "temporary";
+  onClose?: () => void;
+  onItemClick?: () => void;
+}) {
   const mainItems = navigationItems.filter(
     (item) => item.section === "main"
   );
@@ -26,17 +36,20 @@ export default function Sidebar({ open = true }: { open?: boolean }) {
     (item) => item.section === "management"
   );
 
-  const currentWidth = open ? drawerWidth : 0;
-
   return (
     <Drawer
-      variant="permanent"
+      variant={variant}
+      open={open}
+      onClose={onClose}
+      ModalProps={{
+        keepMounted: true,
+      }}
       sx={{
-        width: currentWidth,
+        width: variant === "permanent" ? (open ? DRAWER_WIDTH : 0) : 0,
         flexShrink: 0,
         transition: "width 0.2s",
         "& .MuiDrawer-paper": {
-          width: currentWidth,
+          width: DRAWER_WIDTH,
           overflowX: "hidden",
           transition: "width 0.2s",
           border: "none",
@@ -57,6 +70,7 @@ export default function Sidebar({ open = true }: { open?: boolean }) {
               title={item.title}
               path={item.path}
               icon={item.icon}
+              onClick={onItemClick}
             />
           ))}
         </List>
@@ -90,6 +104,7 @@ export default function Sidebar({ open = true }: { open?: boolean }) {
                   title={item.title}
                   path={item.path}
                   icon={item.icon}
+                  onClick={onItemClick}
                 />
               ))}
             </List>
