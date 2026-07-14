@@ -211,8 +211,12 @@ class AppUpdateService:
             try:
                 archive_dir = apk_dir / "archive"
                 archive_dir.mkdir(parents=True, exist_ok=True)
+                # Generate timestamped archive filename
+                timestamp = datetime.now().strftime("%Y%m%dT%H%M%S")
+                stem = Path(db_obj.apk_filename).stem
+                archive_filename = f"{stem}-{timestamp}.apk"
                 # Archive the file
-                shutil.move(str(file_path), str(archive_dir / db_obj.apk_filename))
+                shutil.move(str(file_path), str(archive_dir / archive_filename))
             except Exception:
                 # Fallback to delete if archive move fails
                 try:

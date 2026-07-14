@@ -107,6 +107,11 @@ def test_download_and_metrics(client):
     assert dl_res.content == file_content
     assert "attachment" in dl_res.headers["content-disposition"]
     assert filename in dl_res.headers["content-disposition"]
+    # Check cache control headers
+    assert "no-cache" in dl_res.headers["cache-control"]
+    assert "no-store" in dl_res.headers["cache-control"]
+    assert dl_res.headers["pragma"] == "no-cache"
+    assert dl_res.headers["expires"] == "0"
 
     # Verify download count incremented
     latest_meta = client.get("/app-updates/latest").json()
@@ -162,3 +167,29 @@ def test_delete_app_update(client):
     # Verify metadata deleted
     updates = client.get("/app-updates/").json()
     assert not any(u["id"] == update_id for u in updates)
+
+def test_ping_updates(client):
+    res = client.get("/app-updates/ping")
+    assert res.status_code == 200
+    assert res.json() == {"status": "ok"}
+
+def test_info_endpoint(client):
+    # Ensure there is an active release
+    f = {"file": ("info.apk", b"info content", "application/vnd.android.package-archive")}
+    client.post("/app-updates/", files=f, data={
+        "version_name": "1.0.15",
+        "version_code": "15",
+        "is_active": "true",
+        "mandatory": "false"
+    })
+
+    res = client.get("/app-updates/info")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["versionName"] == "1.0.15"
+    assert data["versionCode"] == 15
+    assert data["mandatory"] is False
+    assert data["downloadCount"] == 0
+    assert data["fileSize"] == len(b"info content")
+    assert "checksum" in data
+    assert "uploadedAt" in data
