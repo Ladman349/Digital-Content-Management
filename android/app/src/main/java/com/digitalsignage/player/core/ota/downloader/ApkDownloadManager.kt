@@ -41,8 +41,22 @@ class ApkDownloadManager @Inject constructor(
         val finalFile = File(otaDir, "update.apk")
         val partFile = File(otaDir, "update.apk.part")
 
-        // Clean up previous files
-        if (finalFile.exists()) finalFile.delete()
+        // Pre-check: If finalFile exists, verify its checksum to avoid duplicate downloads
+        if (finalFile.exists()) {
+            _downloadState.value = DownloadState.Verifying
+            Log.i(TAG, "[OTA] Checking existing local update.apk...")
+            val existingChecksum = calculateFileSha256(finalFile)
+            if (existingChecksum.equals(update.checksum, ignoreCase = true)) {
+                _downloadState.value = DownloadState.Completed
+                Log.i(TAG, "[OTA] Local update.apk is up-to-date. Skipping download. Ready for installation")
+                return@withContext true
+            } else {
+                Log.i(TAG, "[OTA] Existing update.apk checksum mismatch. Deleting and re-downloading...")
+                finalFile.delete()
+            }
+        }
+
+        // Clean up temporary files
         if (partFile.exists()) partFile.delete()
 
         val request = Request.Builder().url(update.apkUrl).build()
@@ -120,6 +134,23 @@ class ApkDownloadManager @Inject constructor(
             if (partFile.exists()) partFile.delete()
             _downloadState.value = DownloadState.Failed(e.message ?: "Unknown error")
             return@withContext false
+        }
+    }
+
+    private fun calculateFileSha256(file: File): String {
+        return try {
+            val digest = MessageDigest.getInstance("SHA-256")
+            file.inputStream().use { input ->
+                val buffer = ByteArray(8192)
+                var bytesRead: Int
+                while (input.read(buffer).also { bytesRead = it } != -1) {
+                    digest.update(buffer, 0, bytesRead)
+                }
+            }
+            digest.digest().joinToString("") { "%02x".format(it) }
+        } catch (e: Exception) {
+            Log.e(TAG, "[OTA] Failed to calculate SHA-256 for ${file.name}", e)
+            ""
         }
     }
 }
