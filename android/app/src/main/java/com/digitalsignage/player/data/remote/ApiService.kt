@@ -9,6 +9,7 @@ import retrofit2.http.POST
 import retrofit2.http.Header
 import retrofit2.http.Body
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 interface ApiService {
     @POST("devices/register")
@@ -22,5 +23,10 @@ interface ApiService {
 
     @POST("devices/heartbeat")
     suspend fun postHeartbeat(@Body payload: com.digitalsignage.player.data.remote.dto.HeartbeatPayload): Response<Unit>
+
+    @GET("app-updates/check")
+    suspend fun checkForUpdate(
+        @Query("version_code") versionCode: Int
+    ): Response<com.digitalsignage.player.core.ota.model.AppUpdateCheckDto>
 }
 
