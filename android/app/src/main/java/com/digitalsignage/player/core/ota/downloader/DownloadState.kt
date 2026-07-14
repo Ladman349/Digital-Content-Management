@@ -5,6 +5,6 @@ sealed interface DownloadState {
     object Downloading : DownloadState
     data class Progress(val percent: Int) : DownloadState
     object Verifying : DownloadState
-    object Completed : DownloadState
+    object ReadyForInstall : DownloadState
     data class Failed(val reason: String) : DownloadState
 }

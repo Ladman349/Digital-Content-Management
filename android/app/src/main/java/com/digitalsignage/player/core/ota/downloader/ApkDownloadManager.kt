@@ -47,7 +47,8 @@ class ApkDownloadManager @Inject constructor(
             Log.i(TAG, "[OTA] Checking existing local update.apk...")
             val existingChecksum = calculateFileSha256(finalFile)
             if (existingChecksum.equals(update.checksum, ignoreCase = true)) {
-                _downloadState.value = DownloadState.Completed
+                writeMetadataJson(update)
+                _downloadState.value = DownloadState.ReadyForInstall
                 Log.i(TAG, "[OTA] Local update.apk is up-to-date. Skipping download. Ready for installation")
                 return@withContext true
             } else {
@@ -112,7 +113,8 @@ class ApkDownloadManager @Inject constructor(
 
                 if (calculatedChecksum.equals(update.checksum, ignoreCase = true)) {
                     if (partFile.renameTo(finalFile)) {
-                        _downloadState.value = DownloadState.Completed
+                        writeMetadataJson(update)
+                        _downloadState.value = DownloadState.ReadyForInstall
                         Log.i(TAG, "[OTA] Ready for installation")
                         return@withContext true
                     } else {
@@ -134,6 +136,30 @@ class ApkDownloadManager @Inject constructor(
             if (partFile.exists()) partFile.delete()
             _downloadState.value = DownloadState.Failed(e.message ?: "Unknown error")
             return@withContext false
+        }
+    }
+
+    private fun writeMetadataJson(update: OtaCheckResult.UpdateAvailable) {
+        try {
+            val otaDir = File(context.getExternalFilesDir(null), "ota")
+            if (!otaDir.exists()) {
+                otaDir.mkdirs()
+            }
+            val metadataFile = File(otaDir, "metadata.json")
+            val format = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", java.util.Locale.US)
+            val metadataJson = org.json.JSONObject().apply {
+                put("versionCode", update.latestVersionCode)
+                put("versionName", update.versionName)
+                put("checksum", update.checksum)
+                put("downloadedAt", format.format(java.util.Date()))
+                put("mandatory", update.mandatory)
+                put("releaseNotes", update.releaseNotes ?: "")
+                put("apkSize", update.fileSize)
+            }
+            metadataFile.writeText(metadataJson.toString(4))
+            Log.i(TAG, "[OTA] Metadata JSON written: ${metadataFile.absolutePath}")
+        } catch (e: Exception) {
+            Log.e(TAG, "[OTA] Failed to write metadata.json", e)
         }
     }
 
