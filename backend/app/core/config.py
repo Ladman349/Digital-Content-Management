@@ -14,6 +14,7 @@ class Settings(BaseModel):
     API_BASE_URL: str = Field(default_factory=lambda: os.getenv("API_BASE_URL", "http://localhost:8000"))
     CORS_ALLOWED_ORIGINS: str = Field(default_factory=lambda: os.getenv("CORS_ALLOWED_ORIGINS", ""))
     SECRET_KEY: str = Field(default_factory=lambda: os.getenv("SECRET_KEY", "super-secret-key-change-in-production"))
+    OTA_MAX_UPLOAD_MB: int = Field(default_factory=lambda: int(os.getenv("OTA_MAX_UPLOAD_MB", "150")))
 
     def validate_production(self):
         if self.APP_ENV == "production":

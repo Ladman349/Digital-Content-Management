@@ -21,6 +21,11 @@ class AppUpdate(Base):
     release_notes = Column("release_notes", Text, nullable=True)
     mandatory = Column("mandatory", Boolean, default=False, server_default="false")
     is_active = Column("is_active", Boolean, default=False, server_default="false")
+    
+    # Download Metrics
+    download_count = Column("download_count", Integer, default=0, server_default="0", nullable=False)
+    last_downloaded_at = Column("last_downloaded_at", DateTime(timezone=True), nullable=True)
+    
     created_at = Column(
         "created_at", 
         DateTime(timezone=True), 
