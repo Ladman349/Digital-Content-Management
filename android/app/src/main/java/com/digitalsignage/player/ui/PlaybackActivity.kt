@@ -44,6 +44,7 @@ class PlaybackActivity : AppCompatActivity() {
     @Inject lateinit var eventBus: PlayerEventBus
     @Inject lateinit var runtimeConfigStore: RuntimeConfigStoreImpl
     @Inject lateinit var otaUpdateManager: com.digitalsignage.player.core.ota.manager.OtaUpdateManager
+    @Inject lateinit var apkDownloadManager: com.digitalsignage.player.core.ota.downloader.ApkDownloadManager
 
     private val viewModel: PlaybackViewModel by viewModels()
 
@@ -201,6 +202,36 @@ class PlaybackActivity : AppCompatActivity() {
                         Release Notes   : ${result.releaseNotes ?: "None"}
                         ==================================================
                     """.trimIndent())
+
+                    // Trigger Phase 2 Background Download Flow
+                    lifecycleScope.launch {
+                        apkDownloadManager.downloadState.collect { state ->
+                            when (state) {
+                                is com.digitalsignage.player.core.ota.downloader.DownloadState.Idle -> {
+                                    android.util.Log.i("KioskTrace", "[OTA] Download State: Idle")
+                                }
+                                is com.digitalsignage.player.core.ota.downloader.DownloadState.Downloading -> {
+                                    android.util.Log.i("KioskTrace", "[OTA] Download State: Downloading")
+                                }
+                                is com.digitalsignage.player.core.ota.downloader.DownloadState.Progress -> {
+                                    android.util.Log.i("KioskTrace", "[OTA] Download State: Progress ${state.percent}%")
+                                }
+                                is com.digitalsignage.player.core.ota.downloader.DownloadState.Verifying -> {
+                                    android.util.Log.i("KioskTrace", "[OTA] Download State: Verifying checksum")
+                                }
+                                is com.digitalsignage.player.core.ota.downloader.DownloadState.Completed -> {
+                                    android.util.Log.i("KioskTrace", "[OTA] Download State: Completed. [OTA] Ready for installation")
+                                }
+                                is com.digitalsignage.player.core.ota.downloader.DownloadState.Failed -> {
+                                    android.util.Log.e("KioskTrace", "[OTA] Download State: Failed (reason: ${state.reason})")
+                                }
+                            }
+                        }
+                    }
+
+                    lifecycleScope.launch {
+                        apkDownloadManager.download(result)
+                    }
                 }
                 is com.digitalsignage.player.core.ota.model.OtaCheckResult.NoUpdate -> {
                     android.util.Log.i("KioskTrace", "[OTA] No update available. App is up to date.")
