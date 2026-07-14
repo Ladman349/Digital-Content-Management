@@ -1,5 +1,6 @@
 def test_create_device(client):
     payload = {
+        "id": "TV-test-screen",
         "name": "Test Screen",
         "location": "Lobby",
         "resolution": "1920x1080",
@@ -18,6 +19,7 @@ def test_create_device(client):
 
 def test_get_devices(client):
     client.post("/devices", json={
+        "id": "TV-screen-1",
         "name": "Screen 1", "location": "A", "resolution": "1080p", 
         "status": "Online", "lastSeen": "now", "lastSeenMs": 123
     })
@@ -25,10 +27,12 @@ def test_get_devices(client):
     assert response.status_code == 200
     data = response.json()
     assert len(data) >= 1
-    assert data[0]["name"] == "Screen 1"
+    screen = next(d for d in data if d["id"] == "TV-screen-1")
+    assert screen["name"] == "Screen 1"
 
 def test_update_device(client):
     create_response = client.post("/devices", json={
+        "id": "TV-screen-to-update",
         "name": "Screen To Update", "location": "A", "resolution": "1080p", 
         "status": "Offline", "lastSeen": "now", "lastSeenMs": 123
     })
@@ -42,6 +46,7 @@ def test_update_device(client):
 
 def test_delete_device(client):
     create_response = client.post("/devices", json={
+        "id": "TV-screen-to-delete",
         "name": "Screen To Delete", "location": "A", "resolution": "1080p", 
         "status": "Offline", "lastSeen": "now", "lastSeenMs": 123
     })
@@ -59,6 +64,7 @@ from app.services.device_service import DeviceService
 def test_device_heartbeat(client):
     # Create device
     payload = {
+        "id": "TV-heartbeat-device",
         "name": "Heartbeat Device",
         "location": "Lobby",
         "resolution": "1080p",
@@ -104,6 +110,7 @@ def test_heartbeat_invalid_device(client):
 
 def test_device_status_transitions(client):
     create_res = client.post("/devices", json={
+        "id": "TV-status-device",
         "name": "Status Device", "location": "Lobby", "resolution": "1080p", 
         "status": "Offline", "lastSeen": "now", "lastSeenMs": 123
     })
@@ -136,6 +143,7 @@ def test_device_status_transitions(client):
 
 def test_repeated_heartbeats(client):
     create_res = client.post("/devices", json={
+        "id": "TV-repeat-device",
         "name": "Repeat Device", "location": "Lobby", "resolution": "1080p", 
         "status": "Offline", "lastSeen": "now", "lastSeenMs": 123
     })
