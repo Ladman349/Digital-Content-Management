@@ -52,30 +52,31 @@ export default function Navbar({ onToggleSidebar }: { onToggleSidebar: () => voi
       elevation={0}
       sx={{
         bgcolor: "transparent",
-        p: 2,
+        p: { xs: 1, sm: 2 },
       }}
     >
       <Paper
         elevation={0}
         sx={{
-          height: 72,
+          height: { xs: 60, sm: 72 },
           display: "flex",
           alignItems: "center",
-          px: 3,
+          px: { xs: 1.5, sm: 3 },
           borderRadius: 4,
           border: "1px solid #E5E7EB",
           boxShadow: "0 8px 30px rgba(0,0,0,.05)",
         }}
       >
-        <IconButton onClick={onToggleSidebar} sx={{ mr: 2 }}>
+        <IconButton onClick={onToggleSidebar} sx={{ mr: { xs: 0.5, sm: 2 } }}>
           <MenuRoundedIcon />
         </IconButton>
 
         <Typography
           sx={{
-            ml: 3,
-            fontWeight: 700,
-            fontSize: 24,
+            ml: { xs: 1, sm: 3 },
+            fontWeight: 800,
+            fontSize: { xs: 16, sm: 20, md: 24 },
+            whiteSpace: "nowrap",
           }}
         >
           Digital Signage CMS
@@ -83,9 +84,11 @@ export default function Navbar({ onToggleSidebar }: { onToggleSidebar: () => voi
 
         <Box sx={{ flexGrow: 1 }} />
 
-        <SearchBar />
+        <Box sx={{ display: { xs: "none", lg: "block" } }}>
+          <SearchBar />
+        </Box>
 
-        <Box sx={{ width: 24 }} />
+        <Box sx={{ width: { xs: 8, lg: 24 } }} />
 
         <IconButton onClick={handleNotifOpen}>
           <NotificationsRoundedIcon />
@@ -120,7 +123,7 @@ export default function Navbar({ onToggleSidebar }: { onToggleSidebar: () => voi
           sx={{
             display: "flex",
             alignItems: "center",
-            ml: 3,
+            ml: { xs: 1.5, sm: 3 },
             gap: 1.5,
             cursor: "pointer",
             p: 0.5,
@@ -130,12 +133,12 @@ export default function Navbar({ onToggleSidebar }: { onToggleSidebar: () => voi
         >
           <Avatar sx={{ bgcolor: "#6C4CF1" }}>A</Avatar>
 
-          <Box>
+          <Box sx={{ display: { xs: "none", md: "block" } }}>
             <Typography sx={{ fontWeight: 700 }}>Akash</Typography>
             <Typography sx={{ fontSize: 12, color: "#6B7280" }}>Administrator</Typography>
           </Box>
 
-          <KeyboardArrowDownRoundedIcon />
+          <KeyboardArrowDownRoundedIcon sx={{ display: { xs: "none", md: "block" } }} />
         </Box>
 
         <Menu
