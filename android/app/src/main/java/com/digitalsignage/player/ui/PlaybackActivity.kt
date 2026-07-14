@@ -43,6 +43,7 @@ class PlaybackActivity : AppCompatActivity() {
     @Inject lateinit var playbackController: PlaybackController
     @Inject lateinit var eventBus: PlayerEventBus
     @Inject lateinit var runtimeConfigStore: RuntimeConfigStoreImpl
+    @Inject lateinit var otaUpdateManager: com.digitalsignage.player.core.ota.manager.OtaUpdateManager
 
     private val viewModel: PlaybackViewModel by viewModels()
 
@@ -182,6 +183,32 @@ class PlaybackActivity : AppCompatActivity() {
 
         binding.root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
             applyOrientation(currentOrientation)
+        }
+
+        // Trigger OTA Update Check (Phase 1)
+        lifecycleScope.launch {
+            when (val result = otaUpdateManager.checkForUpdates()) {
+                is com.digitalsignage.player.core.ota.model.OtaCheckResult.UpdateAvailable -> {
+                    android.util.Log.i("KioskTrace", """
+                        ==================================================
+                        [OTA] UPDATE AVAILABLE
+                        Current Version : ${result.currentVersionCode}
+                        Latest Version  : ${result.latestVersionCode} (name: ${result.versionName})
+                        Mandatory       : ${result.mandatory}
+                        APK URL         : ${result.apkUrl}
+                        Checksum        : ${result.checksum}
+                        File Size       : ${result.fileSize} bytes
+                        Release Notes   : ${result.releaseNotes ?: "None"}
+                        ==================================================
+                    """.trimIndent())
+                }
+                is com.digitalsignage.player.core.ota.model.OtaCheckResult.NoUpdate -> {
+                    android.util.Log.i("KioskTrace", "[OTA] No update available. App is up to date.")
+                }
+                is com.digitalsignage.player.core.ota.model.OtaCheckResult.Failure -> {
+                    android.util.Log.w("KioskTrace", "[OTA] Check failed: ${result.message}")
+                }
+            }
         }
     }
 
