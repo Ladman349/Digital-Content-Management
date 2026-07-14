@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
-import { Box, Button, TextField, Typography, MenuItem, IconButton } from "@mui/material";
+import { Box, Button, TextField, Typography, MenuItem, IconButton, Drawer } from "@mui/material";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import { useSnackbar } from "notistack";
 
 import type { Playlist, PlaylistItem, PlaylistStatus } from "../../types/playlist";
@@ -26,6 +27,7 @@ export default function PlaylistEditor({ open, initialPlaylist, mediaLibrary, on
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<PlaylistStatus>("Draft");
   const [items, setItems] = useState<PlaylistItem[]>([]);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -58,6 +60,7 @@ export default function PlaylistEditor({ open, initialPlaylist, mediaLibrary, on
       duration: media.type === "Video" ? (media.duration || 10) : 10,
     };
     setItems(prev => [...prev, newItem]);
+    enqueueSnackbar(`Added "${media.name}" to sequence`, { variant: "success" });
   };
 
   const handleMoveUp = (index: number) => {
@@ -124,19 +127,27 @@ export default function PlaylistEditor({ open, initialPlaylist, mediaLibrary, on
   return (
     <Box sx={{ position: "fixed", inset: 0, bgcolor: "#F1F5F9", zIndex: 1200, display: "flex", flexDirection: "column" }}>
       {/* Top Bar */}
-      <Box sx={{ height: 64, bgcolor: "#fff", borderBottom: "1px solid #E2E8F0", display: "flex", alignItems: "center", justifyContent: "space-between", px: 3, flexShrink: 0 }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <IconButton onClick={onClose} edge="start"><CloseRoundedIcon /></IconButton>
-          <Typography sx={{ fontWeight: 700, fontSize: 18, color: "#1E293B" }}>
+      <Box sx={{ height: 64, bgcolor: "#fff", borderBottom: "1px solid #E2E8F0", display: "flex", alignItems: "center", justifyContent: "space-between", px: { xs: 1.5, sm: 3 }, flexShrink: 0 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: { xs: 1, sm: 2 }, minWidth: 0, mr: 1 }}>
+          <IconButton onClick={onClose} edge="start" size="small"><CloseRoundedIcon /></IconButton>
+          <Typography noWrap sx={{ fontWeight: 700, fontSize: { xs: 15, sm: 18 }, color: "#1E293B" }}>
             {initialPlaylist ? "Edit Playlist Sequence" : "Create New Playlist"}
           </Typography>
         </Box>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <Typography sx={{ fontWeight: 600, color: "#64748B", fontSize: 14 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: { xs: 1.5, sm: 2 } }}>
+          <Typography sx={{ fontWeight: 600, color: "#64748B", fontSize: 13, display: { xs: "none", sm: "block" } }}>
             Total Duration: <Box component="span" sx={{ color: "#10B981" }}>{formatDuration(totalDuration)}</Box>
           </Typography>
-          <Button variant="contained" startIcon={<SaveRoundedIcon />} onClick={handleSave} sx={{ bgcolor: "#10B981", "&:hover": { bgcolor: "#059669" }, fontWeight: 700, borderRadius: "10px", textTransform: "none" }}>
-            Save Playlist
+          <Button
+            variant="outlined"
+            startIcon={<AddRoundedIcon />}
+            onClick={() => setMobileDrawerOpen(true)}
+            sx={{ display: { xs: "inline-flex", md: "none" }, textTransform: "none", borderRadius: "10px", fontWeight: 700, px: 1.5 }}
+          >
+            Add Media
+          </Button>
+          <Button variant="contained" startIcon={<SaveRoundedIcon />} onClick={handleSave} sx={{ bgcolor: "#10B981", "&:hover": { bgcolor: "#059669" }, fontWeight: 700, borderRadius: "10px", textTransform: "none", px: { xs: 1.5, sm: 2 } }}>
+            Save
           </Button>
         </Box>
       </Box>
@@ -144,16 +155,29 @@ export default function PlaylistEditor({ open, initialPlaylist, mediaLibrary, on
       {/* Editor Body */}
       <Box sx={{ display: "flex", flexGrow: 1, overflow: "hidden" }}>
         
-        {/* Left Drawer (Media Library) */}
-        <Box sx={{ width: 320, flexShrink: 0, height: "100%" }}>
+        {/* Left Drawer (Media Library) - Docked on Desktop */}
+        <Box sx={{ width: 320, flexShrink: 0, height: "100%", display: { xs: "none", md: "block" } }}>
           <PlaylistMediaDrawer mediaItems={mediaLibrary} onAdd={handleAddMedia} />
         </Box>
 
+        {/* Floating/Slide Overlay Drawer - Mobile Viewports */}
+        <Drawer
+          anchor="left"
+          open={mobileDrawerOpen}
+          onClose={() => setMobileDrawerOpen(false)}
+          sx={{ 
+            display: { xs: "block", md: "none" },
+            "& .MuiDrawer-paper": { width: 280 }
+          }}
+        >
+          <PlaylistMediaDrawer mediaItems={mediaLibrary} onAdd={handleAddMedia} />
+        </Drawer>
+
         {/* Main Content (Timeline & Settings) */}
-        <Box sx={{ flexGrow: 1, overflowY: "auto", p: 4, display: "flex", flexDirection: "column", gap: 4 }}>
+        <Box sx={{ flexGrow: 1, overflowY: "auto", p: { xs: 2, sm: 4 }, display: "flex", flexDirection: "column", gap: { xs: 2.5, sm: 4 } }}>
           
           {/* Settings Section */}
-          <Box sx={{ display: "flex", gap: 3, bgcolor: "#fff", p: 3, borderRadius: "16px", border: "1px solid #E2E8F0", flexDirection: { xs: "column", md: "row" } }}>
+          <Box sx={{ display: "flex", gap: 3, bgcolor: "#fff", p: { xs: 2, sm: 3 }, borderRadius: "16px", border: "1px solid #E2E8F0", flexDirection: { xs: "column", md: "row" } }}>
             <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column", gap: 2 }}>
               <TextField
                 label="Playlist Name"
@@ -191,9 +215,14 @@ export default function PlaylistEditor({ open, initialPlaylist, mediaLibrary, on
 
           {/* Timeline Section */}
           <Box sx={{ flexGrow: 1 }}>
-            <Typography sx={{ fontWeight: 700, fontSize: 18, color: "#1E293B", mb: 2 }}>
-              Playback Sequence
-            </Typography>
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
+              <Typography sx={{ fontWeight: 700, fontSize: 18, color: "#1E293B" }}>
+                Playback Sequence
+              </Typography>
+              <Typography sx={{ fontWeight: 600, color: "#64748B", fontSize: 13, display: { xs: "block", sm: "none" } }}>
+                Duration: <Box component="span" sx={{ color: "#10B981" }}>{formatDuration(totalDuration)}</Box>
+              </Typography>
+            </Box>
             <PlaylistTimeline
               items={items}
               mediaLibrary={mediaLibrary}
