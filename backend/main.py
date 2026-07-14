@@ -18,6 +18,7 @@ from app.routers.media_router import router as media_router
 from app.routers.playlist_router import router as playlist_router
 from app.routers.schedule_router import router as schedule_router
 from app.routers.device_playlist_router import router as device_playlist_router
+from app.routers.app_update_router import router as app_update_router
 
 # Setup logging immediately
 setup_logging()
@@ -129,6 +130,7 @@ api_v1_router.include_router(media_router)
 api_v1_router.include_router(playlist_router)
 api_v1_router.include_router(device_playlist_router)
 api_v1_router.include_router(schedule_router)
+api_v1_router.include_router(app_update_router)
 app.include_router(api_v1_router)
 
 # Legacy root mounts for backward compatibility
@@ -137,6 +139,7 @@ app.include_router(media_router)
 app.include_router(playlist_router)
 app.include_router(device_playlist_router)
 app.include_router(schedule_router)
+app.include_router(app_update_router)
 
 MEDIA_FOLDER = "media"
 os.makedirs(MEDIA_FOLDER, exist_ok=True)

@@ -3,6 +3,7 @@ import pytest
 def test_create_schedule(client):
     # Setup Device
     device_res = client.post("/devices", json={
+        "id": "TV-sch-device",
         "name": "Sch Device",
         "location": "Lobby",
         "resolution": "1920x1080",
@@ -21,7 +22,7 @@ def test_create_schedule(client):
     playlist_res = client.post("/playlists", json={
         "name": "Sch Playlist",
         "description": "Test",
-        "status": "Draft",
+        "status": "Published",
         "totalDuration": 10,
         "updatedAt": 12345,
         "items": [
@@ -60,6 +61,7 @@ def test_create_schedule(client):
 def test_schedule_conflicts(client):
     # Use existing device and playlist for simplicity (we assume test DB persists between functions or we recreate)
     device_res = client.post("/devices", json={
+        "id": "TV-sch-device-2",
         "name": "Sch Device 2",
         "location": "Lobby",
         "resolution": "1920x1080",
@@ -76,7 +78,7 @@ def test_schedule_conflicts(client):
     playlist_res = client.post("/playlists", json={
         "name": "Sch Playlist 2",
         "description": "Test",
-        "status": "Draft",
+        "status": "Published",
         "totalDuration": 10,
         "updatedAt": 12345,
         "items": [
@@ -141,6 +143,7 @@ def test_schedule_conflicts(client):
 def test_schedule_invalid_dates(client):
     # First create a device and media to assign
     device_res = client.post("/devices", json={
+        "id": "TV-sch-invalid-dates-device",
         "name": "Test Device",
         "location": "Lobby",
         "resolution": "1920x1080",
@@ -158,7 +161,7 @@ def test_schedule_invalid_dates(client):
     playlist_res = client.post("/playlists", json={
         "name": "My Playlist",
         "description": "Test description",
-        "status": "Draft",
+        "status": "Published",
         "totalDuration": 10,
         "updatedAt": 12345,
         "items": [
@@ -195,6 +198,7 @@ def test_get_schedules(client):
 
 def test_delete_schedule(client):
     device_res = client.post("/devices", json={
+        "id": "TV-sch-device-3",
         "name": "Sch Device 3",
         "location": "Lobby",
         "resolution": "1920x1080",
@@ -211,7 +215,7 @@ def test_delete_schedule(client):
     playlist_res = client.post("/playlists", json={
         "name": "Sch Playlist 3",
         "description": "Test",
-        "status": "Draft",
+        "status": "Published",
         "totalDuration": 10,
         "updatedAt": 12345,
         "items": [

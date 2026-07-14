@@ -3,6 +3,7 @@ import pytest
 def test_create_playlist(client):
     # First create a device and media to assign
     device_res = client.post("/devices", json={
+        "id": "TV-playlist-test-device",
         "name": "Test Device",
         "location": "Lobby",
         "resolution": "1920x1080",
