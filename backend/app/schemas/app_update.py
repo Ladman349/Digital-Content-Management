@@ -14,21 +14,21 @@ class AppUpdateBase(BaseModel):
     mandatory: bool = False
     is_active: bool = False
 
-class AppUpdateCreate(AppUpdateBase):
-    pass
-
 class AppUpdateResponse(AppUpdateBase):
     id: UUID
+    download_count: int
+    last_downloaded_at: Optional[datetime] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
 class AppUpdateCheckResponse(BaseModel):
-    update_available: bool
-    version_name: Optional[str] = None
-    version_code: Optional[int] = None
-    apk_url: Optional[str] = None
-    checksum_sha256: Optional[str] = None
-    file_size: Optional[int] = None
+    updateAvailable: bool
+    currentVersionCode: int
+    latestVersionCode: Optional[int] = None
+    versionName: Optional[str] = None
+    apkUrl: Optional[str] = None
+    checksum: Optional[str] = None
+    fileSize: Optional[int] = None
     mandatory: Optional[bool] = None
-    release_notes: Optional[str] = None
+    releaseNotes: Optional[str] = None
