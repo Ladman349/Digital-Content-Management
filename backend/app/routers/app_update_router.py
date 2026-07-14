@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, status, File, UploadFile, Form, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -5,6 +6,8 @@ from uuid import UUID
 from typing import List, Optional
 
 from app.database.database import get_db
+
+logger = logging.getLogger("api")
 from app.schemas.app_update import AppUpdateResponse, AppUpdateCheckResponse
 from app.services.app_update_service import AppUpdateService
 
@@ -47,6 +50,25 @@ def get_latest_update(db: Session = Depends(get_db)):
         )
     return active_update
 
+@router.get("/ping")
+def ping_updates():
+    return {"status": "ok"}
+
+@router.get("/info")
+def get_app_updates_info(db: Session = Depends(get_db)):
+    active_update = AppUpdateService.get_active_update(db)
+    if not active_update:
+        return {"message": "No active release found"}
+    return {
+        "versionName": active_update.version_name,
+        "versionCode": active_update.version_code,
+        "mandatory": active_update.mandatory,
+        "uploadedAt": active_update.created_at.isoformat(),
+        "downloadCount": active_update.download_count,
+        "fileSize": active_update.file_size,
+        "checksum": active_update.checksum_sha256
+    }
+
 @router.get("/check", response_model=AppUpdateCheckResponse)
 def check_for_update(version_code: int, db: Session = Depends(get_db)):
     return AppUpdateService.check_for_update(db, version_code)
@@ -61,14 +83,22 @@ def download_update(filename: str, db: Session = Depends(get_db)):
             detail="Requested update file not found."
         )
         
-    # 2. Increment download count and update timestamp
-    AppUpdateService.track_download(db, filename)
+    # 2. Increment download count and update timestamp (best-effort)
+    try:
+        AppUpdateService.track_download(db, filename)
+    except Exception as e:
+        logger.warning(f"Failed to track download metrics for {filename}: {str(e)}", exc_info=True)
     
-    # 3. Return FileResponse with custom disposition headers
+    # 3. Return FileResponse with custom disposition and no-cache headers
     return FileResponse(
         path=str(file_path),
         media_type="application/vnd.android.package-archive",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
+        }
     )
 
 @router.put("/{id}/activate", response_model=AppUpdateResponse)
