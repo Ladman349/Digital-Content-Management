@@ -219,8 +219,8 @@ class PlaybackActivity : AppCompatActivity() {
                                 is com.digitalsignage.player.core.ota.downloader.DownloadState.Verifying -> {
                                     android.util.Log.i("KioskTrace", "[OTA] Download State: Verifying checksum")
                                 }
-                                is com.digitalsignage.player.core.ota.downloader.DownloadState.Completed -> {
-                                    android.util.Log.i("KioskTrace", "[OTA] Download State: Completed. [OTA] Ready for installation")
+                                is com.digitalsignage.player.core.ota.downloader.DownloadState.ReadyForInstall -> {
+                                    android.util.Log.i("KioskTrace", "[OTA] Download State: ReadyForInstall. [OTA] Ready for installation")
                                 }
                                 is com.digitalsignage.player.core.ota.downloader.DownloadState.Failed -> {
                                     android.util.Log.e("KioskTrace", "[OTA] Download State: Failed (reason: ${state.reason})")
