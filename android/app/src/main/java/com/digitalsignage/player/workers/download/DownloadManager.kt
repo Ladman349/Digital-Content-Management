@@ -212,14 +212,26 @@ class DownloadManager @Inject constructor(
                 com.digitalsignage.player.core.performance.PerformanceMonitor.recordEvent("CHECKSUM", "Completed validation for ${session.mediaId}. Result: $isValid")
                 
                 if (isValid) {
-                    tempFile.renameTo(destFile)
-                    com.digitalsignage.player.core.performance.PerformanceMonitor.onDbWriteTriggered()
-                    database.downloadSessionDao().updateSessionState(session.mediaId, DownloadState.COMPLETED, System.currentTimeMillis())
-                    com.digitalsignage.player.core.performance.PerformanceMonitor.onDbWriteTriggered()
-                    database.playlistDao().updateMediaDownloadedState(session.mediaId, true, destFile.absolutePath)
-                    
-                    eventBus.publish(PlayerEvent.DownloadCompleted(session.mediaId))
-                    checkPlaylistReadiness()
+                    val movedSuccessfully = if (tempFile.exists()) {
+                        if (destFile.exists()) destFile.delete()
+                        tempFile.renameTo(destFile) || (tempFile.copyTo(destFile, overwrite = true).also { tempFile.delete() }.exists())
+                    } else {
+                        destFile.exists()
+                    }
+
+                    if (movedSuccessfully && destFile.exists() && destFile.length() > 0) {
+                        com.digitalsignage.player.core.performance.PerformanceMonitor.onDbWriteTriggered()
+                        database.downloadSessionDao().updateSessionState(session.mediaId, DownloadState.COMPLETED, System.currentTimeMillis())
+                        com.digitalsignage.player.core.performance.PerformanceMonitor.onDbWriteTriggered()
+                        database.playlistDao().updateMediaDownloadedState(session.mediaId, true, destFile.absolutePath)
+                        
+                        eventBus.publish(PlayerEvent.DownloadCompleted(session.mediaId))
+                        checkPlaylistReadiness()
+                    } else {
+                        tempFile.delete()
+                        destFile.delete()
+                        throw Exception("File placement failed after download: file missing or empty")
+                    }
                 } else {
                     tempFile.delete()
                     com.digitalsignage.player.core.performance.PerformanceMonitor.onDbWriteTriggered()
