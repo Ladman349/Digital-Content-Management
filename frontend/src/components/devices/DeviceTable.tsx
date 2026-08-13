@@ -356,7 +356,7 @@ export default function DeviceTable({
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   useEffect(() => {
     setPage(0);

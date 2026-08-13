@@ -20,7 +20,7 @@ android {
 
     defaultConfig {
         applicationId = "com.digitalsignage.player"
-        minSdk = 28
+        minSdk = 24
         targetSdk = 34
         versionCode = 3
         versionName = "1.0.0"
@@ -79,7 +79,7 @@ android {
         }
         create("prod") {
             dimension = "environment"
-            val prodHost = localProperties.getProperty("PROD_API_HOST") ?: System.getenv("PROD_API_HOST") ?: "digital-content-management-production.up.railway.app"
+            val prodHost = localProperties.getProperty("PROD_API_HOST") ?: System.getenv("PROD_API_HOST") ?: "digital-content-management-production-6fd4.up.railway.app"
             val prodPort = localProperties.getProperty("PROD_API_PORT") ?: System.getenv("PROD_API_PORT")
             
             val url = if (prodPort.isNullOrEmpty() || prodPort == "443") {
@@ -136,6 +136,14 @@ android {
     }
     testOptions {
         unitTests.isReturnDefaultValues = true
+    }
+    packaging {
+        if (project.hasProperty("disableBaselineProfile") && project.property("disableBaselineProfile") == "true") {
+            resources {
+                excludes += "assets/dexopt/baseline-prof.txt"
+                excludes += "assets/dexopt/baseline-prof.prof"
+            }
+        }
     }
 }
 

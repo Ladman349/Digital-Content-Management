@@ -10,7 +10,7 @@ if (rawBase && !rawBase.startsWith("http://") && !rawBase.startsWith("https://")
     rawBase = `https://${rawBase}`;
   }
 }
-export const API_BASE = rawBase;
+export const API_BASE = rawBase.replace(/\/+$/, "");
 
 export const apiClient = {
   get: async <T>(url: string): Promise<T> => {
