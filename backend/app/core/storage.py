@@ -60,9 +60,9 @@ class LocalStorageProvider(StorageProvider):
         if "/uploads/" in filename:
             filename = filename.split("/uploads/")[-1]
 
-        base_url = base_url_override or settings.API_BASE_URL or "http://localhost:8000"
-        if ("localhost" in base_url or "127.0.0.1" in base_url) and (settings.APP_ENV == "production" or base_url_override):
-            base_url = base_url_override or "https://digital-content-management-production-6fd4.up.railway.app"
+        base_url = base_url_override or settings.API_BASE_URL or "https://digital-content-management-production-6fd4.up.railway.app"
+        if "localhost" in base_url or "127.0.0.1" in base_url:
+            base_url = "https://digital-content-management-production-6fd4.up.railway.app"
 
         return f"{base_url.rstrip('/')}/uploads/{filename}"
 

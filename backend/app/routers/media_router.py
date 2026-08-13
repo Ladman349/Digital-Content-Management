@@ -25,31 +25,22 @@ def download_media(media_id: str, request: Request, db: Session = Depends(get_db
     if not media:
         raise HTTPException(status_code=404, detail="Media not found")
 
-    scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
-    host = request.headers.get("x-forwarded-host", request.url.netloc)
+    scheme = request.headers.get("x-forwarded-proto", "https")
+    host = request.headers.get("x-forwarded-host", "digital-content-management-production-6fd4.up.railway.app")
+    if "localhost" in host or "127.0.0.1" in host:
+        host = "digital-content-management-production-6fd4.up.railway.app"
     request_base_url = f"{scheme}://{host}"
         
     clean_uri = MediaService.extract_clean_storage_uri(media.originalFile)
     
-    if "supabase://" in clean_uri or "supabase://" in (media.originalFile or ""):
-        from app.core.storage import get_storage_provider
-        public_url = get_storage_provider().get_public_url(clean_uri, base_url_override=request_base_url)
-        if ("localhost" in public_url or "127.0.0.1" in public_url) and settings.APP_ENV == "production":
-            public_url = public_url.replace("http://localhost:8000", request_base_url).replace("http://127.0.0.1:8000", request_base_url)
-        return RedirectResponse(public_url)
-        
-    filename = clean_uri.replace("local://", "")
-    if "/uploads/" in filename:
-        filename = filename.split("/uploads/")[-1]
-    file_path = os.path.join("media", filename)
-    if not os.path.exists(file_path):
-        from app.core.storage import get_storage_provider
-        public_url = get_storage_provider().get_public_url(clean_uri, base_url_override=request_base_url)
-        if ("localhost" in public_url or "127.0.0.1" in public_url) and settings.APP_ENV == "production":
-            public_url = public_url.replace("http://localhost:8000", request_base_url).replace("http://127.0.0.1:8000", request_base_url)
-        return RedirectResponse(public_url)
+    from app.core.storage import get_storage_provider
+    public_url = get_storage_provider().get_public_url(clean_uri, base_url_override=request_base_url)
+    
+    # Unconditional safety check: NEVER return localhost or 127.0.0.1 in public_url
+    if "localhost" in public_url or "127.0.0.1" in public_url:
+        public_url = public_url.replace("http://localhost:8000", request_base_url).replace("http://127.0.0.1:8000", request_base_url).replace("http://localhost", request_base_url).replace("http://127.0.0.1", request_base_url)
 
-    return FileResponse(file_path, filename=media.name, media_type="application/octet-stream")
+    return RedirectResponse(public_url)
 
 @router.get("/{media_id}", response_model=MediaResponse)
 def get_media(media_id: str, db: Session = Depends(get_db)):
