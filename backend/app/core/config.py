@@ -14,6 +14,12 @@ class Settings(BaseModel):
     APP_ENV: str = Field(default_factory=lambda: os.getenv("APP_ENV", "development"))
     DATABASE_URL: str = Field(default_factory=lambda: os.getenv("DATABASE_URL", "postgresql://postgres:121@localhost:5432/postgres"))
     
+    # Database connection pool configurations (conservative defaults safe for Supabase direct connections and multi-worker setups)
+    DB_POOL_SIZE: int = Field(default_factory=lambda: int(os.getenv("DB_POOL_SIZE", "5")))
+    DB_MAX_OVERFLOW: int = Field(default_factory=lambda: int(os.getenv("DB_MAX_OVERFLOW", "5")))
+    DB_POOL_RECYCLE: int = Field(default_factory=lambda: int(os.getenv("DB_POOL_RECYCLE", "300")))
+    DB_POOL_TIMEOUT: int = Field(default_factory=lambda: int(os.getenv("DB_POOL_TIMEOUT", "30")))
+
     # Supabase configurations
     SUPABASE_URL: str | None = Field(default_factory=lambda: os.getenv("SUPABASE_URL"))
     SUPABASE_SERVICE_ROLE_KEY: str | None = Field(default_factory=lambda: os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
