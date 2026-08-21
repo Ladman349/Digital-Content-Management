@@ -93,13 +93,20 @@ class StartupValidator @Inject constructor(
             var isValid = true
 
             for (item in mediaItems) {
-                val mediaFile = if (item.localFilePath != null) {
-                    File(item.localFilePath)
-                } else {
-                    File(storageManager.getMediaDirectory(), item.mediaId)
-                }
+                val validFile = storageManager.resolveValidMediaFile(
+                    mediaId = item.mediaId,
+                    url = item.url,
+                    localFilePath = item.localFilePath,
+                    expectedMd5 = item.md5Hash,
+                    expectedSha256 = item.sha256Hash,
+                    expectedSize = null,
+                    fileValidator = fileValidator
+                )
 
-                if (!fileValidator.validateFile(mediaFile, item.md5Hash, item.sha256Hash, null)) {
+                if (validFile != null) {
+                    logger.i("StartupValidator", "Valid physical file resolved for media item ${item.mediaId} at ${validFile.absolutePath}")
+                    database.playlistDao().updateMediaDownloadedState(item.mediaId, true, validFile.absolutePath)
+                } else {
                     logger.e("StartupValidator", "Validation failed for media item: ${item.mediaId}")
                     database.playlistDao().updateMediaDownloadedState(item.mediaId, false, "")
                     isValid = false

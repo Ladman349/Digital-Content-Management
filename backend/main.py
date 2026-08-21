@@ -3,9 +3,9 @@ import uuid
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Depends, APIRouter
+from fastapi import FastAPI, Request, Depends, APIRouter
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
@@ -110,7 +110,7 @@ if settings.APP_ENV == "development":
     # Allow any localhost/127.0.0.1 port in development mode
     allowed_origin_regex = r"^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$"
 elif settings.APP_ENV == "production":
-    # Enforce strict origins in production (no regex wildcard allowed)
+    # Enforce strict origins in production
     allowed_origin_regex = None
 
 app.add_middleware(
@@ -131,7 +131,7 @@ api_v1_router.include_router(device_playlist_router)
 api_v1_router.include_router(schedule_router)
 app.include_router(api_v1_router)
 
-# Legacy root mounts for backward compatibility
+# Root mounts for direct REST APIs
 app.include_router(device_router)
 app.include_router(media_router)
 app.include_router(playlist_router)
@@ -147,398 +147,13 @@ app.mount(
     name="uploads"
 )
 
-IMAGE_EXTENSIONS = (
-    ".png",
-    ".jpg",
-    ".jpeg",
-    ".webp"
-)
-
-VIDEO_EXTENSIONS = (
-    ".mp4",
-    ".webm",
-    ".mov"
-)
-
-ALLOWED_EXTENSIONS = (
-    IMAGE_EXTENSIONS +
-    VIDEO_EXTENSIONS
-)
-
 
 @app.get("/")
 def home():
     return {
-        "message": "Digital Signage Backend Running"
-    }
-
-
-@app.get("/display", response_class=HTMLResponse)
-def display_page(orientation: str = "LANDSCAPE"):
-    container_class = "rotated-0"
-    if orientation == "PORTRAIT_RIGHT":
-        container_class = "rotated-90"
-    elif orientation == "PORTRAIT_LEFT":
-        container_class = "rotated-270"
-    elif orientation == "UPSIDE_DOWN":
-        container_class = "rotated-180"
-
-    return f"""
-<!DOCTYPE html>
-<html>
-
-<head>
-
-    <title>Digital Signage</title>
-
-    <style>
-
-        body {{
-            margin: 0;
-            background: black;
-            overflow: hidden;
-            width: 100vw;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }}
-
-        #playbackContainer {{
-            width: 100vw;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background: black;
-        }}
-
-        .rotated-90 {{
-            transform: rotate(90deg);
-            width: 100vh !important;
-            height: 100vw !important;
-        }}
-
-        .rotated-180 {{
-            transform: rotate(180deg);
-            width: 100vw !important;
-            height: 100vh !important;
-        }}
-
-        .rotated-270 {{
-            transform: rotate(270deg);
-            width: 100vh !important;
-            height: 100vw !important;
-        }}
-
-        img,
-        video {{
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            display: none;
-            background: black;
-        }}
-
-    </style>
-
-</head>
-
-<body>
-
-    <div id="playbackContainer" class="{container_class}">
-        <img id="imagePlayer">
-
-        <video
-            id="videoPlayer"
-            autoplay
-            muted
-            playsinline>
-        </video>
-    </div>
-
-    <script>
-
-        let ads = [];
-        let currentIndex = 0;
-        let imageTimer = null;
-
-        async function loadAds() {{
-
-            try {{
-
-                const response =
-                    await fetch("/ads");
-
-                const data =
-                    await response.json();
-
-                ads = data.ads;
-
-                if (
-                    currentIndex >= ads.length
-                ) {{
-                    currentIndex = 0;
-                }}
-
-            }} catch (error) {{
-
-                console.error(
-                    "Error loading ads:",
-                    error
-                );
-
-            }}
-        }}
-
-        function playNext() {{
-
-            if (ads.length === 0) {{
-                return;
-            }}
-
-            const item =
-                ads[currentIndex];
-
-            currentIndex =
-                (currentIndex + 1)
-                % ads.length;
-
-            const image =
-                document.getElementById(
-                    "imagePlayer"
-                );
-
-            const video =
-                document.getElementById(
-                    "videoPlayer"
-                );
-
-            image.style.display = "none";
-            video.style.display = "none";
-
-            if (imageTimer) {{
-                clearTimeout(imageTimer);
-            }}
-
-            const mediaUrl =
-                item.url +
-                "?t=" +
-                Date.now();
-
-            if (
-                item.type === "image"
-            ) {{
-
-                image.src =
-                    mediaUrl;
-
-                image.style.display =
-                    "block";
-
-                imageTimer =
-                    setTimeout(
-                        playNext,
-                        item.duration || 10000
-                    );
-
-            }}
-            else if (
-                item.type === "video"
-            ) {{
-
-                video.src =
-                    mediaUrl;
-
-                video.style.display =
-                    "block";
-
-                video.load();
-
-                video.play()
-                    .catch(error => {{
-                        console.error(error);
-                        playNext();
-                    }});
-
-            }}
-        }}
-
-        document
-            .getElementById(
-                "videoPlayer"
-            )
-            .addEventListener(
-                "ended",
-                playNext
-            );
-
-        async function start() {{
-
-            await loadAds();
-
-            if (
-                ads.length > 0
-            ) {{
-                playNext();
-            }}
-
-            setInterval(
-                loadAds,
-                30000
-            );
-        }}
-
-        start();
-
-    </script>
-
-</body>
-
-</html>
-    """
-
-
-@app.post("/upload")
-async def upload_media(
-    file: UploadFile = File(...)
-):
-
-    extension = os.path.splitext(
-        file.filename
-    )[1].lower()
-
-    if extension not in ALLOWED_EXTENSIONS:
-
-        raise HTTPException(
-            status_code=400,
-            detail="Unsupported file type"
-        )
-
-    original_name = os.path.splitext(
-        file.filename
-    )[0]
-
-    safe_name = (
-        original_name
-        .replace(" ", "_")
-        .replace("/", "_")
-        .replace("\\", "_")
-    )
-
-    unique_filename = (
-        f"{safe_name}_"
-        f"{uuid.uuid4().hex[:8]}"
-        f"{extension}"
-    )
-
-    file_path = os.path.join(
-        MEDIA_FOLDER,
-        unique_filename
-    )
-
-    with open(
-        file_path,
-        "wb"
-    ) as buffer:
-
-        shutil.copyfileobj(
-            file.file,
-            buffer
-        )
-
-    return {
-        "message":
-            "Uploaded successfully",
-        "original_name":
-            file.filename,
-        "saved_as":
-            unique_filename
-    }
-
-
-@app.delete("/delete/{filename}")
-def delete_media(filename: str):
-
-    file_path = os.path.join(
-        MEDIA_FOLDER,
-        filename
-    )
-
-    if not os.path.exists(
-        file_path
-    ):
-        raise HTTPException(
-            status_code=404,
-            detail="File not found"
-        )
-
-    os.remove(file_path)
-
-    return {
-        "message":
-            "File deleted",
-        "file":
-            filename
-    }
-
-
-@app.get("/ads")
-def get_ads():
-
-    ads = []
-
-    files = sorted(
-        os.listdir(
-            MEDIA_FOLDER
-        )
-    )
-
-    for file in files:
-
-        extension = os.path.splitext(
-            file
-        )[1].lower()
-
-        if extension in IMAGE_EXTENSIONS:
-
-            ads.append({
-                "url":
-                    f"/uploads/{file}",
-                "type":
-                    "image",
-                "duration":
-                    3000
-            })
-
-        elif extension in VIDEO_EXTENSIONS:
-
-            ads.append({
-                "url":
-                    f"/uploads/{file}",
-                "type":
-                    "video"
-            })
-
-    return {
-        "ads": ads
-    }
-
-
-@app.get("/current-ad")
-def current_ad():
-
-    ads = get_ads()["ads"]
-
-    if len(ads) == 0:
-
-        return {
-            "current_ad": None
-        }
-
-    return {
-        "current_ad":
-            ads[0]
+        "message": "Digital Signage Backend Running",
+        "version": "1.0.0",
+        "docs": "/docs"
     }
 
 
@@ -573,4 +188,3 @@ def health_check(db: Session = Depends(get_db)):
 @app.get("/ready")
 def ready_check():
     return {"status": "ready"}
-    

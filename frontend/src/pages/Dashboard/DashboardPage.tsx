@@ -14,16 +14,15 @@ export default function DashboardPage() {
     <>
       <DashboardHeader />
 
-      <Box sx={{ mt: 4 }}>
+      <Box sx={{ mt: { xs: 2, sm: 3 } }}>
         <StatsGrid />
       </Box>
 
       <Box
         sx={{
           display: "grid",
-          gap: 3,
-          mt: 3,
-
+          gap: { xs: 2, sm: 2.5, md: 3 },
+          mt: { xs: 2, sm: 2.5, md: 3 },
           gridTemplateColumns: {
             xs: "1fr",
             lg: "2fr 1fr",
@@ -31,16 +30,14 @@ export default function DashboardPage() {
         }}
       >
         <ActivityChart />
-
         <DeviceStatusCard />
       </Box>
 
       <Box
         sx={{
           display: "grid",
-          gap: 3,
-          mt: 3,
-
+          gap: { xs: 2, sm: 2.5, md: 3 },
+          mt: { xs: 2, sm: 2.5, md: 3 },
           gridTemplateColumns: {
             xs: "1fr",
             md: "1fr 1fr",
@@ -54,9 +51,8 @@ export default function DashboardPage() {
       <Box
         sx={{
           display: "grid",
-          gap: 3,
-          mt: 3,
-
+          gap: { xs: 2, sm: 2.5, md: 3 },
+          mt: { xs: 2, sm: 2.5, md: 3 },
           gridTemplateColumns: {
             xs: "1fr",
             md: "1fr 1fr",

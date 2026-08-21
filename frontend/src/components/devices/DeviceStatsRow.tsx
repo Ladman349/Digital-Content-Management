@@ -1,5 +1,4 @@
 import { Box, Skeleton, Typography } from "@mui/material";
-import Grid from "@mui/material/Grid";
 import type { SvgIconComponent } from "@mui/icons-material";
 
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
@@ -42,41 +41,41 @@ function StatCardContent({
   const clickable = !!filterValue && !!onStatClick;
 
   return (
-    <DashboardCard>
+    <DashboardCard sx={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
       <Box
         onClick={clickable ? () => onStatClick(filterValue!) : undefined}
         sx={{
           cursor: clickable ? "pointer" : "default",
-          "&:active": clickable ? { transform: "scale(0.99)" } : {},
+          "&:active": clickable ? { transform: "scale(0.98)" } : {},
         }}
       >
         <Box
           sx={{
-            width: 48,
-            height: 48,
-            borderRadius: "14px",
+            width: { xs: 38, sm: 44 },
+            height: { xs: 38, sm: 44 },
+            borderRadius: { xs: "10px", sm: "12px" },
             background: color,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             color: "#fff",
-            mb: 2,
-            boxShadow: `0 8px 20px ${color}35`,
+            mb: { xs: 1.25, sm: 1.75 },
+            boxShadow: `0 4px 14px ${color}30`,
           }}
         >
-          <Icon sx={{ fontSize: 24 }} />
+          <Icon sx={{ fontSize: { xs: 19, sm: 22 } }} />
         </Box>
 
-        <Typography sx={{ color: "#64748B", fontSize: 13, fontWeight: 500 }}>
+        <Typography sx={{ color: "#64748B", fontSize: { xs: 11.5, sm: 13 }, fontWeight: 600 }}>
           {title}
         </Typography>
 
         <AnimatedCounter value={value} loading={loading} />
 
-        <Typography sx={{ color: "#94A3B8", fontSize: 12, mt: 1, fontWeight: 500 }}>
+        <Typography sx={{ color: "#94A3B8", fontSize: { xs: 11, sm: 12 }, mt: { xs: 0.5, sm: 1 }, fontWeight: 500 }}>
           {subtitle}
           {clickable && (
-            <Box component="span" sx={{ color: "#6C4CF1", ml: 0.5 }}>
+            <Box component="span" sx={{ color: "#6C4CF1", ml: 0.5, fontWeight: 600 }}>
               · Filter
             </Box>
           )}
@@ -89,10 +88,10 @@ function StatCardContent({
 function StatCardSkeleton() {
   return (
     <DashboardCard>
-      <Skeleton variant="rounded" width={48} height={48} sx={{ borderRadius: "14px", mb: 2 }} />
+      <Skeleton variant="rounded" width={40} height={40} sx={{ borderRadius: "12px", mb: 1.5 }} />
       <Skeleton width="60%" height={16} />
-      <Skeleton width="40%" height={36} sx={{ mt: 1 }} />
-      <Skeleton width="50%" height={14} sx={{ mt: 1 }} />
+      <Skeleton width="40%" height={32} sx={{ mt: 0.5 }} />
+      <Skeleton width="50%" height={14} sx={{ mt: 0.5 }} />
     </DashboardCard>
   );
 }
@@ -118,7 +117,7 @@ export default function DeviceStatsRow({
       title: "Online",
       value: online,
       icon: CheckCircleRoundedIcon,
-      color: "#22C55E",
+      color: "#10B981",
       subtitle: "Active right now",
       filterValue: "Online",
     },
@@ -134,22 +133,33 @@ export default function DeviceStatsRow({
       title: "Locations",
       value: locations,
       icon: LocationOnRoundedIcon,
-      color: "#3B82F6",
+      color: "#0EA5E9",
       subtitle: "Unique sites",
     },
   ];
 
   return (
-    <Grid container spacing={3} sx={{ mb: 3 }}>
+    <Box
+      sx={{
+        display: "grid",
+        gridTemplateColumns: {
+          xs: "repeat(2, 1fr)",
+          sm: "repeat(2, 1fr)",
+          lg: "repeat(4, 1fr)",
+        },
+        gap: { xs: 1.5, sm: 2, md: 3 },
+        mb: { xs: 2.5, sm: 3.5 },
+      }}
+    >
       {stats.map((stat) => (
-        <Grid key={stat.title} sx={{ width: { xs: "100%", sm: "48%", lg: "24%" } }}>
+        <Box key={stat.title}>
           {loading ? (
             <StatCardSkeleton />
           ) : (
             <StatCardContent {...stat} onStatClick={onStatClick} loading={loading} />
           )}
-        </Grid>
+        </Box>
       ))}
-    </Grid>
+    </Box>
   );
 }

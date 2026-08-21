@@ -170,6 +170,8 @@ object NetworkModule {
             level = HttpLoggingInterceptor.Level.BODY
         }
         return OkHttpClient.Builder()
+            .followRedirects(true)
+            .followSslRedirects(true)
             .addInterceptor(logging)
             .addInterceptor(NetworkTraceInterceptor())
             .addInterceptor(AuthInterceptor())

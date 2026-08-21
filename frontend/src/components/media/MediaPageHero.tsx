@@ -23,11 +23,12 @@ export default function MediaPageHero({
       sx={{
         position: "relative",
         overflow: "hidden",
-        borderRadius: "24px",
-        p: { xs: 3, md: 4 },
-        mb: 4,
-        background: "linear-gradient(135deg, #0EA5E9 0%, #3B82F6 50%, #4F46E5 100%)",
+        borderRadius: { xs: "20px", sm: "24px" },
+        p: { xs: 2.5, sm: 3.5, md: 4 },
+        mb: { xs: 2.5, sm: 3.5 },
+        background: "linear-gradient(135deg, #0EA5E9 0%, #2563EB 50%, #4F46E5 100%)",
         color: "#fff",
+        boxShadow: "0 10px 30px -5px rgba(37, 99, 235, 0.3)",
       }}
     >
       <Box
@@ -39,6 +40,7 @@ export default function MediaPageHero({
           height: 200,
           borderRadius: "50%",
           bgcolor: "rgba(255,255,255,0.08)",
+          pointerEvents: "none",
         }}
       />
 
@@ -51,19 +53,7 @@ export default function MediaPageHero({
           height: 140,
           borderRadius: "50%",
           bgcolor: "rgba(255,255,255,0.06)",
-        }}
-      />
-
-      <Box
-        sx={{
-          position: "absolute",
-          top: 20,
-          left: "55%",
-          width: 80,
-          height: 80,
-          borderRadius: "50%",
-          bgcolor: "rgba(255,255,255,0.04)",
-          display: { xs: "none", md: "block" },
+          pointerEvents: "none",
         }}
       />
 
@@ -72,34 +62,35 @@ export default function MediaPageHero({
           position: "relative",
           display: "flex",
           justifyContent: "space-between",
-          alignItems: { xs: "flex-start", lg: "center" },
+          alignItems: { xs: "stretch", sm: "flex-start", lg: "center" },
           flexDirection: { xs: "column", lg: "row" },
-          gap: 3,
+          gap: { xs: 2.5, sm: 3 },
         }}
       >
         <Box>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1.5 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, mb: 1 }}>
             <Box
               sx={{
-                width: 40,
-                height: 40,
-                borderRadius: "12px",
-                bgcolor: "rgba(255,255,255,0.15)",
+                width: { xs: 32, sm: 38 },
+                height: { xs: 32, sm: 38 },
+                borderRadius: "10px",
+                bgcolor: "rgba(255,255,255,0.18)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                backdropFilter: "blur(4px)",
               }}
             >
-              <PermMediaRoundedIcon />
+              <PermMediaRoundedIcon sx={{ fontSize: { xs: 18, sm: 22 } }} />
             </Box>
 
             <Typography
               sx={{
-                fontSize: 13,
-                fontWeight: 600,
-                letterSpacing: "0.04em",
+                fontSize: { xs: 11, sm: 12.5 },
+                fontWeight: 700,
+                letterSpacing: "0.06em",
                 textTransform: "uppercase",
-                opacity: 0.85,
+                opacity: 0.9,
               }}
             >
               Media Library
@@ -110,12 +101,13 @@ export default function MediaPageHero({
                 label={totalSizeFormatted}
                 size="small"
                 sx={{
-                  bgcolor: "rgba(255,255,255,0.15)",
+                  bgcolor: "rgba(255,255,255,0.2)",
                   color: "#fff",
-                  fontWeight: 600,
+                  fontWeight: 700,
                   fontSize: 11,
-                  border: "1px solid rgba(255,255,255,0.2)",
-                  height: 24,
+                  border: "1px solid rgba(255,255,255,0.25)",
+                  height: 22,
+                  backdropFilter: "blur(4px)",
                 }}
               />
             )}
@@ -123,37 +115,25 @@ export default function MediaPageHero({
 
           <Typography
             sx={{
-              fontSize: { xs: 28, md: 34 },
+              fontSize: { xs: 24, sm: 30, md: 34 },
               fontWeight: 800,
-              lineHeight: 1.2,
-              letterSpacing: "-0.02em",
+              lineHeight: 1.15,
+              letterSpacing: "-0.025em",
             }}
           >
-            Media
+            Media Library
           </Typography>
 
           <Typography
             sx={{
-              mt: 1.5,
-              fontSize: 15,
-              opacity: 0.88,
-              maxWidth: 480,
-              lineHeight: 1.6,
+              mt: 1,
+              fontSize: { xs: 13, sm: 14.5 },
+              opacity: 0.9,
+              maxWidth: 540,
+              lineHeight: 1.5,
             }}
           >
-            Manage and organize all your images and videos. Upload new assets to
-            display on your digital signage screens.
-          </Typography>
-
-          <Typography
-            sx={{
-              mt: 2,
-              fontSize: 13,
-              fontWeight: 600,
-              opacity: 0.75,
-            }}
-          >
-            {totalFiles} file{totalFiles !== 1 ? "s" : ""} uploaded
+            Manage and organize all your images and videos. Upload high-res assets to display on screens.
           </Typography>
         </Box>
 
@@ -161,8 +141,9 @@ export default function MediaPageHero({
           sx={{
             display: "flex",
             alignItems: "center",
-            gap: 1.5,
-            flexWrap: "wrap",
+            gap: { xs: 1, sm: 1.5 },
+            flexWrap: "nowrap",
+            width: { xs: "100%", sm: "auto" },
           }}
         >
           <Tooltip title="Refresh">
@@ -170,21 +151,23 @@ export default function MediaPageHero({
               onClick={onRefresh}
               disabled={refreshing}
               sx={{
-                bgcolor: "rgba(255,255,255,0.12)",
+                bgcolor: "rgba(255,255,255,0.15)",
                 color: "#fff",
-                border: "1px solid rgba(255,255,255,0.2)",
+                border: "1px solid rgba(255,255,255,0.25)",
                 borderRadius: "12px",
-                width: 44,
-                height: 44,
+                width: { xs: 40, sm: 44 },
+                height: { xs: 40, sm: 44 },
+                minWidth: { xs: 40, sm: 44 },
+                backdropFilter: "blur(4px)",
                 animation: refreshing ? "spin 0.8s linear infinite" : "none",
                 "@keyframes spin": {
                   from: { transform: "rotate(0deg)" },
                   to: { transform: "rotate(360deg)" },
                 },
-                "&:hover": { bgcolor: "rgba(255,255,255,0.2)" },
+                "&:hover": { bgcolor: "rgba(255,255,255,0.25)" },
               }}
             >
-              <RefreshRoundedIcon />
+              <RefreshRoundedIcon sx={{ fontSize: 20 }} />
             </IconButton>
           </Tooltip>
 
@@ -195,16 +178,19 @@ export default function MediaPageHero({
             sx={{
               textTransform: "none",
               fontWeight: 700,
-              borderRadius: "14px",
-              px: 3,
-              py: 1.25,
-              bgcolor: "#fff",
-              color: "#3B82F6",
+              borderRadius: "12px",
+              px: { xs: 2.5, sm: 3 },
+              py: { xs: 1, sm: 1.15 },
+              fontSize: { xs: 13, sm: 14 },
+              bgcolor: "#FFFFFF",
+              color: "#2563EB",
               whiteSpace: "nowrap",
-              boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+              flex: { xs: 1, sm: "initial" },
+              boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
               "&:hover": {
                 bgcolor: "#F8FAFC",
-                boxShadow: "0 12px 32px rgba(0,0,0,0.2)",
+                transform: "translateY(-1px)",
+                boxShadow: "0 6px 20px rgba(0,0,0,0.2)",
               },
             }}
           >

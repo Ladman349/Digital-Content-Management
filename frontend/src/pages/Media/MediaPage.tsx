@@ -11,7 +11,7 @@ import UploadMediaDialog from "../../components/media/UploadMediaDialog";
 import MediaPreviewDialog from "../../components/media/MediaPreviewDialog";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 
-import { MediaService } from "../../services/MediaService";
+import { useMedia, useUploadMedia, useDeleteMedia } from "../../hooks/queries";
 import { formatBytes, hasActiveFilters, sortMedia } from "../../components/media/utils";
 
 import type { MediaItem } from "../../types/media";
@@ -20,10 +20,10 @@ import type { TypeFilter, CategoryFilter, SortField, SortDirection } from "../..
 export default function MediaPage() {
   const { enqueueSnackbar } = useSnackbar();
 
-  // ── Data State ───────────────────────────────────────────────────────────
-  const [items, setItems] = useState<MediaItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  // ── React Query Hooks ───────────────────────────────────────────────────
+  const { data: items = [], isLoading: loading, refetch, isRefetching: refreshing } = useMedia();
+  const uploadMediaMutation = useUploadMedia();
+  const deleteMediaMutation = useDeleteMedia();
 
   // ── Router state ─────────────────────────────────────────────────────────
   const location = useLocation();
@@ -32,27 +32,9 @@ export default function MediaPage() {
   useEffect(() => {
     if (location.state?.openUploadDialog) {
       setUploadOpen(true);
-      
-      // Clear the state so refreshing doesn't reopen the dialog
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location, navigate]);
-
-  useEffect(() => {
-    fetchMedia();
-  }, []);
-
-  const fetchMedia = async () => {
-    try {
-      setLoading(true);
-      const data = await MediaService.getMedia();
-      setItems(data);
-    } catch (error) {
-      enqueueSnackbar("Failed to load media", { variant: "error" });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // ── Filter & Sort State ──────────────────────────────────────────────────
   const [search, setSearch] = useState("");
@@ -88,11 +70,9 @@ export default function MediaPage() {
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await fetchMedia();
-    setRefreshing(false);
+    await refetch();
     enqueueSnackbar("Media library refreshed", { variant: "success" });
-  }, [enqueueSnackbar]);
+  }, [refetch, enqueueSnackbar]);
 
   const handleClearFilters = useCallback(() => {
     setSearch("");
@@ -109,11 +89,10 @@ export default function MediaPage() {
   // ── Upload Handlers ──────────────────────────────────────────────────────
   const handleUploadSubmit = useCallback(async (files: File[]) => {
     try {
-      const uploadedItems: MediaItem[] = [];
       for (const file of files) {
         const isVideo = file.type.startsWith("video/");
         const mockUrl = URL.createObjectURL(file);
-        const newItem = await MediaService.uploadMedia({
+        await uploadMediaMutation.mutateAsync({
           name: file.name,
           type: isVideo ? "Video" : "Image",
           category: "Announcement",
@@ -125,29 +104,26 @@ export default function MediaPage() {
           uploadedBy: "Current User",
           dimensions: "1920x1080",
         });
-        uploadedItems.push(newItem);
       }
-      setItems(prev => [...uploadedItems, ...prev]);
       enqueueSnackbar(`Successfully uploaded ${files.length} file${files.length !== 1 ? 's' : ''}`, { variant: "success" });
       setUploadOpen(false);
     } catch (err: any) {
       enqueueSnackbar(err.message || "Failed to upload media", { variant: "error" });
     }
-  }, [enqueueSnackbar]);
+  }, [uploadMediaMutation, enqueueSnackbar]);
 
   // ── Delete Handlers ──────────────────────────────────────────────────────
   const handleConfirmDelete = useCallback(async () => {
     if (!deleteTarget) return;
     try {
-      await MediaService.deleteMedia(deleteTarget.id);
-      setItems(prev => prev.filter(i => i.id !== deleteTarget.id));
+      await deleteMediaMutation.mutateAsync(deleteTarget.id);
       enqueueSnackbar(`Deleted "${deleteTarget.name}"`, { variant: "success" });
     } catch (err: any) {
       enqueueSnackbar(err.message || "Failed to delete media", { variant: "error" });
     } finally {
       setDeleteTarget(null);
     }
-  }, [deleteTarget, enqueueSnackbar]);
+  }, [deleteTarget, deleteMediaMutation, enqueueSnackbar]);
 
   return (
     <Box>
