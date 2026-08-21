@@ -11,25 +11,25 @@ import ScheduleEditorDialog from "../../components/schedule/ScheduleEditorDialog
 import SchedulePreviewDialog from "../../components/schedule/SchedulePreviewDialog";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 
-import { ScheduleService } from "../../services/ScheduleService";
-import { PlaylistService } from "../../services/PlaylistService";
-import { DeviceService } from "../../services/DeviceService";
+import { useSchedules, usePlaylists, useDevices, useCreateSchedule, useUpdateSchedule, useDeleteSchedule } from "../../hooks/queries";
 import { hasActiveFilters, sortSchedules, findConflicts } from "../../components/schedule/utils";
 
 import type { Schedule } from "../../types/schedule";
-import type { Playlist } from "../../types/playlist";
-import type { Device } from "../../types/device";
 import type { StatusFilter, SortField, SortDirection } from "../../components/schedule/types";
 
 export default function SchedulePage() {
   const { enqueueSnackbar } = useSnackbar();
 
-  // ── Data State ───────────────────────────────────────────────────────────
-  const [items, setItems] = useState<Schedule[]>([]);
-  const [playlists, setPlaylists] = useState<Playlist[]>([]);
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  // ── React Query Hooks ───────────────────────────────────────────────────
+  const { data: items = [], isLoading: schedulesLoading, refetch, isRefetching: refreshing } = useSchedules();
+  const { data: playlists = [], isLoading: playlistsLoading } = usePlaylists();
+  const { data: devices = [], isLoading: devicesLoading } = useDevices();
+
+  const createScheduleMutation = useCreateSchedule();
+  const updateScheduleMutation = useUpdateSchedule();
+  const deleteScheduleMutation = useDeleteSchedule();
+
+  const loading = schedulesLoading || playlistsLoading || devicesLoading;
 
   // ── Router state ─────────────────────────────────────────────────────────
   const location = useLocation();
@@ -40,33 +40,9 @@ export default function SchedulePage() {
       setEditorMode("create");
       setEditorTarget(undefined);
       setEditorOpen(true);
-      
-      // Clear the state so refreshing doesn't reopen the dialog
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location, navigate]);
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const [schedulesData, playlistsData, devicesData] = await Promise.all([
-        ScheduleService.getSchedules(),
-        PlaylistService.getPlaylists(),
-        DeviceService.getDevices(),
-      ]);
-      setItems(schedulesData);
-      setPlaylists(playlistsData);
-      setDevices(devicesData);
-    } catch (error) {
-      enqueueSnackbar("Failed to load schedule data", { variant: "error" });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // ── Filter & Sort State ──────────────────────────────────────────────────
   const [search, setSearch] = useState("");
@@ -113,11 +89,9 @@ export default function SchedulePage() {
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await fetchData();
-    setRefreshing(false);
+    await refetch();
     enqueueSnackbar("Schedules refreshed", { variant: "success" });
-  }, [enqueueSnackbar]);
+  }, [refetch, enqueueSnackbar]);
 
   const handleClearFilters = useCallback(() => {
     setSearch("");
@@ -157,35 +131,31 @@ export default function SchedulePage() {
   const handleSaveEditor = useCallback(async (schedule: Schedule) => {
     try {
       const isExisting = items.some(s => s.id === schedule.id);
-      let savedSchedule: Schedule;
 
       if (isExisting) {
-        savedSchedule = await ScheduleService.updateSchedule(schedule.id, schedule);
-        setItems(prev => prev.map(s => s.id === savedSchedule.id ? savedSchedule : s));
+        await updateScheduleMutation.mutateAsync({ id: schedule.id, data: schedule });
       } else {
-        savedSchedule = await ScheduleService.createSchedule(schedule);
-        setItems(prev => [savedSchedule, ...prev]);
+        await createScheduleMutation.mutateAsync(schedule);
       }
-      enqueueSnackbar(`Schedule "${savedSchedule.name}" saved successfully`, { variant: "success" });
+      enqueueSnackbar(`Schedule "${schedule.name}" saved successfully`, { variant: "success" });
       setEditorOpen(false);
     } catch (err: any) {
       enqueueSnackbar(err.message || "Failed to save schedule", { variant: "error" });
     }
-  }, [items, enqueueSnackbar]);
+  }, [items, updateScheduleMutation, createScheduleMutation, enqueueSnackbar]);
 
   // ── Delete Handlers ──────────────────────────────────────────────────────
   const handleConfirmDelete = useCallback(async () => {
     if (!deleteTarget) return;
     try {
-      await ScheduleService.deleteSchedule(deleteTarget.id);
-      setItems(prev => prev.filter(i => i.id !== deleteTarget.id));
+      await deleteScheduleMutation.mutateAsync(deleteTarget.id);
       enqueueSnackbar(`Deleted "${deleteTarget.name}"`, { variant: "success" });
     } catch (err: any) {
       enqueueSnackbar(err.message || "Failed to delete schedule", { variant: "error" });
     } finally {
       setDeleteTarget(null);
     }
-  }, [deleteTarget, enqueueSnackbar]);
+  }, [deleteTarget, deleteScheduleMutation, enqueueSnackbar]);
 
   return (
     <Box>

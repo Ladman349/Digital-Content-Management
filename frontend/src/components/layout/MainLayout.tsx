@@ -15,7 +15,7 @@ export default function MainLayout() {
   }, [isMobile]);
 
   const handleToggleSidebar = () => {
-    setSidebarOpen(!sidebarOpen);
+    setSidebarOpen((prev) => !prev);
   };
 
   const handleCloseSidebar = () => {
@@ -29,7 +29,7 @@ export default function MainLayout() {
   };
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "#f5f7fb" }}>
+    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "#F8FAFC" }}>
       <Sidebar
         open={sidebarOpen}
         variant={isMobile ? "temporary" : "permanent"}
@@ -40,10 +40,11 @@ export default function MainLayout() {
       <Box
         sx={{
           flexGrow: 1,
-          p: { xs: 2, sm: 3 },
-          background: "#F8FAFC",
+          p: { xs: 1.5, sm: 2.5, md: 3.5 },
           width: "100%",
           minWidth: 0,
+          display: "flex",
+          flexDirection: "column",
         }}
       >
         <Navbar onToggleSidebar={handleToggleSidebar} />
@@ -51,7 +52,11 @@ export default function MainLayout() {
         <Box
           component="main"
           sx={{
-             mt: 3,
+            mt: { xs: 2, sm: 2.5, md: 3 },
+            flexGrow: 1,
+            maxWidth: "1600px",
+            width: "100%",
+            mx: "auto",
           }}
         >
           <Outlet />

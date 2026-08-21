@@ -109,10 +109,12 @@ function DeviceMobileCard({
   device,
   onEdit,
   onDelete,
+  onCopyId,
 }: {
   device: Device;
   onEdit: (device: Device) => void;
   onDelete: (device: Device) => void;
+  onCopyId?: (id: string) => void;
 }) {
   return (
     <Box
@@ -128,19 +130,30 @@ function DeviceMobileCard({
         <DeviceAvatar name={device.name} />
 
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <Box>
-              <Typography sx={{ fontWeight: 700, fontSize: 15 }}>{device.name}</Typography>
-              <Typography sx={{ color: "#94A3B8", fontSize: 12, fontWeight: 500, mt: 0.25 }}>
-                {device.id}
-              </Typography>
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1 }}>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography sx={{ fontWeight: 700, fontSize: 15, color: "#0F172A" }}>{device.name}</Typography>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mt: 0.25 }}>
+                <Typography sx={{ color: "#94A3B8", fontSize: 12, fontWeight: 500, fontFamily: "monospace" }}>
+                  {device.id}
+                </Typography>
+                {onCopyId && (
+                  <IconButton
+                    size="small"
+                    onClick={() => onCopyId(device.id)}
+                    sx={{ p: 0.25, color: "#94A3B8", "&:hover": { color: "#6C4CF1" } }}
+                  >
+                    <ContentCopyRoundedIcon sx={{ fontSize: 13 }} />
+                  </IconButton>
+                )}
+              </Box>
             </Box>
             <StatusChip status={statusToVariant(device.status)} />
           </Box>
 
-          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mt: 1.5 }}>
-            <LocationOnOutlinedIcon sx={{ fontSize: 15, color: "#94A3B8" }} />
-            <Typography sx={{ color: "#64748B", fontSize: 13 }}>{device.location}</Typography>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mt: 1.5 }}>
+            <LocationOnOutlinedIcon sx={{ fontSize: 16, color: "#94A3B8" }} />
+            <Typography sx={{ color: "#64748B", fontSize: 13, fontWeight: 500 }}>{device.location}</Typography>
           </Box>
 
           <Box
@@ -149,13 +162,17 @@ function DeviceMobileCard({
               justifyContent: "space-between",
               alignItems: "center",
               mt: 2,
+              p: 1.25,
+              bgcolor: "#F8FAFC",
+              borderRadius: "10px",
+              border: "1px solid #EEF2F7",
             }}
           >
             <Box>
               <Typography sx={{ color: "#94A3B8", fontSize: 11, fontWeight: 600, textTransform: "uppercase" }}>
                 Resolution
               </Typography>
-              <Typography sx={{ fontSize: 13, fontWeight: 600, mt: 0.25 }}>
+              <Typography sx={{ fontSize: 13, fontWeight: 600, color: "#334155", mt: 0.25 }}>
                 {device.resolution}
               </Typography>
             </Box>
@@ -183,8 +200,9 @@ function DeviceMobileCard({
                 textTransform: "none",
                 borderRadius: "10px",
                 fontWeight: 600,
-                borderColor: "#E5E7EB",
+                borderColor: "#E2E8F0",
                 color: "#374151",
+                "&:hover": { borderColor: "#6C4CF1", bgcolor: "#F5F3FF" },
               }}
             >
               Edit
@@ -478,6 +496,7 @@ export default function DeviceTable({
                 device={device}
                 onEdit={onEdit}
                 onDelete={onDelete}
+                onCopyId={onCopyId}
               />
             ))}
           </Box>

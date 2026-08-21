@@ -129,16 +129,22 @@ class PlaylistRepositoryImpl @Inject constructor(
                         val currentActive = database.playlistDao().getPlaylistByState(PlaylistState.ACTIVE)
                         val currentPending = database.playlistDao().getPlaylistByState(PlaylistState.PENDING)
                         
+                        val activeMediaItems = currentActive?.let { database.playlistDao().getMediaItemsForPlaylist(it.playlistId) } ?: emptyList()
+                        val allActiveFilesExist = activeMediaItems.isNotEmpty() && activeMediaItems.all { 
+                            it.isDownloaded && !it.localFilePath.isNullOrEmpty() && java.io.File(it.localFilePath).exists() 
+                        }
+
                         val isAlreadyActive = currentActive != null && 
                                 currentActive.playlistId == syncData.playlistId && 
-                                currentActive.version == syncData.version
+                                currentActive.version == syncData.version &&
+                                allActiveFilesExist
                                 
                         val isAlreadyPending = currentPending != null && 
                                 currentPending.playlistId == syncData.playlistId && 
                                 currentPending.version == syncData.version
                                 
                         if (isAlreadyActive || isAlreadyPending) {
-                            logger.i("PlaylistRepository", "Playlist version ${syncData.version} is already active/pending in DB. Ignoring sync.")
+                            logger.i("PlaylistRepository", "Playlist version ${syncData.version} is already active/pending with valid files in DB. Ignoring sync.")
                             com.digitalsignage.player.core.performance.PerformanceMonitor.recordEvent("SYNC", "Sync bypassed: version ${syncData.version} matches active/pending")
                             return Result.Success(false)
                         }

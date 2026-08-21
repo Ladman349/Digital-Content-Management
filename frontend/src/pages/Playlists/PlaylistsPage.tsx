@@ -12,25 +12,25 @@ import PlaylistPreviewDialog from "../../components/playlists/PlaylistPreviewDia
 import AssignDevicesDialog from "../../components/playlists/AssignDevicesDialog";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 
-import { PlaylistService } from "../../services/PlaylistService";
-import { MediaService } from "../../services/MediaService";
-import { DeviceService } from "../../services/DeviceService";
+import { usePlaylists, useMedia, useDevices, useCreatePlaylist, useUpdatePlaylist, useDeletePlaylist } from "../../hooks/queries";
 import { hasActiveFilters, sortPlaylists } from "../../components/playlists/utils";
 
 import type { Playlist } from "../../types/playlist";
-import type { MediaItem } from "../../types/media";
-import type { Device } from "../../types/device";
 import type { StatusFilter, SortField, SortDirection } from "../../components/playlists/types";
 
 export default function PlaylistsPage() {
   const { enqueueSnackbar } = useSnackbar();
 
-  // ── Data State ───────────────────────────────────────────────────────────
-  const [items, setItems] = useState<Playlist[]>([]);
-  const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  // ── React Query Hooks ───────────────────────────────────────────────────
+  const { data: items = [], isLoading: playlistsLoading, refetch, isRefetching: refreshing } = usePlaylists();
+  const { data: mediaItems = [], isLoading: mediaLoading } = useMedia();
+  const { data: devices = [], isLoading: devicesLoading } = useDevices();
+
+  const createPlaylistMutation = useCreatePlaylist();
+  const updatePlaylistMutation = useUpdatePlaylist();
+  const deletePlaylistMutation = useDeletePlaylist();
+
+  const loading = playlistsLoading || mediaLoading || devicesLoading;
 
   // ── Router state ─────────────────────────────────────────────────────────
   const location = useLocation();
@@ -40,33 +40,9 @@ export default function PlaylistsPage() {
     if (location.state?.openCreateDialog) {
       setEditorTarget(undefined);
       setEditorOpen(true);
-      
-      // Clear the state so refreshing doesn't reopen the dialog
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location, navigate]);
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const [playlistsData, mediaData, devicesData] = await Promise.all([
-        PlaylistService.getPlaylists(),
-        MediaService.getMedia(),
-        DeviceService.getDevices(),
-      ]);
-      setItems(playlistsData);
-      setMediaItems(mediaData);
-      setDevices(devicesData);
-    } catch (error) {
-      enqueueSnackbar("Failed to load playlist data", { variant: "error" });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // ── Filter & Sort State ──────────────────────────────────────────────────
   const [search, setSearch] = useState("");
@@ -102,11 +78,9 @@ export default function PlaylistsPage() {
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await fetchData();
-    setRefreshing(false);
+    await refetch();
     enqueueSnackbar("Playlists refreshed", { variant: "success" });
-  }, [enqueueSnackbar]);
+  }, [refetch, enqueueSnackbar]);
 
   const handleClearFilters = useCallback(() => {
     setSearch("");
@@ -132,48 +106,46 @@ export default function PlaylistsPage() {
   const handleSaveEditor = useCallback(async (playlist: Playlist) => {
     try {
       const isExisting = items.some(p => p.id === playlist.id);
-      let savedPlaylist: Playlist;
       
       if (isExisting) {
-        savedPlaylist = await PlaylistService.updatePlaylist(playlist.id, playlist);
-        setItems(prev => prev.map(p => p.id === savedPlaylist.id ? savedPlaylist : p));
+        await updatePlaylistMutation.mutateAsync({ id: playlist.id, data: playlist });
       } else {
-        savedPlaylist = await PlaylistService.createPlaylist(playlist);
-        setItems(prev => [savedPlaylist, ...prev]);
+        await createPlaylistMutation.mutateAsync(playlist);
       }
-      enqueueSnackbar(`Playlist "${savedPlaylist.name}" saved successfully`, { variant: "success" });
+      enqueueSnackbar(`Playlist "${playlist.name}" saved successfully`, { variant: "success" });
       setEditorOpen(false);
     } catch (err: any) {
       enqueueSnackbar(err.message || "Failed to save playlist", { variant: "error" });
     }
-  }, [items, enqueueSnackbar]);
+  }, [items, updatePlaylistMutation, createPlaylistMutation, enqueueSnackbar]);
 
   // ── Delete Handlers ──────────────────────────────────────────────────────
   const handleConfirmDelete = useCallback(async () => {
     if (!deleteTarget) return;
     try {
-      await PlaylistService.deletePlaylist(deleteTarget.id);
-      setItems(prev => prev.filter(i => i.id !== deleteTarget.id));
+      await deletePlaylistMutation.mutateAsync(deleteTarget.id);
       enqueueSnackbar(`Deleted "${deleteTarget.name}"`, { variant: "success" });
     } catch (err: any) {
       enqueueSnackbar(err.message || "Failed to delete playlist", { variant: "error" });
     } finally {
       setDeleteTarget(null);
     }
-  }, [deleteTarget, enqueueSnackbar]);
+  }, [deleteTarget, deletePlaylistMutation, enqueueSnackbar]);
 
   // ── Assign Handlers ──────────────────────────────────────────────────────
   const handleSaveAssignments = useCallback(async (deviceIds: string[]) => {
     if (!assignTarget) return;
     try {
-      const updated = await PlaylistService.updatePlaylist(assignTarget.id, { assignedDeviceIds: deviceIds, updatedAt: Date.now() });
-      setItems(prev => prev.map(p => p.id === updated.id ? updated : p));
+      await updatePlaylistMutation.mutateAsync({
+        id: assignTarget.id,
+        data: { assignedDeviceIds: deviceIds, updatedAt: Date.now() },
+      });
       enqueueSnackbar(`Updated device assignments for "${assignTarget.name}"`, { variant: "success" });
       setAssignTarget(null);
     } catch (err) {
       enqueueSnackbar("Failed to update assignments", { variant: "error" });
     }
-  }, [assignTarget, enqueueSnackbar]);
+  }, [assignTarget, updatePlaylistMutation, enqueueSnackbar]);
 
   return (
     <Box>

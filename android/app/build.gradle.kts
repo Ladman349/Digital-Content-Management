@@ -1,5 +1,6 @@
 import java.util.Properties
 import java.io.FileInputStream
+import java.net.URI
 
 plugins {
     id("com.android.application")
@@ -33,33 +34,48 @@ android {
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
             
+            val devUrl = localProperties.getProperty("DEV_API_URL") ?: System.getenv("DEV_API_URL")
             val devHost = localProperties.getProperty("DEV_API_HOST") ?: System.getenv("DEV_API_HOST")
             val devPort = localProperties.getProperty("DEV_API_PORT") ?: System.getenv("DEV_API_PORT")
             
-            if (devHost.isNullOrEmpty() || devPort.isNullOrEmpty()) {
-                throw GradleException("DEV_API_HOST and DEV_API_PORT must be defined in local.properties or as environment variables for the 'dev' flavor. Please configure them (e.g. DEV_API_HOST=192.168.31.37 DEV_API_PORT=8000)")
+            val finalBaseUrl: String
+            val cleartextDomain: String?
+            
+            if (!devUrl.isNullOrEmpty()) {
+                finalBaseUrl = if (devUrl.endsWith("/")) devUrl else "$devUrl/"
+                val uri = URI(finalBaseUrl)
+                cleartextDomain = if (uri.scheme.equals("http", ignoreCase = true)) uri.host else null
+            } else if (!devHost.isNullOrEmpty() && !devPort.isNullOrEmpty()) {
+                finalBaseUrl = "http://${devHost}:${devPort}/"
+                cleartextDomain = devHost
+            } else {
+                throw GradleException("Either DEV_API_URL (e.g. DEV_API_URL=https://my-api.com/) or both DEV_API_HOST and DEV_API_PORT (e.g. DEV_API_HOST=192.168.1.100 DEV_API_PORT=8000) must be defined in local.properties or as environment variables for the 'dev' flavor.")
             }
             
-            // Dynamically generate the dev flavor network_security_config.xml to allow cleartext only for the specific IP
+            // Dynamically generate the dev flavor network_security_config.xml
             val resDir = file("src/dev/res/xml")
             if (!resDir.exists()) {
                 resDir.mkdirs()
             }
             val xmlFile = file("src/dev/res/xml/network_security_config.xml")
+            val cleartextDomainBlock = if (!cleartextDomain.isNullOrEmpty()) {
+                """
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">$cleartextDomain</domain>
+    </domain-config>"""
+            } else ""
+            
             xmlFile.writeText("""<?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
     <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>
-    </base-config>
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="false">$devHost</domain>
-    </domain-config>
+    </base-config>$cleartextDomainBlock
 </network-security-config>
             """.trimIndent())
             
-            buildConfigField("String", "BASE_URL", "\"http://${devHost}:${devPort}/\"")
+            buildConfigField("String", "BASE_URL", "\"$finalBaseUrl\"")
             buildConfigField("String", "ENVIRONMENT", "\"development\"")
         }
         create("staging") {

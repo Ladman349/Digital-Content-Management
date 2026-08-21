@@ -10,11 +10,17 @@ class DeviceService:
 
     @staticmethod
     def get_devices(db: Session) -> List[Device]:
-        return db.query(Device).all()
+        devices = db.query(Device).all()
+        for device in devices:
+            device.status = DeviceService.calculate_status(device.heartbeatAt)
+        return devices
 
     @staticmethod
     def get_device(db: Session, device_id: str) -> Device:
-        return db.query(Device).filter(Device.id == device_id).first()
+        device = db.query(Device).filter(Device.id == device_id).first()
+        if device:
+            device.status = DeviceService.calculate_status(device.heartbeatAt)
+        return device
 
     @staticmethod
     def create_device(db: Session, payload: DeviceCreate) -> Device:

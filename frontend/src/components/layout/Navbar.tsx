@@ -8,6 +8,7 @@ import {
   Menu,
   MenuItem,
   ListItemIcon,
+  Badge,
 } from "@mui/material";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -16,6 +17,7 @@ import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import NotificationsRoundedIcon from "@mui/icons-material/NotificationsRounded";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
+import FiberManualRecordRoundedIcon from "@mui/icons-material/FiberManualRecordRounded";
 
 import SearchBar from "./SearchBar";
 
@@ -52,46 +54,93 @@ export default function Navbar({ onToggleSidebar }: { onToggleSidebar: () => voi
       elevation={0}
       sx={{
         bgcolor: "transparent",
-        p: { xs: 1, sm: 2 },
+        zIndex: 1100,
+        maxWidth: "1600px",
+        mx: "auto",
+        width: "100%",
       }}
     >
       <Paper
         elevation={0}
         sx={{
-          height: { xs: 60, sm: 72 },
+          height: { xs: 58, sm: 68 },
           display: "flex",
           alignItems: "center",
-          px: { xs: 1.5, sm: 3 },
-          borderRadius: 4,
-          border: "1px solid #E5E7EB",
-          boxShadow: "0 8px 30px rgba(0,0,0,.05)",
+          px: { xs: 1.5, sm: 2.5 },
+          borderRadius: { xs: 3.5, sm: 4 },
+          border: "1px solid rgba(226, 232, 240, 0.8)",
+          bgcolor: "rgba(255, 255, 255, 0.88)",
+          backdropFilter: "blur(16px)",
+          boxShadow: "0 4px 20px -2px rgba(15, 23, 42, 0.05)",
         }}
       >
-        <IconButton onClick={onToggleSidebar} sx={{ mr: { xs: 0.5, sm: 2 } }}>
-          <MenuRoundedIcon />
-        </IconButton>
-
-        <Typography
+        <IconButton
+          onClick={onToggleSidebar}
+          size="small"
+          aria-label="open drawer"
           sx={{
-            ml: { xs: 1, sm: 3 },
-            fontWeight: 800,
-            fontSize: { xs: 16, sm: 20, md: 24 },
-            whiteSpace: "nowrap",
+            p: { xs: 0.75, sm: 1 },
+            mr: { xs: 1, sm: 1.5 },
+            bgcolor: "#F8FAFC",
+            border: "1px solid #E2E8F0",
+            borderRadius: 2.5,
+            "&:hover": { bgcolor: "#F1F5F9" },
           }}
         >
-          Digital Signage CMS
-        </Typography>
+          <MenuRoundedIcon fontSize="small" sx={{ color: "#334155" }} />
+        </IconButton>
+
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Typography
+            sx={{
+              fontWeight: 800,
+              fontSize: { xs: 15, sm: 18, md: 20 },
+              letterSpacing: "-0.02em",
+              color: "#0F172A",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Signage CMS
+          </Typography>
+          <Box
+            sx={{
+              display: { xs: "none", sm: "flex" },
+              alignItems: "center",
+              gap: 0.5,
+              bgcolor: "rgba(16, 185, 129, 0.1)",
+              color: "#059669",
+              px: 1,
+              py: 0.25,
+              borderRadius: "20px",
+              fontSize: 11,
+              fontWeight: 700,
+            }}
+          >
+            <FiberManualRecordRoundedIcon sx={{ fontSize: 8, color: "#10B981" }} />
+            LIVE
+          </Box>
+        </Box>
 
         <Box sx={{ flexGrow: 1 }} />
 
-        <Box sx={{ display: { xs: "none", lg: "block" } }}>
+        <Box sx={{ display: { xs: "none", md: "block" }, mx: 2 }}>
           <SearchBar />
         </Box>
 
-        <Box sx={{ width: { xs: 8, lg: 24 } }} />
-
-        <IconButton onClick={handleNotifOpen}>
-          <NotificationsRoundedIcon />
+        <IconButton
+          onClick={handleNotifOpen}
+          size="small"
+          sx={{
+            p: 1,
+            bgcolor: "#F8FAFC",
+            border: "1px solid #E2E8F0",
+            borderRadius: 2.5,
+            "&:hover": { bgcolor: "#F1F5F9" },
+          }}
+        >
+          <Badge variant="dot" color="primary">
+            <NotificationsRoundedIcon fontSize="small" sx={{ color: "#475569" }} />
+          </Badge>
         </IconButton>
         
         <Menu
@@ -105,16 +154,17 @@ export default function Navbar({ onToggleSidebar }: { onToggleSidebar: () => voi
               elevation: 0,
               sx: {
                 mt: 1.5,
-                minWidth: 200,
-                boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
-                border: "1px solid #E5E7EB",
+                minWidth: 220,
+                boxShadow: "0 12px 32px rgba(15, 23, 42, 0.12)",
+                border: "1px solid #E2E8F0",
                 borderRadius: 3,
+                p: 1,
               }
             }
           }}
         >
-          <MenuItem disabled sx={{ py: 2, justifyContent: "center" }}>
-            <Typography variant="body2">No notifications</Typography>
+          <MenuItem disabled sx={{ py: 1.5, justifyContent: "center" }}>
+            <Typography variant="body2" sx={{ color: "#94A3B8" }}>No unread notifications</Typography>
           </MenuItem>
         </Menu>
 
@@ -123,22 +173,40 @@ export default function Navbar({ onToggleSidebar }: { onToggleSidebar: () => voi
           sx={{
             display: "flex",
             alignItems: "center",
-            ml: { xs: 1.5, sm: 3 },
-            gap: 1.5,
+            ml: { xs: 1, sm: 1.5 },
+            gap: 1,
             cursor: "pointer",
             p: 0.5,
-            borderRadius: 2,
-            "&:hover": { bgcolor: "#F8FAFC" }
+            pr: { xs: 0.5, sm: 1.5 },
+            borderRadius: 3,
+            border: "1px solid transparent",
+            transition: "all 0.2s ease",
+            "&:hover": { bgcolor: "#F8FAFC", borderColor: "#E2E8F0" }
           }}
         >
-          <Avatar sx={{ bgcolor: "#6C4CF1" }}>A</Avatar>
+          <Avatar
+            sx={{
+              width: { xs: 34, sm: 38 },
+              height: { xs: 34, sm: 38 },
+              bgcolor: "#6C4CF1",
+              fontSize: 14,
+              fontWeight: 700,
+              boxShadow: "0 4px 12px rgba(108, 76, 241, 0.3)",
+            }}
+          >
+            A
+          </Avatar>
 
-          <Box sx={{ display: { xs: "none", md: "block" } }}>
-            <Typography sx={{ fontWeight: 700 }}>Akash</Typography>
-            <Typography sx={{ fontSize: 12, color: "#6B7280" }}>Administrator</Typography>
+          <Box sx={{ display: { xs: "none", lg: "block" } }}>
+            <Typography sx={{ fontWeight: 700, fontSize: 13, color: "#0F172A", lineHeight: 1.2 }}>
+              Akash
+            </Typography>
+            <Typography sx={{ fontSize: 11, color: "#64748B", fontWeight: 500 }}>
+              Administrator
+            </Typography>
           </Box>
 
-          <KeyboardArrowDownRoundedIcon sx={{ display: { xs: "none", md: "block" } }} />
+          <KeyboardArrowDownRoundedIcon fontSize="small" sx={{ display: { xs: "none", sm: "block" }, color: "#94A3B8" }} />
         </Box>
 
         <Menu
@@ -153,16 +221,17 @@ export default function Navbar({ onToggleSidebar }: { onToggleSidebar: () => voi
               sx: {
                 mt: 1.5,
                 minWidth: 200,
-                boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
-                border: "1px solid #E5E7EB",
+                boxShadow: "0 12px 32px rgba(15, 23, 42, 0.12)",
+                border: "1px solid #E2E8F0",
                 borderRadius: 3,
+                p: 0.5,
               }
             }
           }}
         >
-          <MenuItem onClick={handleLogout} sx={{ color: "error.main" }}>
+          <MenuItem onClick={handleLogout} sx={{ color: "error.main", borderRadius: 2, py: 1 }}>
             <ListItemIcon><LogoutRoundedIcon fontSize="small" color="error" /></ListItemIcon>
-            Logout
+            <Typography sx={{ fontWeight: 600, fontSize: 13 }}>Logout</Typography>
           </MenuItem>
         </Menu>
       </Paper>

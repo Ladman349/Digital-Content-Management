@@ -1,4 +1,4 @@
-import { Box, IconButton, Paper, Typography, Tooltip, Skeleton } from "@mui/material";
+import { Box, IconButton, Paper, Typography, Tooltip, Skeleton, Chip } from "@mui/material";
 import Grid from "@mui/material/Grid";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import OpenInFullRoundedIcon from "@mui/icons-material/OpenInFullRounded";
@@ -59,13 +59,15 @@ function MediaCard({
       elevation={0}
       sx={{
         borderRadius: "16px",
-        border: "1px solid #EEF2F7",
+        border: "1px solid #EEF2F6",
         overflow: "hidden",
         position: "relative",
-        transition: "all 0.2s ease",
+        bgcolor: "#FFFFFF",
+        transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
         "&:hover": {
-          boxShadow: "0 12px 30px rgba(15,23,42,0.08)",
-          transform: "translateY(-4px)",
+          boxShadow: "0 12px 32px rgba(15,23,42,0.08)",
+          transform: "translateY(-3px)",
+          borderColor: "#E2E8F0",
           "& .media-actions": { opacity: 1 },
           "& .media-overlay": { opacity: 1 },
         },
@@ -73,22 +75,33 @@ function MediaCard({
     >
       {/* Thumbnail Area */}
       <Box
+        onClick={() => onPreview(item)}
         sx={{
           position: "relative",
-          height: 160,
-          bgcolor: "#F8FAFC",
-          backgroundImage: `url(${item.thumbnail})`,
+          height: { xs: 150, sm: 165 },
+          bgcolor: "#0F172A",
+          backgroundImage: item.thumbnail ? `url(${item.thumbnail})` : undefined,
           backgroundSize: "cover",
           backgroundPosition: "center",
-          borderBottom: "1px solid #EEF2F7",
+          borderBottom: "1px solid #EEF2F6",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
         }}
       >
+        {!item.thumbnail && (
+          <Box sx={{ color: "rgba(255,255,255,0.4)" }}>
+            {isVideo ? <MovieRoundedIcon sx={{ fontSize: 48 }} /> : <ImageRoundedIcon sx={{ fontSize: 48 }} />}
+          </Box>
+        )}
+
         <Box
           className="media-overlay"
           sx={{
             position: "absolute",
             inset: 0,
-            bgcolor: "rgba(15,23,42,0.4)",
+            bgcolor: "rgba(15,23,42,0.45)",
             opacity: 0,
             transition: "opacity 0.2s ease",
             display: "flex",
@@ -96,18 +109,38 @@ function MediaCard({
             justifyContent: "center",
           }}
         >
-          <IconButton
-            onClick={() => onPreview(item)}
+          <Box
             sx={{
-              bgcolor: "rgba(255,255,255,0.2)",
+              bgcolor: "rgba(255,255,255,0.25)",
               color: "#fff",
-              backdropFilter: "blur(4px)",
-              "&:hover": { bgcolor: "rgba(255,255,255,0.3)" },
+              backdropFilter: "blur(6px)",
+              p: 1.25,
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
-            <OpenInFullRoundedIcon />
-          </IconButton>
+            <OpenInFullRoundedIcon fontSize="small" />
+          </Box>
         </Box>
+
+        {/* Type Badge */}
+        <Chip
+          label={item.type.toUpperCase()}
+          size="small"
+          sx={{
+            position: "absolute",
+            top: 8,
+            left: 8,
+            height: 20,
+            fontSize: 10,
+            fontWeight: 700,
+            bgcolor: isVideo ? "rgba(236, 72, 153, 0.9)" : "rgba(14, 165, 233, 0.9)",
+            color: "#fff",
+            backdropFilter: "blur(4px)",
+          }}
+        />
 
         {isVideo && (
           <Box
@@ -115,33 +148,33 @@ function MediaCard({
               position: "absolute",
               bottom: 8,
               right: 8,
-              bgcolor: "rgba(15,23,42,0.7)",
+              bgcolor: "rgba(15,23,42,0.8)",
               color: "#fff",
               px: 1,
               py: 0.25,
               borderRadius: "6px",
               fontSize: 11,
-              fontWeight: 600,
+              fontWeight: 700,
               display: "flex",
               alignItems: "center",
               gap: 0.5,
               backdropFilter: "blur(4px)",
             }}
           >
-            <PlayCircleOutlineRoundedIcon sx={{ fontSize: 14 }} />
+            <PlayCircleOutlineRoundedIcon sx={{ fontSize: 13 }} />
             {formatDuration(item.duration)}
           </Box>
         )}
       </Box>
 
       {/* Details Area */}
-      <Box sx={{ p: 2 }}>
+      <Box sx={{ p: { xs: 1.75, sm: 2 } }}>
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1 }}>
           <Typography
             sx={{
               fontWeight: 700,
-              fontSize: 14,
-              color: "#111827",
+              fontSize: { xs: 13.5, sm: 14 },
+              color: "#0F172A",
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
@@ -151,19 +184,14 @@ function MediaCard({
           >
             {item.name}
           </Typography>
-          {isVideo ? (
-            <MovieRoundedIcon sx={{ fontSize: 16, color: "#94A3B8", flexShrink: 0 }} />
-          ) : (
-            <ImageRoundedIcon sx={{ fontSize: 16, color: "#94A3B8", flexShrink: 0 }} />
-          )}
         </Box>
 
-        <Typography sx={{ color: "#64748B", fontSize: 12, mb: 0.5 }}>
-          {formatBytes(item.size)} • {item.dimensions}
+        <Typography sx={{ color: "#64748B", fontSize: 12, fontWeight: 500, mb: 0.5 }}>
+          {formatBytes(item.size)} {item.dimensions ? `• ${item.dimensions}` : ""}
         </Typography>
 
-        <Typography sx={{ color: "#94A3B8", fontSize: 12 }}>
-          {dateStr} by {item.uploadedBy}
+        <Typography sx={{ color: "#94A3B8", fontSize: 11.5 }}>
+          {dateStr} {item.uploadedBy ? `by ${item.uploadedBy}` : ""}
         </Typography>
 
         <Box
@@ -172,19 +200,22 @@ function MediaCard({
             position: "absolute",
             bottom: 8,
             right: 8,
-            opacity: 0,
+            opacity: { xs: 1, md: 0 },
             transition: "opacity 0.2s ease",
           }}
         >
           <Tooltip title="Delete">
             <IconButton
               size="small"
-              onClick={() => onDelete(item)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(item);
+              }}
               sx={{
                 bgcolor: "#fff",
-                border: "1px solid #E5E7EB",
+                border: "1px solid #E2E8F0",
                 color: "#EF4444",
-                boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+                boxShadow: "0 2px 6px rgba(0,0,0,0.06)",
                 "&:hover": { bgcolor: "#FEF2F2", borderColor: "#FECACA" },
               }}
             >
@@ -208,7 +239,7 @@ export default function MediaGrid({
 }: Props) {
   if (loading) {
     return (
-      <Grid container spacing={3}>
+      <Grid container spacing={{ xs: 1.5, sm: 2, md: 3 }}>
         {Array.from({ length: 8 }).map((_, i) => (
           <Grid key={i} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
             <MediaCardSkeleton />
@@ -244,7 +275,7 @@ export default function MediaGrid({
   }
 
   return (
-    <Grid container spacing={3}>
+    <Grid container spacing={{ xs: 1.5, sm: 2, md: 3 }}>
       {items.map((item) => (
         <Grid key={item.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
           <MediaCard item={item} onPreview={onPreview} onDelete={onDelete} />
