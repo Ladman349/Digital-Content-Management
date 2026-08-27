@@ -13,6 +13,7 @@ import type { MediaItem } from "../../types/media";
 import { formatDuration } from "./utils";
 import EmptyState from "../common/EmptyState";
 import { formatDate } from "../../utils/date";
+
 interface Props {
   mediaItems: MediaItem[];
   playlists: Playlist[];
@@ -59,21 +60,23 @@ function PlaylistCard({
       elevation={0}
       sx={{
         borderRadius: "16px",
-        border: "1px solid #EEF2F7",
+        border: "1px solid #EEF2F6",
         overflow: "hidden",
         position: "relative",
-        transition: "all 0.2s ease",
+        bgcolor: "#FFFFFF",
+        transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
         display: "flex",
         flexDirection: "column",
         height: "100%",
         "&:hover": {
-          boxShadow: "0 12px 30px rgba(15,23,42,0.08)",
-          transform: "translateY(-4px)",
+          boxShadow: "0 12px 32px rgba(15,23,42,0.08)",
+          transform: "translateY(-3px)",
+          borderColor: "#E2E8F0",
         },
       }}
     >
       {/* Thumbnails strip */}
-      <Box sx={{ display: "flex", height: 120, bgcolor: "#F1F5F9" }}>
+      <Box sx={{ display: "flex", height: { xs: 100, sm: 120 }, bgcolor: "#F1F5F9" }}>
         {thumbnails.length > 0 ? (
           thumbnails.map((thumb, idx) => (
             <Box
@@ -95,13 +98,13 @@ function PlaylistCard({
       </Box>
 
       {/* Content */}
-      <Box sx={{ p: 2, display: "flex", flexDirection: "column", flexGrow: 1 }}>
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
+      <Box sx={{ p: { xs: 1.75, sm: 2 }, display: "flex", flexDirection: "column", flexGrow: 1 }}>
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1, gap: 1 }}>
           <Typography
             sx={{
               fontWeight: 700,
-              fontSize: 15,
-              color: "#111827",
+              fontSize: { xs: 14, sm: 15 },
+              color: "#0F172A",
               lineHeight: 1.3,
             }}
           >
@@ -114,8 +117,8 @@ function PlaylistCard({
               bgcolor: colors.bg,
               color: colors.text,
               border: `1px solid ${colors.border}`,
-              fontWeight: 600,
-              fontSize: 11,
+              fontWeight: 700,
+              fontSize: 10.5,
               height: 22,
             }}
           />
@@ -124,59 +127,60 @@ function PlaylistCard({
         <Typography
           sx={{
             color: "#64748B",
-            fontSize: 13,
-            mb: 2,
+            fontSize: 12.5,
+            mb: 1.5,
             display: "-webkit-box",
             WebkitLineClamp: 2,
             WebkitBoxOrient: "vertical",
             overflow: "hidden",
             flexGrow: 1,
+            lineHeight: 1.4,
           }}
         >
           {playlist.description || "No description provided."}
         </Typography>
 
         {/* Metrics */}
-        <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
+        <Box sx={{ display: "flex", gap: 1.5, mb: 1.5, flexWrap: "wrap" }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, color: "#64748B" }}>
-            <ScheduleRoundedIcon sx={{ fontSize: 16 }} />
-            <Typography sx={{ fontSize: 12, fontWeight: 500 }}>
+            <ScheduleRoundedIcon sx={{ fontSize: 15 }} />
+            <Typography sx={{ fontSize: 11.5, fontWeight: 600 }}>
               {formatDuration(playlist.totalDuration)}
             </Typography>
           </Box>
           <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, color: "#64748B" }}>
-            <FormatListBulletedRoundedIcon sx={{ fontSize: 16 }} />
-            <Typography sx={{ fontSize: 12, fontWeight: 500 }}>
+            <FormatListBulletedRoundedIcon sx={{ fontSize: 15 }} />
+            <Typography sx={{ fontSize: 11.5, fontWeight: 600 }}>
               {playlist.items.length} items
             </Typography>
           </Box>
           <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, color: "#64748B" }}>
-            <TvRoundedIcon sx={{ fontSize: 16 }} />
-            <Typography sx={{ fontSize: 12, fontWeight: 500 }}>
-              {playlist.assignedDeviceIds.length} devices
+            <TvRoundedIcon sx={{ fontSize: 15 }} />
+            <Typography sx={{ fontSize: 11.5, fontWeight: 600 }}>
+              {playlist.assignedDeviceIds.length} screens
             </Typography>
           </Box>
         </Box>
 
         {/* Actions & Meta */}
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", pt: 1.5, borderTop: "1px solid #F1F5F9" }}>
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", pt: 1.25, borderTop: "1px solid #F1F5F9" }}>
           <Typography sx={{ color: "#94A3B8", fontSize: 11 }}>
             Updated {dateStr}
           </Typography>
           
           <Box sx={{ display: "flex", gap: 0.5 }}>
             <Tooltip title="Preview">
-              <IconButton size="small" onClick={() => onPreview(playlist)} sx={{ color: "#3B82F6" }}>
+              <IconButton size="small" onClick={() => onPreview(playlist)} sx={{ color: "#3B82F6", p: 0.5 }}>
                 <PlayCircleOutlineRoundedIcon sx={{ fontSize: 18 }} />
               </IconButton>
             </Tooltip>
             <Tooltip title="Edit Sequence">
-              <IconButton size="small" onClick={() => onEdit(playlist)} sx={{ color: "#10B981" }}>
+              <IconButton size="small" onClick={() => onEdit(playlist)} sx={{ color: "#10B981", p: 0.5 }}>
                 <EditRoundedIcon sx={{ fontSize: 18 }} />
               </IconButton>
             </Tooltip>
             <Tooltip title="Delete">
-              <IconButton size="small" onClick={() => onDelete(playlist)} sx={{ color: "#EF4444" }}>
+              <IconButton size="small" onClick={() => onDelete(playlist)} sx={{ color: "#EF4444", p: 0.5 }}>
                 <DeleteOutlineRoundedIcon sx={{ fontSize: 18 }} />
               </IconButton>
             </Tooltip>
@@ -200,10 +204,10 @@ export default function PlaylistGrid({
 }: Props) {
   if (loading) {
     return (
-      <Grid container spacing={3}>
-        {Array.from({ length: 8 }).map((_, i) => (
+      <Grid container spacing={{ xs: 1.5, sm: 2, md: 3 }}>
+        {Array.from({ length: 6 }).map((_, i) => (
           <Grid key={i} size={{ xs: 12, sm: 6, lg: 4 }}>
-            <Skeleton variant="rectangular" height={280} sx={{ borderRadius: "16px" }} />
+            <Skeleton variant="rectangular" height={260} sx={{ borderRadius: "16px" }} />
           </Grid>
         ))}
       </Grid>
@@ -229,7 +233,7 @@ export default function PlaylistGrid({
   }
 
   return (
-    <Grid container spacing={3}>
+    <Grid container spacing={{ xs: 1.5, sm: 2, md: 3 }}>
       {playlists.map((playlist) => (
         <Grid key={playlist.id} size={{ xs: 12, sm: 6, lg: 4 }}>
           <PlaylistCard playlist={playlist} mediaItems={mediaItems} onEdit={onEdit} onPreview={onPreview} onDelete={onDelete} />

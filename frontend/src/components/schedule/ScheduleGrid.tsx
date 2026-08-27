@@ -14,6 +14,7 @@ import DateRangeRoundedIcon from "@mui/icons-material/DateRangeRounded";
 import type { Schedule, ScheduleStatus, SchedulePriority } from "../../types/schedule";
 import type { Playlist } from "../../types/playlist";
 import EmptyState from "../common/EmptyState";
+
 interface Props {
   playlists: Playlist[];
   schedules: Schedule[];
@@ -69,16 +70,18 @@ function ScheduleCard({
       sx={{
         borderRadius: "16px",
         border: "1px solid",
-        borderColor: hasConflict ? "#FECACA" : "#EEF2F7",
+        borderColor: hasConflict ? "#FECACA" : "#EEF2F6",
         overflow: "hidden",
         position: "relative",
-        transition: "all 0.2s ease",
+        bgcolor: "#FFFFFF",
+        transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
         display: "flex",
         flexDirection: "column",
         height: "100%",
         "&:hover": {
-          boxShadow: "0 12px 30px rgba(15,23,42,0.08)",
-          transform: "translateY(-4px)",
+          boxShadow: "0 12px 32px rgba(15,23,42,0.08)",
+          transform: "translateY(-3px)",
+          borderColor: hasConflict ? "#FCA5A5" : "#E2E8F0",
         },
       }}
     >
@@ -86,16 +89,16 @@ function ScheduleCard({
       <Box sx={{ height: 4, bgcolor: hasConflict ? "#EF4444" : pColor }} />
 
       {/* Content */}
-      <Box sx={{ p: 2.5, display: "flex", flexDirection: "column", flexGrow: 1 }}>
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
+      <Box sx={{ p: { xs: 2, sm: 2.5 }, display: "flex", flexDirection: "column", flexGrow: 1 }}>
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1, gap: 1 }}>
           <Box>
-            <Typography sx={{ fontWeight: 700, fontSize: 16, color: "#111827", lineHeight: 1.3 }}>
+            <Typography sx={{ fontWeight: 700, fontSize: { xs: 14.5, sm: 16 }, color: "#0F172A", lineHeight: 1.3 }}>
               {schedule.name}
             </Typography>
             {hasConflict && (
               <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, color: "#EF4444", mt: 0.5 }}>
                 <WarningRoundedIcon sx={{ fontSize: 14 }} />
-                <Typography sx={{ fontSize: 12, fontWeight: 600 }}>Device Conflict</Typography>
+                <Typography sx={{ fontSize: 11.5, fontWeight: 700 }}>Device Conflict</Typography>
               </Box>
             )}
           </Box>
@@ -106,65 +109,65 @@ function ScheduleCard({
               bgcolor: colors.bg,
               color: colors.text,
               border: `1px solid ${colors.border}`,
-              fontWeight: 600,
-              fontSize: 11,
+              fontWeight: 700,
+              fontSize: 10.5,
               height: 22,
             }}
           />
         </Box>
 
         {/* Schedule Info Grid */}
-        <Box sx={{ mt: 2, display: "flex", flexDirection: "column", gap: 1.5, flexGrow: 1 }}>
+        <Box sx={{ mt: 1.5, display: "flex", flexDirection: "column", gap: 1.25, flexGrow: 1 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, color: "#64748B" }}>
-            <DateRangeRoundedIcon sx={{ fontSize: 16 }} />
-            <Typography sx={{ fontSize: 13, fontWeight: 500 }}>
+            <DateRangeRoundedIcon sx={{ fontSize: 16, color: "#94A3B8" }} />
+            <Typography sx={{ fontSize: 12.5, fontWeight: 500 }}>
               {schedule.startDate} to {schedule.endDate}
             </Typography>
           </Box>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, color: "#64748B" }}>
-            <AccessTimeRoundedIcon sx={{ fontSize: 16 }} />
-            <Typography sx={{ fontSize: 13, fontWeight: 500 }}>
+            <AccessTimeRoundedIcon sx={{ fontSize: 16, color: "#94A3B8" }} />
+            <Typography sx={{ fontSize: 12.5, fontWeight: 500 }}>
               {schedule.startTime} - {schedule.endTime} • {schedule.repeat}
             </Typography>
           </Box>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, color: "#64748B" }}>
-            <FormatListBulletedRoundedIcon sx={{ fontSize: 16 }} />
-            <Typography sx={{ fontSize: 13, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <FormatListBulletedRoundedIcon sx={{ fontSize: 16, color: "#94A3B8" }} />
+            <Typography sx={{ fontSize: 12.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {playlist?.name || "Unknown Playlist"}
             </Typography>
           </Box>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, color: "#64748B" }}>
-            <TvRoundedIcon sx={{ fontSize: 16 }} />
-            <Typography sx={{ fontSize: 13, fontWeight: 500 }}>
+            <TvRoundedIcon sx={{ fontSize: 16, color: "#94A3B8" }} />
+            <Typography sx={{ fontSize: 12.5, fontWeight: 500 }}>
               {schedule.deviceIds.length} target devices
             </Typography>
           </Box>
         </Box>
 
         {/* Actions & Meta */}
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", pt: 2, mt: 2, borderTop: "1px solid #F1F5F9" }}>
-          <Typography sx={{ color: pColor, fontSize: 12, fontWeight: 600 }}>
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", pt: 1.5, mt: 2, borderTop: "1px solid #F1F5F9" }}>
+          <Typography sx={{ color: pColor, fontSize: 11.5, fontWeight: 700 }}>
             {schedule.priority} Priority
           </Typography>
           
           <Box sx={{ display: "flex", gap: 0.5 }}>
             <Tooltip title="Preview">
-              <IconButton size="small" onClick={() => onPreview(schedule)} sx={{ color: "#3B82F6" }}>
+              <IconButton size="small" onClick={() => onPreview(schedule)} sx={{ color: "#3B82F6", p: 0.5 }}>
                 <FormatListBulletedRoundedIcon sx={{ fontSize: 18 }} />
               </IconButton>
             </Tooltip>
             <Tooltip title="Duplicate">
-              <IconButton size="small" onClick={() => onDuplicate(schedule)} sx={{ color: "#64748B" }}>
+              <IconButton size="small" onClick={() => onDuplicate(schedule)} sx={{ color: "#64748B", p: 0.5 }}>
                 <ContentCopyRoundedIcon sx={{ fontSize: 18 }} />
               </IconButton>
             </Tooltip>
             <Tooltip title="Edit">
-              <IconButton size="small" onClick={() => onEdit(schedule)} sx={{ color: "#F59E0B" }}>
+              <IconButton size="small" onClick={() => onEdit(schedule)} sx={{ color: "#F59E0B", p: 0.5 }}>
                 <EditRoundedIcon sx={{ fontSize: 18 }} />
               </IconButton>
             </Tooltip>
             <Tooltip title="Delete">
-              <IconButton size="small" onClick={() => onDelete(schedule)} sx={{ color: "#EF4444" }}>
+              <IconButton size="small" onClick={() => onDelete(schedule)} sx={{ color: "#EF4444", p: 0.5 }}>
                 <DeleteOutlineRoundedIcon sx={{ fontSize: 18 }} />
               </IconButton>
             </Tooltip>
@@ -190,8 +193,8 @@ export default function ScheduleGrid({
 }: Props) {
   if (loading) {
     return (
-      <Grid container spacing={3}>
-        {Array.from({ length: 8 }).map((_, i) => (
+      <Grid container spacing={{ xs: 1.5, sm: 2, md: 3 }}>
+        {Array.from({ length: 6 }).map((_, i) => (
           <Grid key={i} size={{ xs: 12, sm: 6, lg: 4 }}>
             <Skeleton variant="rectangular" height={240} sx={{ borderRadius: "16px" }} />
           </Grid>
@@ -219,7 +222,7 @@ export default function ScheduleGrid({
   }
 
   return (
-    <Grid container spacing={3}>
+    <Grid container spacing={{ xs: 1.5, sm: 2, md: 3 }}>
       {schedules.map((schedule) => (
         <Grid key={schedule.id} size={{ xs: 12, sm: 6, lg: 4 }}>
           <ScheduleCard

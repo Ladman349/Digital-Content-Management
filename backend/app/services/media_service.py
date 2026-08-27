@@ -119,6 +119,8 @@ class MediaService:
             
         db.commit()
         db.refresh(media)
+        from app.core.cache import PlayerCache
+        PlayerCache.invalidate_all()
         return media
 
     @staticmethod
@@ -134,6 +136,8 @@ class MediaService:
             db.delete(media)
             db.commit()
             logger.info(f"Media deleted from database mediaId={media_id}")
+            from app.core.cache import PlayerCache
+            PlayerCache.invalidate_all()
         except IntegrityError:
             db.rollback()
             raise HTTPException(status_code=409, detail="Cannot delete media because it is referenced by one or more playlists.")
@@ -147,15 +151,31 @@ class MediaService:
         return True
 
     @staticmethod
-    def to_response(media: Media) -> MediaResponse:
+    def extract_clean_storage_uri(raw_uri: str | None) -> str:
+        if not raw_uri:
+            return ""
+        if "supabase://" in raw_uri:
+            return "supabase://" + raw_uri.split("supabase://", 1)[1]
+        if "local://" in raw_uri:
+            return "local://" + raw_uri.split("local://", 1)[1]
+        return raw_uri
+
+    @staticmethod
+    def to_response(media: Media, request_base_url: str | None = None) -> MediaResponse:
         provider = get_storage_provider()
+        clean_thumbnail = MediaService.extract_clean_storage_uri(media.thumbnail)
+        clean_original = MediaService.extract_clean_storage_uri(media.originalFile)
+
+        thumb_url = provider.get_public_url(clean_thumbnail, base_url_override=request_base_url)
+        orig_url = provider.get_public_url(clean_original, base_url_override=request_base_url)
+
         return MediaResponse(
             id=media.id,
             name=media.name,
             type=media.type,
             category=media.category,
-            thumbnail=provider.get_public_url(media.thumbnail),
-            originalFile=provider.get_public_url(media.originalFile),
+            thumbnail=thumb_url,
+            originalFile=orig_url,
             size=media.size,
             dimensions=media.dimensions,
             duration=media.duration,

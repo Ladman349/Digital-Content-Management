@@ -127,7 +127,7 @@ export default function PlaylistFiltersBar({
       <Box
         sx={{
           display: "flex",
-          gap: 2,
+          gap: 1.5,
           flexWrap: "wrap",
           alignItems: "center",
         }}
@@ -137,7 +137,7 @@ export default function PlaylistFiltersBar({
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
           size="small"
-          sx={{ flex: 1, minWidth: { xs: "100%", sm: 280 }, ...inputSx }}
+          sx={{ flex: 1, minWidth: { xs: "100%", sm: 260 }, ...inputSx }}
           slotProps={{
             input: {
               startAdornment: (
@@ -162,7 +162,7 @@ export default function PlaylistFiltersBar({
           value={statusFilter}
           onChange={(e) => onStatusFilterChange(e.target.value as StatusFilter)}
           size="small"
-          sx={{ width: { xs: "100%", sm: 160 }, ...inputSx }}
+          sx={{ width: { xs: "calc(50% - 6px)", sm: 160 }, ...inputSx }}
         >
           <MenuItem value="All">All Statuses</MenuItem>
           <MenuItem value="Published">Published</MenuItem>
@@ -176,7 +176,7 @@ export default function PlaylistFiltersBar({
           value={sortValue}
           onChange={handleSortChange}
           size="small"
-          sx={{ width: { xs: "100%", sm: 180 }, ...inputSx }}
+          sx={{ width: { xs: "calc(50% - 6px)", sm: 180 }, ...inputSx }}
         >
           <MenuItem value="updatedAt-desc">Recently Updated</MenuItem>
           <MenuItem value="updatedAt-asc">Oldest Updated</MenuItem>
@@ -199,6 +199,7 @@ export default function PlaylistFiltersBar({
               border: "1px solid #E5E7EB",
               px: 2,
               height: 40,
+              width: { xs: "100%", sm: "auto" },
             }}
           >
             Clear filters

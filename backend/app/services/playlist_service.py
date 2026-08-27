@@ -83,6 +83,8 @@ class PlaylistService:
 
         db.commit()
         db.refresh(playlist)
+        from app.core.cache import PlayerCache
+        PlayerCache.invalidate_all()
         return playlist
 
     @staticmethod
@@ -142,6 +144,8 @@ class PlaylistService:
 
         db.commit()
         db.refresh(playlist)
+        from app.core.cache import PlayerCache
+        PlayerCache.invalidate_all()
         return playlist
 
     @staticmethod
@@ -156,6 +160,8 @@ class PlaylistService:
         try:
             db.delete(playlist)
             db.commit()
+            from app.core.cache import PlayerCache
+            PlayerCache.invalidate_all()
             return True
         except IntegrityError:
             db.rollback()

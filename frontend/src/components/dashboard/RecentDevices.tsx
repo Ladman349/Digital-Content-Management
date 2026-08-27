@@ -1,32 +1,13 @@
-import { useSnackbar } from "notistack";
 import { Box, Chip, Divider, Typography, CircularProgress } from "@mui/material";
-import { useEffect, useState } from "react";
 import DashboardCard from "../common/DashboardCard";
-import { DeviceService } from "../../services/DeviceService";
-import { PlaylistService } from "../../services/PlaylistService";
-import type { Device } from "../../types/device";
-import type { Playlist } from "../../types/playlist";
+import { useDevices, usePlaylists } from "../../hooks/queries";
 
 export default function CurrentPlayback() {
-  const { enqueueSnackbar } = useSnackbar();
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [playlists, setPlaylists] = useState<Playlist[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: devices = [], isLoading: devLoading } = useDevices();
+  const { data: playlists = [], isLoading: playLoading } = usePlaylists();
+  const loading = devLoading || playLoading;
 
-  useEffect(() => {
-    Promise.all([DeviceService.getDevices(), PlaylistService.getPlaylists()])
-      .then(([devs, plists]) => {
-        setDevices(devs);
-        setPlaylists(plists);
-        setLoading(false);
-      })
-      .catch((err) => {
-        enqueueSnackbar(err.message || "Failed to load playback data", { variant: "error" });
-        setLoading(false);
-      });
-  }, []);
-
-  if (loading) {
+  if (loading && !devices.length) {
     return (
       <DashboardCard>
         <Typography sx={{ fontSize: 20, fontWeight: 700, mb: 3 }}>Current Playback</Typography>
@@ -58,19 +39,29 @@ export default function CurrentPlayback() {
 
             return (
               <Box key={device.id}>
-                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", py: 1.5 }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    py: 1.5,
+                  }}
+                >
                   <Box>
-                    <Typography sx={{ fontWeight: 700 }}>{device.name}</Typography>
-                    <Typography sx={{ color: "#94A3B8", fontSize: 13, mt: 0.3, fontStyle: isPlaying ? "normal" : "italic" }}>
-                      {isPlaying ? playlist.name : "No Active Playlist"}
+                    <Typography sx={{ fontWeight: 600 }}>{device.name}</Typography>
+                    <Typography sx={{ fontSize: 13, color: "#94A3B8" }}>
+                      {device.location}
                     </Typography>
                   </Box>
+
                   <Chip
-                    label={isPlaying ? "Playing" : "Idle"}
-                    color={isPlaying ? "success" : "warning"}
-                    sx={{ borderRadius: "8px", fontWeight: 600 }}
+                    label={isPlaying ? playlist?.name : "No Playlist"}
+                    size="small"
+                    color={isPlaying ? "primary" : "default"}
+                    sx={{ fontWeight: 600 }}
                   />
                 </Box>
+
                 {index < onlineDevices.length - 1 && <Divider />}
               </Box>
             );

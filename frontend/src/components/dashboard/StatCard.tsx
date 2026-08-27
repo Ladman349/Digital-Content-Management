@@ -23,46 +23,51 @@ export default function StatCard({
       elevation={0}
       onClick={onClick}
       sx={{
-        p: 3,
-        borderRadius: "16px",
-        border: "1px solid #EEF2F7",
+        p: { xs: 1.75, sm: 2.5, md: 3 },
+        borderRadius: { xs: 3, sm: 4 },
+        border: "1px solid #EEF2F6",
         bgcolor: "#FFFFFF",
-        boxShadow: "0 10px 30px rgba(15,23,42,0.06)",
-        transition: "all .25s ease",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.03), 0 8px 24px -4px rgba(15,23,42,0.05)",
+        transition: "all .2s cubic-bezier(0.4, 0, 0.2, 1)",
         cursor: onClick ? "pointer" : "default",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+        height: "100%",
 
         "&:hover": {
-          transform: "translateY(-4px)",
-          boxShadow: "0 18px 40px rgba(15,23,42,0.10)",
+          transform: "translateY(-2px)",
+          boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05), 0 16px 32px -4px rgba(15,23,42,0.08)",
+          borderColor: "#E2E8F0",
         },
       }}
     >
-      <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2 }}>
-        {/* Icon circle */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: { xs: 1.25, sm: 2 } }}>
         <Box
           sx={{
-            width: 52,
-            height: 52,
-            minWidth: 52,
-            borderRadius: "50%",
-            bgcolor: `${color}26`, // 15% opacity hex
+            width: { xs: 40, sm: 48 },
+            height: { xs: 40, sm: 48 },
+            minWidth: { xs: 40, sm: 48 },
+            borderRadius: { xs: "12px", sm: "14px" },
+            bgcolor: `${color}18`,
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
             color,
+            boxShadow: `0 4px 12px ${color}20`,
           }}
         >
           {icon}
         </Box>
 
-        {/* Content */}
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography
+            noWrap
             sx={{
               color: "#64748B",
-              fontSize: 13,
+              fontSize: { xs: 12, sm: 13 },
               fontWeight: 600,
-              letterSpacing: 0.2,
+              letterSpacing: 0.1,
             }}
           >
             {title}
@@ -70,29 +75,32 @@ export default function StatCard({
 
           <Typography
             sx={{
-              fontWeight: 700,
-              fontSize: 28,
-              lineHeight: 1.2,
-              mt: 0.5,
+              fontWeight: 800,
+              fontSize: { xs: 20, sm: 26, md: 28 },
+              lineHeight: 1.15,
+              mt: 0.25,
+              color: "#0F172A",
+              letterSpacing: "-0.02em",
             }}
           >
             {typeof value === "number" ? value.toLocaleString() : value}
           </Typography>
-
-          {subtitle && (
-            <Typography
-              sx={{
-                color: "#94A3B8",
-                fontSize: 12,
-                fontWeight: 400,
-                mt: 0.5,
-              }}
-            >
-              {subtitle}
-            </Typography>
-          )}
         </Box>
       </Box>
+
+      {subtitle && (
+        <Typography
+          sx={{
+            color: "#94A3B8",
+            fontSize: { xs: 11, sm: 12 },
+            fontWeight: 500,
+            mt: { xs: 1.25, sm: 1.5 },
+            lineHeight: 1.3,
+          }}
+        >
+          {subtitle}
+        </Typography>
+      )}
     </Paper>
   );
 }
