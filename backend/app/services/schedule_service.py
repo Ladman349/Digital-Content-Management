@@ -116,6 +116,8 @@ class ScheduleService:
         
         db.commit()
         db.refresh(schedule)
+        from app.core.cache import PlayerCache
+        PlayerCache.invalidate_all()
         return schedule
 
     @staticmethod
@@ -151,6 +153,8 @@ class ScheduleService:
 
         db.commit()
         db.refresh(schedule)
+        from app.core.cache import PlayerCache
+        PlayerCache.invalidate_all()
         return schedule
 
     @staticmethod
@@ -165,6 +169,8 @@ class ScheduleService:
         try:
             db.delete(schedule)
             db.commit()
+            from app.core.cache import PlayerCache
+            PlayerCache.invalidate_all()
             return True
         except IntegrityError:
             db.rollback()
