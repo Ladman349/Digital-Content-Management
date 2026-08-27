@@ -53,6 +53,8 @@ class DeviceService:
             
         db.commit()
         db.refresh(device)
+        from app.core.cache import PlayerCache
+        PlayerCache.invalidate_device(device_id)
         return device
 
     @staticmethod
@@ -67,6 +69,8 @@ class DeviceService:
         try:
             db.delete(device)
             db.commit()
+            from app.core.cache import PlayerCache
+            PlayerCache.invalidate_device(device_id)
             return True
         except IntegrityError:
             db.rollback()

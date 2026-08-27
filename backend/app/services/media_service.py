@@ -119,6 +119,8 @@ class MediaService:
             
         db.commit()
         db.refresh(media)
+        from app.core.cache import PlayerCache
+        PlayerCache.invalidate_all()
         return media
 
     @staticmethod
@@ -134,6 +136,8 @@ class MediaService:
             db.delete(media)
             db.commit()
             logger.info(f"Media deleted from database mediaId={media_id}")
+            from app.core.cache import PlayerCache
+            PlayerCache.invalidate_all()
         except IntegrityError:
             db.rollback()
             raise HTTPException(status_code=409, detail="Cannot delete media because it is referenced by one or more playlists.")
