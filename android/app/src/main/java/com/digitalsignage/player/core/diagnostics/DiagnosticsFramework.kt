@@ -218,7 +218,7 @@ object DiagnosticsFramework {
                 "google.com",
                 "cloudflare.com",
                 "railway.app",
-                "digital-content-management-production.up.railway.app",
+                "digital-content-management-production-6fd4.up.railway.app",
                 "api.grovitai.com"
             )
             
@@ -255,7 +255,7 @@ object DiagnosticsFramework {
         val httpUrls = listOf(
             "https://google.com",
             "https://cloudflare.com",
-            "https://digital-content-management-production.up.railway.app/"
+            "https://digital-content-management-production-6fd4.up.railway.app/"
         )
         
         val httpBuilder = StringBuilder()
@@ -295,7 +295,7 @@ object DiagnosticsFramework {
             socket.supportedProtocols.forEach { sb.append("  - ").append(it).append("\n") }
             
             // Raw Handshake to Railway
-            val targetHost = "digital-content-management-production.up.railway.app"
+            val targetHost = "digital-content-management-production-6fd4.up.railway.app"
             val rawSslStart = System.currentTimeMillis()
             sb.append("\nHandshake attempt to: $targetHost\n")
             try {
@@ -385,7 +385,7 @@ object DiagnosticsFramework {
         // Section 13: DNS Override Test (Google/Cloudflare UDP Port 53)
         try {
             val dnsOverrideContent = StringBuilder()
-            val targetDomain = "digital-content-management-production.up.railway.app"
+            val targetDomain = "digital-content-management-production-6fd4.up.railway.app"
             val dnsServers = listOf("8.8.8.8", "1.1.1.1")
             
             dnsOverrideContent.append("Testing Custom UDP DNS lookup (bypassing system resolver) for $targetDomain:\n")
@@ -432,7 +432,7 @@ object DiagnosticsFramework {
         // Section 15: Hostname Verification
         try {
             val hostNameContent = """
-                Target Domain: digital-content-management-production.up.railway.app
+                Target Domain: digital-content-management-production-6fd4.up.railway.app
                 Hostname Verification Strategy: OkHttp OkHostnameVerifier
                 Certificate matches target: Verified (Handled inside Section 7/8 OkHttp Handshake validation)
             """.trimIndent()
@@ -445,7 +445,7 @@ object DiagnosticsFramework {
         try {
             val reachBuilder = StringBuilder()
             reachBuilder.append("Testing HTTP methods against Railway:\n")
-            val targetUrl = "https://digital-content-management-production.up.railway.app/"
+            val targetUrl = "https://digital-content-management-production-6fd4.up.railway.app/"
             val methods = listOf("HEAD", "GET", "OPTIONS")
             
             for (method in methods) {

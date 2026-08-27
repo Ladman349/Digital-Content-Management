@@ -18,7 +18,7 @@ class StorageProvider(ABC):
         pass
 
     @abstractmethod
-    def get_public_url(self, storage_uri: str) -> str:
+    def get_public_url(self, storage_uri: str, base_url_override: str | None = None) -> str:
         """Resolves a storage URI into a public HTTP/HTTPS URL"""
         pass
 
@@ -39,16 +39,32 @@ class LocalStorageProvider(StorageProvider):
         return f"local://{filename}"
 
     def delete(self, storage_uri: str) -> bool:
-        filename = storage_uri.replace("local://", "")
+        clean = storage_uri
+        if "local://" in clean:
+            clean = "local://" + clean.split("local://", 1)[1]
+        filename = clean.replace("local://", "")
         file_path = os.path.join(self.MEDIA_FOLDER, filename)
         if os.path.exists(file_path):
             os.remove(file_path)
             return True
         return False
 
-    def get_public_url(self, storage_uri: str) -> str:
-        filename = storage_uri.replace("local://", "")
-        return f"{settings.API_BASE_URL.rstrip('/')}/uploads/{filename}"
+    def get_public_url(self, storage_uri: str, base_url_override: str | None = None) -> str:
+        clean = storage_uri or ""
+        if "supabase://" in clean:
+            clean = "supabase://" + clean.split("supabase://", 1)[1]
+        elif "local://" in clean:
+            clean = "local://" + clean.split("local://", 1)[1]
+
+        filename = clean.replace("local://", "").replace("supabase://media/", "").replace("supabase://", "")
+        if "/uploads/" in filename:
+            filename = filename.split("/uploads/")[-1]
+
+        base_url = base_url_override or settings.API_BASE_URL or "https://digital-content-management-production-6fd4.up.railway.app"
+        if "localhost" in base_url or "127.0.0.1" in base_url:
+            base_url = "https://digital-content-management-production-6fd4.up.railway.app"
+
+        return f"{base_url.rstrip('/')}/uploads/{filename}"
 
     def verify_connection(self) -> None:
         # Check if media directory is writable
@@ -96,11 +112,14 @@ class SupabaseStorageProvider(StorageProvider):
             raise RuntimeError(f"Supabase upload failed: {str(e)}")
 
     def delete(self, storage_uri: str) -> bool:
-        if not storage_uri.startswith("supabase://"):
+        clean = storage_uri or ""
+        if "supabase://" in clean:
+            clean = "supabase://" + clean.split("supabase://", 1)[1]
+        else:
             return False
             
         # Parse uri: supabase://bucket/filename
-        parts = storage_uri.replace("supabase://", "").split("/", 1)
+        parts = clean.replace("supabase://", "").split("/", 1)
         if len(parts) < 2:
             return False
         bucket, filename = parts
@@ -125,13 +144,18 @@ class SupabaseStorageProvider(StorageProvider):
         except Exception:
             return False
 
-    def get_public_url(self, storage_uri: str) -> str:
-        if not storage_uri.startswith("supabase://"):
+    def get_public_url(self, storage_uri: str, base_url_override: str | None = None) -> str:
+        clean = storage_uri or ""
+        if "supabase://" in clean:
+            clean = "supabase://" + clean.split("supabase://", 1)[1]
+        else:
             return storage_uri
-            
-        parts = storage_uri.replace("supabase://", "").split("/", 1)
-        bucket, filename = parts
-        return f"{self.url}/storage/v1/object/public/{bucket}/{filename}"
+
+        parts = clean.replace("supabase://", "").split("/", 1)
+        if len(parts) == 2:
+            bucket, filename = parts
+            return f"{self.url}/storage/v1/object/public/{bucket}/{filename}"
+        return clean
 
     def verify_connection(self) -> None:
         if not self.url or not self.key:

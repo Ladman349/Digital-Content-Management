@@ -8,29 +8,31 @@ export default function DashboardHeader() {
         justifyContent: "space-between",
         alignItems: "center",
         flexWrap: "wrap",
-        gap: 3,
-        mb: 4,
+        gap: 2,
+        mb: { xs: 2.5, sm: 3.5 },
       }}
     >
       <Box>
         <Typography
           sx={{
-            fontSize: 32,
+            fontSize: { xs: 24, sm: 28, md: 32 },
             fontWeight: 800,
-            color: "#111827",
+            color: "#0F172A",
+            letterSpacing: "-0.025em",
           }}
         >
-          Dashboard
+          Dashboard Overview
         </Typography>
 
         <Typography
           sx={{
-            mt: 1,
-            color: "#6B7280",
-            fontSize: 15,
+            mt: 0.5,
+            color: "#64748B",
+            fontSize: { xs: 13.5, sm: 15 },
+            fontWeight: 500,
           }}
         >
-          Welcome back, Akash 👋
+          Welcome back, Akash 👋 Here's your signage system status today.
         </Typography>
       </Box>
     </Box>

@@ -38,15 +38,53 @@ def get_device_status(device_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Device not found")
     return status_response
 
+from fastapi.responses import JSONResponse
+from app.core.cache import PlayerCache
+
 @router.get("/{device_id}/current-playlist")
 def get_current_playlist(request: Request, device_id: str, db: Session = Depends(get_db)):
+    if_none_match = request.headers.get("if-none-match")
+    
+    # 1. Fast Path: Serve from in-memory cache if fresh, avoiding Supabase database queries
+    cached = PlayerCache.get(device_id)
+    if cached is not None:
+        result, etag = cached
+        if not result:
+            return Response(status_code=204)
+            
+        if if_none_match:
+            clean_inm = if_none_match.strip().strip('"')
+            clean_etag = etag.strip('"')
+            if clean_inm == clean_etag or if_none_match.strip() == etag:
+                return Response(status_code=304, headers={"ETag": etag})
+
+        return JSONResponse(
+            content=result.model_dump(),
+            headers={"ETag": etag}
+        )
+
+    # 2. Cache Miss / Expired: Resolve active playlist from database
     scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
     host = request.headers.get("x-forwarded-host", request.url.netloc)
     base_url = f"{scheme}://{host}"
     result = PlayerService.get_current_playlist(db, device_id, base_url)
     if not result:
+        PlayerCache.set(device_id, None, '""')
         return Response(status_code=204)
-    return result
+        
+    etag = f'"{result.playlistId}_{result.updatedAt}_{result.deviceOrientation}"'
+    PlayerCache.set(device_id, result, etag)
+
+    if if_none_match:
+        clean_inm = if_none_match.strip().strip('"')
+        clean_etag = etag.strip('"')
+        if clean_inm == clean_etag or if_none_match.strip() == etag:
+            return Response(status_code=304, headers={"ETag": etag})
+
+    return JSONResponse(
+        content=result.model_dump(),
+        headers={"ETag": etag}
+    )
 
 @router.put("/{device_id}", response_model=DeviceResponse)
 def update_device(device_id: str, payload: DeviceUpdate, db: Session = Depends(get_db)):

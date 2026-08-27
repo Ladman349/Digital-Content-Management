@@ -10,11 +10,17 @@ class DeviceService:
 
     @staticmethod
     def get_devices(db: Session) -> List[Device]:
-        return db.query(Device).all()
+        devices = db.query(Device).all()
+        for device in devices:
+            device.status = DeviceService.calculate_status(device.heartbeatAt)
+        return devices
 
     @staticmethod
     def get_device(db: Session, device_id: str) -> Device:
-        return db.query(Device).filter(Device.id == device_id).first()
+        device = db.query(Device).filter(Device.id == device_id).first()
+        if device:
+            device.status = DeviceService.calculate_status(device.heartbeatAt)
+        return device
 
     @staticmethod
     def create_device(db: Session, payload: DeviceCreate) -> Device:
@@ -47,6 +53,8 @@ class DeviceService:
             
         db.commit()
         db.refresh(device)
+        from app.core.cache import PlayerCache
+        PlayerCache.invalidate_device(device_id)
         return device
 
     @staticmethod
@@ -61,6 +69,8 @@ class DeviceService:
         try:
             db.delete(device)
             db.commit()
+            from app.core.cache import PlayerCache
+            PlayerCache.invalidate_device(device_id)
             return True
         except IntegrityError:
             db.rollback()

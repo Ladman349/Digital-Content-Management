@@ -1,8 +1,6 @@
-import { useSnackbar } from "notistack";
 import { Box, Divider, Typography, CircularProgress, Tooltip } from "@mui/material";
-import { useEffect, useState } from "react";
 import DashboardCard from "../common/DashboardCard";
-import { DeviceService } from "../../services/DeviceService";
+import { useDevices } from "../../hooks/queries";
 import type { Device } from "../../types/device";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import PauseCircleRoundedIcon from "@mui/icons-material/PauseCircleRounded";
@@ -10,23 +8,9 @@ import CloudOffRoundedIcon from "@mui/icons-material/CloudOffRounded";
 import { getRelativeTime, formatDateTime } from "../../utils/date";
 
 export default function DeviceStatusCard() {
-  const { enqueueSnackbar } = useSnackbar();
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: devices = [], isLoading: loading } = useDevices();
 
-  useEffect(() => {
-    DeviceService.getDevices()
-      .then((data) => {
-        setDevices(data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        enqueueSnackbar(err.message || "Failed to load devices", { variant: "error" });
-        setLoading(false);
-      });
-  }, []);
-
-  if (loading) {
+  if (loading && !devices.length) {
     return (
       <DashboardCard>
         <Typography sx={{ fontSize: 20, fontWeight: 700, mb: 3 }}>Device Health</Typography>
@@ -59,7 +43,7 @@ export default function DeviceStatusCard() {
                 </Typography>
               </Tooltip>
             </Box>
-            {index < group.length - 1 && <Divider sx={{ my: 0.5 }} />}
+            {index < group.length - 1 && <Divider />}
           </Box>
         ))}
       </Box>
@@ -68,16 +52,16 @@ export default function DeviceStatusCard() {
 
   return (
     <DashboardCard>
-      <Typography sx={{ fontSize: 20, fontWeight: 700, mb: 3 }}>Device Health</Typography>
-      
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
+        <Typography sx={{ fontSize: 20, fontWeight: 700 }}>Device Health</Typography>
+      </Box>
+
       {devices.length === 0 ? (
         <Typography sx={{ color: "#94A3B8", textAlign: "center", py: 4 }}>No devices found</Typography>
       ) : (
         <Box sx={{ maxHeight: 400, overflowY: "auto", pr: 1 }}>
-          {renderGroup("Online", online, <CheckCircleRoundedIcon fontSize="small" />, "#10B981")}
-          {online.length > 0 && (idle.length > 0 || offline.length > 0) && <Divider sx={{ my: 2 }} />}
+          {renderGroup("Online", online, <CheckCircleRoundedIcon fontSize="small" />, "#22C55E")}
           {renderGroup("Idle", idle, <PauseCircleRoundedIcon fontSize="small" />, "#F59E0B")}
-          {idle.length > 0 && offline.length > 0 && <Divider sx={{ my: 2 }} />}
           {renderGroup("Offline", offline, <CloudOffRoundedIcon fontSize="small" />, "#EF4444")}
         </Box>
       )}

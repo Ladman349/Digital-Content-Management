@@ -34,6 +34,7 @@ class DownloadManager @Inject constructor(
 ) {
     private val scope = CoroutineScope(Dispatchers.IO)
     private val isRunning = java.util.concurrent.atomic.AtomicBoolean(false)
+    private val activeDownloads = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     
     // Future Bandwidth Management Configurations
     private val maxConcurrentDownloads = 3
@@ -94,20 +95,46 @@ class DownloadManager @Inject constructor(
         }
     }
     
-    private suspend fun attemptDownload(session: DownloadSessionEntity) {
+    internal suspend fun attemptDownload(session: DownloadSessionEntity) {
         android.util.Log.i("SyncTrace", "Entered attemptDownload() mediaId=${session.mediaId}")
         android.util.Log.i("DownloadTrace", "Entering attemptDownload URL=${session.url}")
         val maxRetries = 5
         val now = System.currentTimeMillis()
-        
-        if (session.retryCount >= maxRetries) {
-            logger.e("DownloadManager", "Max retries reached for ${session.mediaId}")
-            database.downloadSessionDao().updateSessionState(session.mediaId, DownloadState.FAILED, now)
-            eventBus.publish(PlayerEvent.DownloadFailed(session.mediaId, Exception("Max retries exceeded")))
+
+        // 1. Deduplication Check: Prevent concurrent downloads for the exact same mediaId
+        if (!activeDownloads.add(session.mediaId)) {
+            logger.d("DownloadManager", "Download for mediaId=${session.mediaId} already active in memory. Skipping concurrent request.")
             return
         }
         
         try {
+            if (session.retryCount >= maxRetries) {
+                logger.e("DownloadManager", "Max retries reached for ${session.mediaId}")
+                database.downloadSessionDao().updateSessionState(session.mediaId, DownloadState.FAILED, now)
+                eventBus.publish(PlayerEvent.DownloadFailed(session.mediaId, Exception("Max retries exceeded")))
+                return
+            }
+
+            // 2. Pre-flight Physical File Check: Check physical filesystem BEFORE making any OkHttp network call
+            val existingFile = storageManager.resolveValidMediaFile(
+                mediaId = session.mediaId,
+                url = session.url,
+                localFilePath = session.destinationPath,
+                expectedMd5 = session.expectedChecksumMd5,
+                expectedSha256 = session.expectedChecksumSha256,
+                expectedSize = if (session.expectedSize > 0L) session.expectedSize else null,
+                fileValidator = fileValidator
+            )
+
+            if (existingFile != null) {
+                logger.i("DownloadManager", "Pre-flight check passed: Valid physical file already exists for ${session.mediaId} at ${existingFile.absolutePath}. Skipping network download.")
+                database.downloadSessionDao().updateSessionState(session.mediaId, DownloadState.COMPLETED, now)
+                database.playlistDao().updateMediaDownloadedState(session.mediaId, true, existingFile.absolutePath)
+                eventBus.publish(PlayerEvent.DownloadCompleted(session.mediaId))
+                checkPlaylistReadiness()
+                return
+            }
+            
             database.downloadSessionDao().updateSessionState(session.mediaId, DownloadState.DOWNLOADING, now)
             android.util.Log.i("DownloadTrace", "Step: updateSessionState DOWNLOADING")
             eventBus.publish(PlayerEvent.DebugStage("4. DownloadManager attempting download for: ${session.url}"))
@@ -115,9 +142,7 @@ class DownloadManager @Inject constructor(
             eventBus.publish(PlayerEvent.DownloadStarted(session.mediaId))
             android.util.Log.i("DownloadTrace", "Step: publish DownloadStarted")
             
-            val nameFromUrl = session.url.substringAfterLast('/').substringBefore('?')
-            val sanitized = nameFromUrl.replace("[\\\\/:*?\"<>|]".toRegex(), "_")
-            val fileName = "${session.mediaId}_$sanitized"
+            val fileName = storageManager.getCanonicalFileName(session.mediaId, session.url)
             val destFile = File(storageManager.getMediaDirectory(), fileName)
             val tempFile = File(storageManager.getMediaDirectory(), "${fileName}.tmp")
             android.util.Log.d("DownloadManager", "Destination: ${destFile.absolutePath}")
@@ -136,10 +161,25 @@ class DownloadManager @Inject constructor(
             }
             
             android.util.Log.i("DownloadTrace", "Immediately before execute: URL=${session.url}")
-            val response = client.newCall(requestBuilder.build()).execute()
+            var response = client.newCall(requestBuilder.build()).execute()
             android.util.Log.d("DownloadManager", "HTTP status: ${response.code}")
             android.util.Log.i("DownloadTrace", "Immediately after execute: code=${response.code}, message=${response.message}")
             
+            var redirectCount = 0
+            while ((response.code in 300..399) && redirectCount < 5) {
+                val location = response.header("Location")
+                android.util.Log.i("DownloadTrace", "Following HTTP ${response.code} redirect to: $location")
+                if (location.isNullOrEmpty()) break
+                response.close()
+                redirectCount++
+                val redirectRequestBuilder = Request.Builder().url(location)
+                if (downloadedBytes > 0) {
+                    redirectRequestBuilder.header("Range", "bytes=${downloadedBytes}-")
+                }
+                response = client.newCall(redirectRequestBuilder.build()).execute()
+                android.util.Log.i("DownloadTrace", "Redirect response code: ${response.code}")
+            }
+
             if (!response.isSuccessful && response.code != 206) {
                 val errorBody = response.body?.string() ?: "null"
                 android.util.Log.e("DownloadTrace", "Unsuccessful response body=${errorBody}")
@@ -212,14 +252,26 @@ class DownloadManager @Inject constructor(
                 com.digitalsignage.player.core.performance.PerformanceMonitor.recordEvent("CHECKSUM", "Completed validation for ${session.mediaId}. Result: $isValid")
                 
                 if (isValid) {
-                    tempFile.renameTo(destFile)
-                    com.digitalsignage.player.core.performance.PerformanceMonitor.onDbWriteTriggered()
-                    database.downloadSessionDao().updateSessionState(session.mediaId, DownloadState.COMPLETED, System.currentTimeMillis())
-                    com.digitalsignage.player.core.performance.PerformanceMonitor.onDbWriteTriggered()
-                    database.playlistDao().updateMediaDownloadedState(session.mediaId, true, destFile.absolutePath)
-                    
-                    eventBus.publish(PlayerEvent.DownloadCompleted(session.mediaId))
-                    checkPlaylistReadiness()
+                    val movedSuccessfully = if (tempFile.exists()) {
+                        if (destFile.exists()) destFile.delete()
+                        tempFile.renameTo(destFile) || (tempFile.copyTo(destFile, overwrite = true).also { tempFile.delete() }.exists())
+                    } else {
+                        destFile.exists()
+                    }
+
+                    if (movedSuccessfully && destFile.exists() && destFile.length() > 0) {
+                        com.digitalsignage.player.core.performance.PerformanceMonitor.onDbWriteTriggered()
+                        database.downloadSessionDao().updateSessionState(session.mediaId, DownloadState.COMPLETED, System.currentTimeMillis())
+                        com.digitalsignage.player.core.performance.PerformanceMonitor.onDbWriteTriggered()
+                        database.playlistDao().updateMediaDownloadedState(session.mediaId, true, destFile.absolutePath)
+                        
+                        eventBus.publish(PlayerEvent.DownloadCompleted(session.mediaId))
+                        checkPlaylistReadiness()
+                    } else {
+                        tempFile.delete()
+                        destFile.delete()
+                        throw Exception("File placement failed after download: file missing or empty")
+                    }
                 } else {
                     tempFile.delete()
                     com.digitalsignage.player.core.performance.PerformanceMonitor.onDbWriteTriggered()
@@ -235,9 +287,17 @@ class DownloadManager @Inject constructor(
             logger.e("DownloadManager", "Failed downloading ${session.mediaId}", e)
             val nextRetry = session.retryCount + 1
             database.downloadSessionDao().incrementRetryCount(session.mediaId, nextRetry, System.currentTimeMillis())
-            database.downloadSessionDao().updateSessionState(session.mediaId, DownloadState.PAUSED, System.currentTimeMillis())
-            delay(2000L * nextRetry)
-            database.downloadSessionDao().updateSessionState(session.mediaId, DownloadState.QUEUED, System.currentTimeMillis())
+            if (nextRetry >= maxRetries) {
+                logger.e("DownloadManager", "Max retries ($maxRetries) reached for ${session.mediaId}. Marking state as FAILED.")
+                database.downloadSessionDao().updateSessionState(session.mediaId, DownloadState.FAILED, System.currentTimeMillis())
+                eventBus.publish(PlayerEvent.DownloadFailed(session.mediaId, e))
+            } else {
+                database.downloadSessionDao().updateSessionState(session.mediaId, DownloadState.PAUSED, System.currentTimeMillis())
+                delay(2000L * nextRetry)
+                database.downloadSessionDao().updateSessionState(session.mediaId, DownloadState.QUEUED, System.currentTimeMillis())
+            }
+        } finally {
+            activeDownloads.remove(session.mediaId)
         }
     }
     

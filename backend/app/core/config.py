@@ -1,17 +1,32 @@
 import os
 from pydantic import BaseModel, Field
 
+def resolve_api_base_url() -> str:
+    railway_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
+    if railway_domain:
+        domain = railway_domain.strip()
+        if not domain.startswith("http://") and not domain.startswith("https://"):
+            return f"https://{domain}"
+        return domain
+    return os.getenv("API_BASE_URL", "http://localhost:8000")
+
 class Settings(BaseModel):
     APP_ENV: str = Field(default_factory=lambda: os.getenv("APP_ENV", "development"))
     DATABASE_URL: str = Field(default_factory=lambda: os.getenv("DATABASE_URL", "postgresql://postgres:121@localhost:5432/postgres"))
     
+    # Database connection pool configurations (conservative defaults safe for Supabase direct connections and multi-worker setups)
+    DB_POOL_SIZE: int = Field(default_factory=lambda: int(os.getenv("DB_POOL_SIZE", "5")))
+    DB_MAX_OVERFLOW: int = Field(default_factory=lambda: int(os.getenv("DB_MAX_OVERFLOW", "5")))
+    DB_POOL_RECYCLE: int = Field(default_factory=lambda: int(os.getenv("DB_POOL_RECYCLE", "300")))
+    DB_POOL_TIMEOUT: int = Field(default_factory=lambda: int(os.getenv("DB_POOL_TIMEOUT", "30")))
+
     # Supabase configurations
     SUPABASE_URL: str | None = Field(default_factory=lambda: os.getenv("SUPABASE_URL"))
     SUPABASE_SERVICE_ROLE_KEY: str | None = Field(default_factory=lambda: os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
     SUPABASE_STORAGE_BUCKET: str = Field(default_factory=lambda: os.getenv("SUPABASE_STORAGE_BUCKET", "media"))
     
     # API base and CORS configs
-    API_BASE_URL: str = Field(default_factory=lambda: os.getenv("API_BASE_URL", "http://localhost:8000"))
+    API_BASE_URL: str = Field(default_factory=resolve_api_base_url)
     CORS_ALLOWED_ORIGINS: str = Field(default_factory=lambda: os.getenv("CORS_ALLOWED_ORIGINS", ""))
     SECRET_KEY: str = Field(default_factory=lambda: os.getenv("SECRET_KEY", "super-secret-key-change-in-production"))
     OTA_MAX_UPLOAD_MB: int = Field(default_factory=lambda: int(os.getenv("OTA_MAX_UPLOAD_MB", "150")))

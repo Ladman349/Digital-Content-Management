@@ -10,9 +10,9 @@ export default function AnimatedCounter({ value, loading = false }: Props) {
     return (
       <Typography
         sx={{
-          fontSize: 32,
+          fontSize: { xs: 22, sm: 26, md: 32 },
           fontWeight: 800,
-          color: "#111827",
+          color: "#0F172A",
           mt: 0.5,
           letterSpacing: "-0.02em",
         }}
@@ -26,9 +26,9 @@ export default function AnimatedCounter({ value, loading = false }: Props) {
     <Typography
       component="div"
       sx={{
-        fontSize: 32,
+        fontSize: { xs: 22, sm: 26, md: 32 },
         fontWeight: 800,
-        color: "#111827",
+        color: "#0F172A",
         mt: 0.5,
         letterSpacing: "-0.02em",
         fontVariantNumeric: "tabular-nums",
