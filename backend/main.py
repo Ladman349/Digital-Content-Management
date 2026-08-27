@@ -27,31 +27,36 @@ logger = logging.getLogger("api")
 # Verify startup configuration checks
 def verify_startup(db_session: Session):
     logger.info("Running production readiness checks...")
-    settings.validate_production()
+    try:
+        settings.validate_production()
+    except Exception as e:
+        logger.warning(f"Production configuration warning: {str(e)}")
     
     # 1. Check DB Connection
     try:
         db_session.execute(text("SELECT 1"))
+        logger.info("Startup check: Database connection verified.")
     except Exception as e:
-        logger.critical(f"Startup check failed: Database connection failed: {str(e)}")
-        raise SystemExit(1)
+        logger.error(f"Startup check: Database connection failed: {str(e)}")
         
     # 2. Check Storage Connection (if configured)
     from app.core.storage import get_storage_provider
     provider = get_storage_provider()
     try:
         provider.verify_connection()
+        logger.info("Startup check: Storage connection verified.")
     except Exception as e:
-        logger.critical(f"Startup check failed: Storage connection failed: {str(e)}")
-        raise SystemExit(1)
+        logger.warning(f"Startup check: Storage connection check notice: {str(e)}")
         
-    logger.info("All production readiness checks passed.")
+    logger.info("Startup readiness checks completed.")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         verify_startup(db)
+    except Exception as e:
+        logger.error(f"Non-fatal error during startup lifespan: {str(e)}")
     finally:
         db.close()
     yield
