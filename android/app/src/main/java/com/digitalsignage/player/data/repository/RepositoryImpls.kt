@@ -170,7 +170,7 @@ class PlaylistRepositoryImpl @Inject constructor(
                                 url = dto.downloadUrl,
                                 localFilePath = existingItem?.localFilePath,
                                 expectedMd5 = null,
-                                expectedSha256 = dto.checksum,
+                                expectedSha256 = null, // Ultra-fast size check: avoid continuous SHA256 re-hashing on disk
                                 expectedSize = if (dto.size > 0L) dto.size else null,
                                 fileValidator = fileValidator
                             )
