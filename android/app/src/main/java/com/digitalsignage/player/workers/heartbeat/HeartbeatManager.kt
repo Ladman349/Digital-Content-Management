@@ -12,6 +12,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import com.digitalsignage.player.domain.repository.HeartbeatRepository
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -24,6 +25,7 @@ import javax.inject.Singleton
 class HeartbeatManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val configStore: RuntimeConfigStoreImpl,
+    private val heartbeatRepository: HeartbeatRepository,
     private val logger: Logger
 ) {
     // Injectable scopes are preferred, but a managed SupervisorJob internally ensures we do not leak
@@ -39,6 +41,8 @@ class HeartbeatManager @Inject constructor(
         }
         
         logger.i("HeartbeatManager", "Starting heartbeat manager configuration collector.")
+        triggerImmediateHeartbeat()
+        
         collectionJob = scope.launch {
             configStore.heartbeatInterval.distinctUntilChanged().collect { configuredInterval ->
                 var intervalMinutes = configuredInterval
@@ -75,6 +79,17 @@ class HeartbeatManager @Inject constructor(
             ExistingPeriodicWorkPolicy.UPDATE,
             heartbeatRequest
         )
+    }
+
+    fun triggerImmediateHeartbeat() {
+        scope.launch(Dispatchers.IO) {
+            try {
+                logger.d("HeartbeatManager", "Triggering immediate foreground heartbeat")
+                heartbeatRepository.sendHeartbeat()
+            } catch (e: Exception) {
+                logger.w("HeartbeatManager", "Foreground heartbeat failed: ${e.message}")
+            }
+        }
     }
 
     fun stop() {

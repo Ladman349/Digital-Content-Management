@@ -404,6 +404,7 @@ class PlayerOrchestratorImpl @Inject constructor(
                 if (isSyncable) {
                     android.util.Log.i("SyncTrace", "Periodic sync polling triggered in state ${currentState.name}")
                     attemptSyncSafely()
+                    heartbeatManager.triggerImmediateHeartbeat()
                 }
                 delay(PLAYLIST_POLL_INTERVAL_MS)
             }
