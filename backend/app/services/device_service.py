@@ -87,12 +87,26 @@ class DeviceService:
         current_time = int(time.time() * 1000)
         elapsed_seconds = (current_time - heartbeat_at) / 1000
 
-        if elapsed_seconds < 60:
+        if elapsed_seconds <= 120:
             return "Online"
-        elif elapsed_seconds <= 300:
+        elif elapsed_seconds <= 600:
             return "Idle"
         else:
             return "Offline"
+
+    @staticmethod
+    def update_last_seen(db: Session, device_id: str):
+        try:
+            current_time = int(time.time() * 1000)
+            device = db.query(Device).filter(Device.id == device_id).first()
+            if device:
+                device.heartbeatAt = current_time
+                device.lastSeenMs = current_time
+                device.lastSeen = "now"
+                device.status = "Online"
+                db.commit()
+        except Exception:
+            db.rollback()
 
     @staticmethod
     def process_heartbeat(db: Session, payload: HeartbeatRequest) -> Device:
