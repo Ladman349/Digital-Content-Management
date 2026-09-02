@@ -43,6 +43,9 @@ from app.core.cache import PlayerCache
 
 @router.get("/{device_id}/current-playlist")
 def get_current_playlist(request: Request, device_id: str, db: Session = Depends(get_db)):
+    # Record device activity so status is accurately Online on every poll
+    DeviceService.update_last_seen(db, device_id)
+    
     if_none_match = request.headers.get("if-none-match")
     
     # 1. Fast Path: Serve from in-memory cache if fresh, avoiding Supabase database queries
