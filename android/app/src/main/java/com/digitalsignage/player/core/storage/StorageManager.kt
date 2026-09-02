@@ -77,14 +77,11 @@ class StorageManager @Inject constructor(
         // 3. Direct mediaId filename
         candidatePaths.add(File(mediaDir, mediaId))
 
-        // 4. Any prefix-matched file in media directory
-        val mediaFiles = mediaDir.listFiles() ?: emptyArray()
-        for (file in mediaFiles) {
-            if (file.name.endsWith(".tmp")) continue
-            if (file.name.startsWith("${mediaId}_") || file.name == mediaId) {
-                if (candidatePaths.none { it.absolutePath == file.absolutePath }) {
-                    candidatePaths.add(file)
-                }
+        // 4. Direct file lookup
+        if (!url.isNullOrBlank()) {
+            val expected = File(mediaDir, getCanonicalFileName(mediaId, url))
+            if (expected.exists() && candidatePaths.none { it.absolutePath == expected.absolutePath }) {
+                candidatePaths.add(expected)
             }
         }
 

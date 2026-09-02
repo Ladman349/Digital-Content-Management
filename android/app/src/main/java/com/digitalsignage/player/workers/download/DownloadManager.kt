@@ -107,6 +107,10 @@ class DownloadManager @Inject constructor(
             return
         }
         
+        val fileName = storageManager.getCanonicalFileName(session.mediaId, session.url)
+        val tempFile = File(storageManager.getMediaDirectory(), "${fileName}.tmp")
+        var activeResponse: okhttp3.Response? = null
+        
         try {
             if (session.retryCount >= maxRetries) {
                 logger.e("DownloadManager", "Max retries reached for ${session.mediaId}")
@@ -142,9 +146,7 @@ class DownloadManager @Inject constructor(
             eventBus.publish(PlayerEvent.DownloadStarted(session.mediaId))
             android.util.Log.i("DownloadTrace", "Step: publish DownloadStarted")
             
-            val fileName = storageManager.getCanonicalFileName(session.mediaId, session.url)
             val destFile = File(storageManager.getMediaDirectory(), fileName)
-            val tempFile = File(storageManager.getMediaDirectory(), "${fileName}.tmp")
             android.util.Log.d("DownloadManager", "Destination: ${destFile.absolutePath}")
             android.util.Log.i("DownloadTrace", "Step: destFile=${destFile.absolutePath}, tempFile=${tempFile.absolutePath}")
             
@@ -166,6 +168,7 @@ class DownloadManager @Inject constructor(
             
             android.util.Log.i("DownloadTrace", "Immediately before execute: URL=${session.url}")
             var response = client.newCall(requestBuilder.build()).execute()
+            activeResponse = response
             android.util.Log.d("DownloadManager", "HTTP status: ${response.code}")
             android.util.Log.i("DownloadTrace", "Immediately after execute: code=${response.code}, message=${response.message}")
             
@@ -184,6 +187,7 @@ class DownloadManager @Inject constructor(
                     redirectRequestBuilder.header("Range", "bytes=${downloadedBytes}-")
                 }
                 response = client.newCall(redirectRequestBuilder.build()).execute()
+                activeResponse = response
                 android.util.Log.i("DownloadTrace", "Redirect response code: ${response.code}")
             }
 
@@ -300,6 +304,7 @@ class DownloadManager @Inject constructor(
                 throw Exception("Empty response body")
             }
         } catch (e: Exception) {
+            if (tempFile.exists()) tempFile.delete()
             android.util.Log.e("DownloadManager", "Download failed", e)
             android.util.Log.e("DownloadTrace", "Exception class: ${e.javaClass.name}, message: ${e.message}", e)
             logger.e("DownloadManager", "Failed downloading ${session.mediaId}", e)
@@ -315,6 +320,7 @@ class DownloadManager @Inject constructor(
                 database.downloadSessionDao().updateSessionState(session.mediaId, DownloadState.QUEUED, System.currentTimeMillis())
             }
         } finally {
+            activeResponse?.close()
             activeDownloads.remove(session.mediaId)
         }
     }

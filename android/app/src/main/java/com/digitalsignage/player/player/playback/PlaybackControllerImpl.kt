@@ -64,11 +64,7 @@ class PlaybackControllerImpl @Inject constructor(
         playbackStateStore.updateState(PresentationState.Image(file))
     }
 
-    private val videoRenderer by lazy {
-        VideoRendererImpl(exoPlayer!!) { file ->
-            playbackStateStore.updateState(PresentationState.Video(file))
-        }
-    }
+    private var videoRenderer: VideoRendererImpl? = null
 
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -187,6 +183,9 @@ class PlaybackControllerImpl @Inject constructor(
                     }
                 })
             }
+        videoRenderer = VideoRendererImpl(exoPlayer!!) { file ->
+            playbackStateStore.updateState(PresentationState.Video(file))
+        }
         eventBus.publish(PlayerEvent.EngineInitialized)
     }
 
@@ -226,7 +225,7 @@ class PlaybackControllerImpl @Inject constructor(
 
         val renderer = when (item.mediaType) {
             MediaType.IMAGE -> imageRenderer
-            MediaType.VIDEO -> videoRenderer
+            MediaType.VIDEO -> videoRenderer!!
             else -> {
                 isPlayingActive = false
                 return
@@ -337,6 +336,7 @@ class PlaybackControllerImpl @Inject constructor(
             exoPlayer?.removeListener(playerListener)
             exoPlayer?.release()
             exoPlayer = null
+            videoRenderer = null
         }
     }
 }

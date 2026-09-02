@@ -147,18 +147,15 @@ class PlaylistRepositoryImpl @Inject constructor(
                             return Result.Success(false)
                         }
 
-                        val activePlaylist = database.playlistDao().getPlaylistByState(PlaylistState.ACTIVE)
-                        val activeItems = activePlaylist?.let { database.playlistDao().getMediaItemsForPlaylist(it.playlistId) } ?: emptyList()
-                        
-                        android.util.Log.i("SyncTrace", "1. activeItems size: ${activeItems.size}")
-                        activeItems.forEach {
+                        android.util.Log.i("SyncTrace", "1. activeItems size: ${activeMediaItems.size}")
+                        activeMediaItems.forEach {
                             android.util.Log.i("SyncTrace", "2. Existing MediaItem - mediaId: ${it.mediaId}, isDownloaded: ${it.isDownloaded}, localFilePath: ${it.localFilePath}")
                         }
                         
                         val itemEntities = syncData.items.mapIndexed { index, wrapper ->
                             val dto = wrapper.media
                             eventBus.publish(PlayerEvent.DebugStage("6. MediaItem[$index]: id=${dto.mediaId}, url=${dto.downloadUrl}"))
-                            val existingItem = activeItems.find { it.mediaId == dto.mediaId }
+                            val existingItem = activeMediaItems.find { it.mediaId == dto.mediaId }
                             
                             // Check physical file on disk before marking isDownloaded
                             val resolvedFile = storageManager.resolveValidMediaFile(

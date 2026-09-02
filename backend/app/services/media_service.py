@@ -45,12 +45,16 @@ class MediaService:
         if size > 100 * 1024 * 1024:  # 100MB
             raise HTTPException(status_code=400, detail="File is too large")
         
-        file_content = file.file.read()
-        
-        # Compute checksum
+        # Compute checksum incrementally
         sha256 = hashlib.sha256()
-        sha256.update(file_content)
+        while True:
+            chunk = file.file.read(4 * 1024 * 1024)
+            if not chunk:
+                break
+            sha256.update(chunk)
         checksum = sha256.hexdigest()
+        
+        file.file.seek(0)
             
         dimensions = "Unknown"
         media_type = "Image"
@@ -59,10 +63,11 @@ class MediaService:
         if ext in MediaService.IMAGE_EXTENSIONS:
             media_type = "Image"
             try:
-                with Image.open(io.BytesIO(file_content)) as img:
+                with Image.open(file.file) as img:
                     dimensions = f"{img.width}x{img.height}"
             except Exception:
                 dimensions = "Unknown"
+            file.file.seek(0)
         else:
             media_type = "Video"
             dimensions = "1920x1080"
@@ -74,6 +79,8 @@ class MediaService:
         provider = get_storage_provider()
         logger.info(f"Uploading media filename={file.filename} size={size} provider={provider.__class__.__name__}")
         
+        file_content = file.file.read()
+        file.file.seek(0)
         storage_uri = provider.upload(file_content, unique_filename, file.content_type)
         
         media_id = f"MEDIA-{uuid.uuid4().hex[:8].upper()}"

@@ -2,6 +2,7 @@ from typing import List
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status, Request
 from fastapi.responses import FileResponse, RedirectResponse, Response
 import os
+import shutil
 import urllib.request
 import logging
 from sqlalchemy.orm import Session
@@ -75,8 +76,10 @@ def download_media(media_id: str, request: Request, db: Session = Depends(get_db
                     logger.info(f"[MEDIA_DOWNLOAD_SUPABASE] Downloading {media_id} from {public_url}")
                     req = urllib.request.Request(public_url, headers={"User-Agent": "Railway-Media-Proxy/1.0"})
                     with urllib.request.urlopen(req) as resp, open(cached_file_path, "wb") as f:
-                        f.write(resp.read())
+                        shutil.copyfileobj(resp, f, length=1024 * 1024)
                     logger.info(f"[MEDIA_CACHE_POPULATED] Cached {media_id} ({os.path.getsize(cached_file_path)} bytes) on Railway disk")
+                    with _global_lock:
+                        _download_locks.pop(media_id, None)
                 except Exception as e:
                     logger.error(f"Failed to cache media {media_id} on Railway disk: {str(e)}")
                     return RedirectResponse(public_url)

@@ -97,14 +97,15 @@ class DeviceService:
     @staticmethod
     def update_last_seen(db: Session, device_id: str):
         try:
-            current_time = int(time.time() * 1000)
-            device = db.query(Device).filter(Device.id == device_id).first()
-            if device:
-                device.heartbeatAt = current_time
-                device.lastSeenMs = current_time
-                device.lastSeen = "now"
-                device.status = "Online"
-                db.commit()
+            from datetime import datetime, timezone
+            current_time = int(datetime.now(timezone.utc).timestamp() * 1000)
+            db.query(Device).filter(Device.id == device_id).update({
+                "heartbeatAt": current_time,
+                "lastSeenMs": current_time,
+                "lastSeen": "now",
+                "status": "Online"
+            })
+            db.commit()
         except Exception:
             db.rollback()
 

@@ -1,4 +1,4 @@
-﻿import time
+import time
 from typing import Optional, Dict, Tuple
 from app.schemas.player import CurrentPlaylistResponse
 
@@ -23,7 +23,16 @@ class PlayerCache:
         return result, etag
 
     @classmethod
+    def _sweep(cls):
+        if len(cls._cache) > 500:
+            current_time = time.time()
+            keys_to_remove = [k for k, v in cls._cache.items() if current_time - v[0] > cls.TTL_SECONDS]
+            for k in keys_to_remove:
+                cls._cache.pop(k, None)
+
+    @classmethod
     def set(cls, device_id: str, result: Optional[CurrentPlaylistResponse], etag: str) -> None:
+        cls._sweep()
         cls._cache[device_id] = (time.time(), result, etag)
 
     @classmethod
