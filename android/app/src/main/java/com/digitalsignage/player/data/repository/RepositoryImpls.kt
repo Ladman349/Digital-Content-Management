@@ -141,13 +141,9 @@ class PlaylistRepositoryImpl @Inject constructor(
                                 currentActive.version == syncData.version &&
                                 allActiveFilesExist
                                 
-                        val isAlreadyPending = currentPending != null && 
-                                currentPending.playlistId == syncData.playlistId && 
-                                currentPending.version == syncData.version
-                                
-                        if (isAlreadyActive || isAlreadyPending) {
-                            logger.i("PlaylistRepository", "Playlist version ${syncData.version} is already active/pending with valid files in DB. Ignoring sync.")
-                            com.digitalsignage.player.core.performance.PerformanceMonitor.recordEvent("SYNC", "Sync bypassed: version ${syncData.version} matches active/pending")
+                        if (isAlreadyActive) {
+                            logger.i("PlaylistRepository", "Playlist version ${syncData.version} is already active with valid files on disk. Ignoring sync.")
+                            com.digitalsignage.player.core.performance.PerformanceMonitor.recordEvent("SYNC", "Sync bypassed: version ${syncData.version} matches active")
                             return Result.Success(false)
                         }
 
