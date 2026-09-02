@@ -89,7 +89,9 @@ class SupabaseStorageProvider(StorageProvider):
         
         headers = {
             "Authorization": f"Bearer {self.key}",
-            "Content-Type": content_type
+            "Content-Type": content_type,
+            "cache-control": "public, max-age=31536000, immutable",
+            "x-upsert": "true"
         }
         
         req = urllib.request.Request(

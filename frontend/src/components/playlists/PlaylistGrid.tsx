@@ -7,6 +7,8 @@ import FilterListOffRoundedIcon from "@mui/icons-material/FilterListOffRounded";
 import FormatListBulletedRoundedIcon from "@mui/icons-material/FormatListBulletedRounded";
 import TvRoundedIcon from "@mui/icons-material/TvRounded";
 import ScheduleRoundedIcon from "@mui/icons-material/ScheduleRounded";
+import MovieRoundedIcon from "@mui/icons-material/MovieRounded";
+import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
 
 import type { Playlist, PlaylistStatus } from "../../types/playlist";
 import type { MediaItem } from "../../types/media";
@@ -47,10 +49,15 @@ function PlaylistCard({
 }) {
   const dateStr = formatDate(playlist.updatedAt);
 
-  // Fetch thumbnails for up to the first 3 items
+  // Fetch thumbnails for up to the first 3 items safely without loading heavy video files
   const thumbnails = playlist.items.slice(0, 3).map((item) => {
     const media = mediaItems.find((m) => m.id === item.mediaId);
-    return media?.thumbnail || "";
+    const isVideo = media?.type === "Video";
+    const hasImage = Boolean(media?.thumbnail && !media.thumbnail.match(/\.(mp4|mov|webm|mkv|avi)(\?.*)?$/i) && !isVideo);
+    return {
+      thumb: hasImage ? (media?.thumbnail || "") : "",
+      isVideo,
+    };
   });
 
   const colors = statusColors[playlist.status];
@@ -76,22 +83,34 @@ function PlaylistCard({
       }}
     >
       {/* Thumbnails strip */}
-      <Box sx={{ display: "flex", height: { xs: 100, sm: 120 }, bgcolor: "#F1F5F9" }}>
+      <Box sx={{ display: "flex", height: { xs: 100, sm: 120 }, bgcolor: "#0F172A" }}>
         {thumbnails.length > 0 ? (
-          thumbnails.map((thumb, idx) => (
+          thumbnails.map((item, idx) => (
             <Box
               key={idx}
               sx={{
                 flex: 1,
-                backgroundImage: `url(${thumb})`,
+                backgroundImage: item.thumb ? `url(${item.thumb})` : undefined,
                 backgroundSize: "cover",
                 backgroundPosition: "center",
-                borderRight: idx < thumbnails.length - 1 ? "2px solid #fff" : "none",
+                bgcolor: item.thumb ? "transparent" : "#1E293B",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRight: idx < thumbnails.length - 1 ? "2px solid #0F172A" : "none",
               }}
-            />
+            >
+              {!item.thumb && (
+                item.isVideo ? (
+                  <MovieRoundedIcon sx={{ color: "rgba(255,255,255,0.35)", fontSize: 28 }} />
+                ) : (
+                  <ImageRoundedIcon sx={{ color: "rgba(255,255,255,0.35)", fontSize: 28 }} />
+                )
+              )}
+            </Box>
           ))
         ) : (
-          <Box sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Box sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "#F1F5F9" }}>
             <FormatListBulletedRoundedIcon sx={{ color: "#CBD5E1", fontSize: 40 }} />
           </Box>
         )}

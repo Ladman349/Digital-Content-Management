@@ -53,6 +53,7 @@ function MediaCard({
 }) {
   const isVideo = item.type === "Video";
   const dateStr = formatDate(item.uploadedAt);
+  const hasValidImageThumb = Boolean(item.thumbnail && !item.thumbnail.match(/\.(mp4|mov|webm|mkv|avi)(\?.*)?$/i) && !isVideo);
 
   return (
     <Paper
@@ -80,7 +81,7 @@ function MediaCard({
           position: "relative",
           height: { xs: 150, sm: 165 },
           bgcolor: "#0F172A",
-          backgroundImage: item.thumbnail ? `url(${item.thumbnail})` : undefined,
+          backgroundImage: hasValidImageThumb ? `url(${item.thumbnail})` : undefined,
           backgroundSize: "cover",
           backgroundPosition: "center",
           borderBottom: "1px solid #EEF2F6",
@@ -90,7 +91,7 @@ function MediaCard({
           justifyContent: "center",
         }}
       >
-        {!item.thumbnail && (
+        {!hasValidImageThumb && (
           <Box sx={{ color: "rgba(255,255,255,0.4)" }}>
             {isVideo ? <MovieRoundedIcon sx={{ fontSize: 48 }} /> : <ImageRoundedIcon sx={{ fontSize: 48 }} />}
           </Box>

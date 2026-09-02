@@ -96,7 +96,7 @@ export default function MediaPage() {
           name: file.name,
           type: isVideo ? "Video" : "Image",
           category: "Announcement",
-          thumbnail: mockUrl,
+          thumbnail: isVideo ? "" : mockUrl,
           originalFile: mockUrl,
           size: file.size,
           duration: isVideo ? 120 : undefined,
