@@ -148,6 +148,15 @@ class MediaService:
         except Exception as e:
             logger.error(f"Failed to delete media from storage uri={media.originalFile}: {str(e)}")
             
+        try:
+            import glob
+            cache_dir = os.path.join(os.getcwd(), "media_cache")
+            for f in glob.glob(os.path.join(cache_dir, f"{media_id}.*")):
+                if os.path.exists(f):
+                    os.remove(f)
+        except Exception as e:
+            logger.warning(f"Failed to delete local cached media {media_id}: {str(e)}")
+
         return True
 
     @staticmethod

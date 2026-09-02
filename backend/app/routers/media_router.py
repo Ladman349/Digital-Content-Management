@@ -1,13 +1,20 @@
 from typing import List
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status, Request
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, Response
 import os
+import urllib.request
+import logging
 from sqlalchemy.orm import Session
 
 from app.database.database import get_db
 from app.schemas.media import MediaUpdate, MediaResponse
 from app.services.media_service import MediaService
 from app.core.config import settings
+
+logger = logging.getLogger("api")
+
+CACHE_DIR = os.path.join(os.getcwd(), "media_cache")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
 router = APIRouter(
     prefix="/media",
@@ -25,22 +32,49 @@ def download_media(media_id: str, request: Request, db: Session = Depends(get_db
     if not media:
         raise HTTPException(status_code=404, detail="Media not found")
 
-    scheme = request.headers.get("x-forwarded-proto", "https")
-    host = request.headers.get("x-forwarded-host", "digital-content-management-production-6fd4.up.railway.app")
-    if "localhost" in host or "127.0.0.1" in host:
-        host = "digital-content-management-production-6fd4.up.railway.app"
-    request_base_url = f"{scheme}://{host}"
-        
-    clean_uri = MediaService.extract_clean_storage_uri(media.originalFile)
-    
-    from app.core.storage import get_storage_provider
-    public_url = get_storage_provider().get_public_url(clean_uri, base_url_override=request_base_url)
-    
-    # Unconditional safety check: NEVER return localhost or 127.0.0.1 in public_url
-    if "localhost" in public_url or "127.0.0.1" in public_url:
-        public_url = public_url.replace("http://localhost:8000", request_base_url).replace("http://127.0.0.1:8000", request_base_url).replace("http://localhost", request_base_url).replace("http://127.0.0.1", request_base_url)
+    etag = f'"{media.checksum}"' if media.checksum else f'"{media.id}"'
+    if_none_match = request.headers.get("if-none-match")
+    if if_none_match:
+        clean_inm = if_none_match.strip().strip('"')
+        clean_etag = etag.strip('"')
+        if clean_inm == clean_etag or if_none_match.strip() == etag:
+            return Response(
+                status_code=304,
+                headers={
+                    "ETag": etag,
+                    "Cache-Control": "public, max-age=31536000, immutable"
+                }
+            )
 
-    return RedirectResponse(public_url)
+    # Check local disk cache on Railway
+    ext = os.path.splitext(media.name)[1].lower() or ".bin"
+    cached_file_path = os.path.join(CACHE_DIR, f"{media.id}{ext}")
+    
+    # If not cached on Railway disk, fetch from Supabase ONCE and store locally
+    if not os.path.exists(cached_file_path) or os.path.getsize(cached_file_path) == 0:
+        clean_uri = MediaService.extract_clean_storage_uri(media.originalFile)
+        from app.core.storage import get_storage_provider
+        public_url = get_storage_provider().get_public_url(clean_uri)
+        
+        try:
+            logger.info(f"Populating Railway disk cache for media {media_id} from Supabase: {public_url}")
+            req = urllib.request.Request(public_url, headers={"User-Agent": "Railway-Media-Proxy/1.0"})
+            with urllib.request.urlopen(req) as resp, open(cached_file_path, "wb") as f:
+                f.write(resp.read())
+            logger.info(f"Successfully cached media {media_id} on Railway disk ({os.path.getsize(cached_file_path)} bytes)")
+        except Exception as e:
+            logger.error(f"Failed to cache media {media_id} on Railway disk: {str(e)}")
+            return RedirectResponse(public_url)
+
+    # Serve directly from Railway disk with Range support and 1-year caching
+    return FileResponse(
+        path=cached_file_path,
+        filename=media.name,
+        headers={
+            "ETag": etag,
+            "Cache-Control": "public, max-age=31536000, immutable"
+        }
+    )
 
 @router.get("/{media_id}", response_model=MediaResponse)
 def get_media(media_id: str, db: Session = Depends(get_db)):
