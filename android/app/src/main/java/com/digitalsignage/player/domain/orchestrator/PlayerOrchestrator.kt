@@ -369,7 +369,7 @@ class PlayerOrchestratorImpl @Inject constructor(
     }
 
     private companion object {
-        const val PLAYLIST_POLL_INTERVAL_MS = 15_000L
+        const val PLAYLIST_POLL_INTERVAL_MS = 30_000L
     }
 
     private suspend fun attemptSyncSafely() {

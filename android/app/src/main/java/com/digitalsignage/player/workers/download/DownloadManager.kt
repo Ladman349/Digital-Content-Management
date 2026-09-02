@@ -155,6 +155,9 @@ class DownloadManager @Inject constructor(
             android.util.Log.i("DownloadTrace", "Step: if tempFile.exists() block finished")
             
             val requestBuilder = Request.Builder().url(session.url)
+            if (!session.expectedChecksumSha256.isNullOrBlank()) {
+                requestBuilder.header("If-None-Match", "\"${session.expectedChecksumSha256}\"")
+            }
             if (downloadedBytes > 0) {
                 requestBuilder.header("Range", "bytes=${downloadedBytes}-")
                 logger.d("DownloadManager", "Resuming download for ${session.mediaId} from offset: ${downloadedBytes}")
@@ -173,11 +176,34 @@ class DownloadManager @Inject constructor(
                 response.close()
                 redirectCount++
                 val redirectRequestBuilder = Request.Builder().url(location)
+                if (!session.expectedChecksumSha256.isNullOrBlank()) {
+                    redirectRequestBuilder.header("If-None-Match", "\"${session.expectedChecksumSha256}\"")
+                }
                 if (downloadedBytes > 0) {
                     redirectRequestBuilder.header("Range", "bytes=${downloadedBytes}-")
                 }
                 response = client.newCall(redirectRequestBuilder.build()).execute()
                 android.util.Log.i("DownloadTrace", "Redirect response code: ${response.code}")
+            }
+
+            // Handle 304 Not Modified: Server confirms media hasn't changed
+            if (response.code == 304) {
+                logger.i("DownloadManager", "Server returned 304 Not Modified for ${session.mediaId}. File is already up to date.")
+                response.close()
+                database.downloadSessionDao().updateSessionState(session.mediaId, DownloadState.COMPLETED, now)
+                val resolvedFile = storageManager.resolveValidMediaFile(
+                    mediaId = session.mediaId,
+                    url = session.url,
+                    localFilePath = session.destinationPath,
+                    expectedMd5 = session.expectedChecksumMd5,
+                    expectedSha256 = session.expectedChecksumSha256,
+                    expectedSize = if (session.expectedSize > 0L) session.expectedSize else null,
+                    fileValidator = fileValidator
+                ) ?: destFile
+                database.playlistDao().updateMediaDownloadedState(session.mediaId, true, resolvedFile.absolutePath)
+                eventBus.publish(PlayerEvent.DownloadCompleted(session.mediaId))
+                checkPlaylistReadiness()
+                return
             }
 
             if (!response.isSuccessful && response.code != 206) {
