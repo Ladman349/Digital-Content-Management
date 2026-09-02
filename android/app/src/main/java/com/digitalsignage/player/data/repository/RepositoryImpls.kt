@@ -182,7 +182,7 @@ class PlaylistRepositoryImpl @Inject constructor(
                                 sha256Hash = dto.checksum,
                                 mediaType = dto.type,
                                 isDownloaded = isDownloaded,
-                                localFilePath = resolvedFile?.absolutePath ?: existingItem?.localFilePath,
+                                localFilePath = resolvedFile?.absolutePath,
                                 mimeType = dto.mimeType
                             )
                         }
