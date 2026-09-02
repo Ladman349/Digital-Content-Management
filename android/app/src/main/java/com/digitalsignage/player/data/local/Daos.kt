@@ -49,6 +49,13 @@ interface PlaylistDao {
         insertMediaItems(items)
     }
 
+    @Transaction
+    suspend fun insertActivePlaylistTransaction(playlist: PlaylistEntity, items: List<MediaItemEntity>) {
+        archiveActivePlaylist()
+        insertPlaylist(playlist.copy(state = PlaylistState.ACTIVE))
+        insertMediaItems(items)
+    }
+
     @Query("DELETE FROM playlist WHERE playlistId = :playlistId")
     suspend fun deletePlaylistById(playlistId: String)
 

@@ -11,10 +11,21 @@ from app.schemas.media import MediaUpdate, MediaResponse
 from app.services.media_service import MediaService
 from app.core.config import settings
 
+import threading
+
 logger = logging.getLogger("api")
 
-CACHE_DIR = os.path.join(os.getcwd(), "media_cache")
+CACHE_DIR = os.getenv("MEDIA_CACHE_DIR", os.path.join(os.getcwd(), "media_cache"))
 os.makedirs(CACHE_DIR, exist_ok=True)
+
+_download_locks = {}
+_global_lock = threading.Lock()
+
+def get_media_lock(media_id: str) -> threading.Lock:
+    with _global_lock:
+        if media_id not in _download_locks:
+            _download_locks[media_id] = threading.Lock()
+        return _download_locks[media_id]
 
 router = APIRouter(
     prefix="/media",
@@ -38,6 +49,7 @@ def download_media(media_id: str, request: Request, db: Session = Depends(get_db
         clean_inm = if_none_match.strip().strip('"')
         clean_etag = etag.strip('"')
         if clean_inm == clean_etag or if_none_match.strip() == etag:
+            logger.info(f"[MEDIA_304] Client sent matching ETag for {media_id}. Returning 304.")
             return Response(
                 status_code=304,
                 headers={
@@ -50,21 +62,26 @@ def download_media(media_id: str, request: Request, db: Session = Depends(get_db
     ext = os.path.splitext(media.name)[1].lower() or ".bin"
     cached_file_path = os.path.join(CACHE_DIR, f"{media.id}{ext}")
     
-    # If not cached on Railway disk, fetch from Supabase ONCE and store locally
+    # Thread-safe deduplication: Only one worker/thread downloads from Supabase per media_id
     if not os.path.exists(cached_file_path) or os.path.getsize(cached_file_path) == 0:
-        clean_uri = MediaService.extract_clean_storage_uri(media.originalFile)
-        from app.core.storage import get_storage_provider
-        public_url = get_storage_provider().get_public_url(clean_uri)
-        
-        try:
-            logger.info(f"Populating Railway disk cache for media {media_id} from Supabase: {public_url}")
-            req = urllib.request.Request(public_url, headers={"User-Agent": "Railway-Media-Proxy/1.0"})
-            with urllib.request.urlopen(req) as resp, open(cached_file_path, "wb") as f:
-                f.write(resp.read())
-            logger.info(f"Successfully cached media {media_id} on Railway disk ({os.path.getsize(cached_file_path)} bytes)")
-        except Exception as e:
-            logger.error(f"Failed to cache media {media_id} on Railway disk: {str(e)}")
-            return RedirectResponse(public_url)
+        with get_media_lock(media_id):
+            if not os.path.exists(cached_file_path) or os.path.getsize(cached_file_path) == 0:
+                logger.info(f"[MEDIA_CACHE_MISS] Media {media_id} not in Railway cache. Fetching from Supabase...")
+                clean_uri = MediaService.extract_clean_storage_uri(media.originalFile)
+                from app.core.storage import get_storage_provider
+                public_url = get_storage_provider().get_public_url(clean_uri)
+                
+                try:
+                    logger.info(f"[MEDIA_DOWNLOAD_SUPABASE] Downloading {media_id} from {public_url}")
+                    req = urllib.request.Request(public_url, headers={"User-Agent": "Railway-Media-Proxy/1.0"})
+                    with urllib.request.urlopen(req) as resp, open(cached_file_path, "wb") as f:
+                        f.write(resp.read())
+                    logger.info(f"[MEDIA_CACHE_POPULATED] Cached {media_id} ({os.path.getsize(cached_file_path)} bytes) on Railway disk")
+                except Exception as e:
+                    logger.error(f"Failed to cache media {media_id} on Railway disk: {str(e)}")
+                    return RedirectResponse(public_url)
+    else:
+        logger.info(f"[MEDIA_CACHE_HIT] Serving {media_id} directly from Railway disk cache ({os.path.getsize(cached_file_path)} bytes)")
 
     # Serve directly from Railway disk with Range support and 1-year caching
     return FileResponse(

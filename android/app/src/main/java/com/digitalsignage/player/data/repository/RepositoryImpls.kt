@@ -29,7 +29,9 @@ class PlaylistRepositoryImpl @Inject constructor(
     private val database: AppDatabase,
     private val configStore: RuntimeConfigStoreImpl,
     private val logger: Logger,
-    private val eventBus: PlayerEventBus
+    private val eventBus: PlayerEventBus,
+    private val storageManager: com.digitalsignage.player.core.storage.StorageManager,
+    private val fileValidator: com.digitalsignage.player.core.utils.FileValidator
 ) : PlaylistRepository {
 
     override suspend fun syncPlaylist(): Result<Boolean> {
@@ -149,15 +151,6 @@ class PlaylistRepositoryImpl @Inject constructor(
                             return Result.Success(false)
                         }
 
-                        logger.i("PlaylistRepository", "New playlist version ${syncData.version} received. Saving as PENDING.")
-                        
-                        val entity = PlaylistEntity(
-                            playlistId = syncData.playlistId,
-                            version = syncData.version,
-                            state = PlaylistState.PENDING,
-                            lastSyncedAt = System.currentTimeMillis()
-                        )
-                        
                         val activePlaylist = database.playlistDao().getPlaylistByState(PlaylistState.ACTIVE)
                         val activeItems = activePlaylist?.let { database.playlistDao().getMediaItemsForPlaylist(it.playlistId) } ?: emptyList()
                         
@@ -171,6 +164,18 @@ class PlaylistRepositoryImpl @Inject constructor(
                             eventBus.publish(PlayerEvent.DebugStage("6. MediaItem[$index]: id=${dto.mediaId}, url=${dto.downloadUrl}"))
                             val existingItem = activeItems.find { it.mediaId == dto.mediaId }
                             
+                            // Check physical file on disk before marking isDownloaded
+                            val resolvedFile = storageManager.resolveValidMediaFile(
+                                mediaId = dto.mediaId,
+                                url = dto.downloadUrl,
+                                localFilePath = existingItem?.localFilePath,
+                                expectedMd5 = null,
+                                expectedSha256 = dto.checksum,
+                                expectedSize = if (dto.size > 0L) dto.size else null,
+                                fileValidator = fileValidator
+                            )
+                            val isDownloaded = resolvedFile != null && resolvedFile.exists() && resolvedFile.length() > 0
+
                             MediaItemEntity(
                                 mediaId = dto.mediaId,
                                 playlistId = syncData.playlistId,
@@ -180,35 +185,49 @@ class PlaylistRepositoryImpl @Inject constructor(
                                 md5Hash = null,
                                 sha256Hash = dto.checksum,
                                 mediaType = dto.type,
-                                isDownloaded = existingItem?.isDownloaded ?: false,
-                                localFilePath = existingItem?.localFilePath,
+                                isDownloaded = isDownloaded,
+                                localFilePath = resolvedFile?.absolutePath ?: existingItem?.localFilePath,
                                 mimeType = dto.mimeType
                             )
                         }
                         
+                        val itemsToDownload = itemEntities.filter { !it.isDownloaded }
+                        val allDownloaded = itemsToDownload.isEmpty()
+                        
+                        val entity = PlaylistEntity(
+                            playlistId = syncData.playlistId,
+                            version = syncData.version,
+                            state = if (allDownloaded) PlaylistState.ACTIVE else PlaylistState.PENDING,
+                            lastSyncedAt = System.currentTimeMillis()
+                        )
+
                         // Metadata update only in transaction
                         com.digitalsignage.player.core.performance.PerformanceMonitor.onDbWriteTriggered()
-                        database.playlistDao().insertPendingPlaylistTransaction(entity, itemEntities)
-                        android.util.Log.i("PlaylistTrace", "Inserted pending playlist")
+                        if (allDownloaded) {
+                            database.playlistDao().insertActivePlaylistTransaction(entity, itemEntities)
+                            logger.i("PlaylistRepository", "All media files already exist on disk. Activated playlist ${syncData.playlistId} directly.")
+                        } else {
+                            database.playlistDao().insertPendingPlaylistTransaction(entity, itemEntities)
+                            logger.i("PlaylistRepository", "Queuing ${itemsToDownload.size} missing media downloads for playlist ${syncData.playlistId}.")
+                        }
                         
                         // Store ETag independently of version
                         if (newETag != null) {
                             configStore.savePlaylistETag(newETag)
                         }
                         
-                        val itemsToDownload = itemEntities.filter { !it.isDownloaded }
+                        if (itemsToDownload.isNotEmpty()) {
+                            android.util.Log.i("SyncTrace", "3. itemEntities size: ${itemEntities.size}")
+                            android.util.Log.i("SyncTrace", "4. itemsToDownload size: ${itemsToDownload.size}")
+                            eventBus.publish(PlayerEvent.DebugStage("About to call enqueueDownloads() for ${itemsToDownload.size} items"))
+                            enqueueDownloads(itemsToDownload)
+                            eventBus.publish(PlayerEvent.DebugStage("enqueueDownloads() returned successfully"))
+                        } else {
+                            logger.i("PlaylistRepository", "No network downloads needed. All media items are already present on local disk.")
+                            eventBus.publish(PlayerEvent.DebugStage("All media files already on disk. Zero network downloads queued."))
+                        }
                         
-                        android.util.Log.i("SyncTrace", "3. itemEntities size: ${itemEntities.size}")
-                        android.util.Log.i("SyncTrace", "4. itemsToDownload size: ${itemsToDownload.size}")
-                        
-                        eventBus.publish(PlayerEvent.DebugStage("About to call enqueueDownloads()"))
-                        
-                        // Queue downloads via persistent storage
-                        enqueueDownloads(itemsToDownload)
-                        
-                        eventBus.publish(PlayerEvent.DebugStage("enqueueDownloads() returned successfully"))
-                        
-                        com.digitalsignage.player.core.performance.PerformanceMonitor.recordEvent("SYNC", "Sync completed: saved pending version ${syncData.version}")
+                        com.digitalsignage.player.core.performance.PerformanceMonitor.recordEvent("SYNC", "Sync completed: saved version ${syncData.version} (allDownloaded=$allDownloaded)")
                         Result.Success(true)
                     } else {
                         com.digitalsignage.player.core.performance.PerformanceMonitor.recordEvent("SYNC", "Sync failed: syncData null")
