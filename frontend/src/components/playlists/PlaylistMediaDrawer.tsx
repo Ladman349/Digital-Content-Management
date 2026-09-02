@@ -1,7 +1,8 @@
 import { Box, IconButton, InputAdornment, TextField, Typography, Paper } from "@mui/material";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
-import PlayCircleOutlineRoundedIcon from "@mui/icons-material/PlayCircleOutlineRounded";
+import MovieRoundedIcon from "@mui/icons-material/MovieRounded";
+import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
 import { useState } from "react";
 
 import type { MediaItem } from "../../types/media";
@@ -52,34 +53,36 @@ export default function PlaylistMediaDrawer({ mediaItems, onAdd }: Props) {
             }}
           >
             {/* Thumbnail Image */}
-            <Box
-              sx={{
-                width: 64,
-                height: 48,
-                borderRadius: "6px",
-                backgroundImage: `url(${media.thumbnail})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-                flexShrink: 0,
-                position: "relative",
-              }}
-            >
-              {media.type === "Video" && (
+            {(() => {
+              const isVideo = media.type === "Video";
+              const hasValidImageThumb = Boolean(media.thumbnail && !media.thumbnail.match(/\.(mp4|mov|webm|mkv|avi)(\?.*)?$/i) && !isVideo);
+              return (
                 <Box
                   sx={{
-                    position: "absolute",
-                    inset: 0,
+                    width: 64,
+                    height: 48,
+                    borderRadius: "6px",
+                    bgcolor: "#0F172A",
+                    backgroundImage: hasValidImageThumb ? `url(${media.thumbnail})` : undefined,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                    flexShrink: 0,
+                    position: "relative",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    bgcolor: "rgba(0,0,0,0.3)",
-                    borderRadius: "6px",
                   }}
                 >
-                  <PlayCircleOutlineRoundedIcon sx={{ color: "#fff", fontSize: 16 }} />
+                  {!hasValidImageThumb && (
+                    isVideo ? (
+                      <MovieRoundedIcon sx={{ color: "rgba(255,255,255,0.4)", fontSize: 24 }} />
+                    ) : (
+                      <ImageRoundedIcon sx={{ color: "rgba(255,255,255,0.4)", fontSize: 24 }} />
+                    )
+                  )}
                 </Box>
-              )}
-            </Box>
+              );
+            })()}
 
             {/* Media Metadata */}
             <Box sx={{ flexGrow: 1, minWidth: 0 }}>

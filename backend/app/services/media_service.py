@@ -82,7 +82,7 @@ class MediaService:
             name=file.filename,
             type=media_type,
             category="Announcement",
-            thumbnail=storage_uri,
+            thumbnail=storage_uri if media_type == "Image" else "",
             originalFile=storage_uri,
             size=size,
             dimensions=dimensions,
@@ -166,7 +166,12 @@ class MediaService:
         clean_thumbnail = MediaService.extract_clean_storage_uri(media.thumbnail)
         clean_original = MediaService.extract_clean_storage_uri(media.originalFile)
 
-        thumb_url = provider.get_public_url(clean_thumbnail, base_url_override=request_base_url)
+        # Sanitize video thumbnails so browsers never download raw video files as CSS backgrounds
+        if media.type == "Video" and (not clean_thumbnail or clean_thumbnail == clean_original or any(clean_thumbnail.lower().endswith(ext) for ext in ('.mov', '.mp4', '.webm', '.mkv', '.avi'))):
+            thumb_url = ""
+        else:
+            thumb_url = provider.get_public_url(clean_thumbnail, base_url_override=request_base_url) if clean_thumbnail else ""
+
         orig_url = provider.get_public_url(clean_original, base_url_override=request_base_url)
 
         return MediaResponse(
