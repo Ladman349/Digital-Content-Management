@@ -65,6 +65,7 @@ class PlaylistExecutorImpl @Inject constructor(
         loopJob?.cancel()
         loopJob = scope.launch {
             var currentIndex = 0
+            var consecutiveErrors = 0
             while (isActive) {
                 if (playlist.items.isEmpty()) {
                     logger.i("PlaylistExecutor", "Playlist items are empty in loop. Stopping controller.")
@@ -88,10 +89,17 @@ class PlaylistExecutorImpl @Inject constructor(
                 
                 try {
                     playbackController.playItem(item)
+                    consecutiveErrors = 0
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
                     logger.e("PlaylistExecutor", "Error playing media ${item.mediaId}, skipping", e)
+                    consecutiveErrors++
+                    delay(2000L)
+                    if (consecutiveErrors > playlist.items.size * 3) {
+                        logger.e("PlaylistExecutor", "Consecutive error limit exceeded, stopping playlist")
+                        break
+                    }
                 }
                 
                 val pending = pendingPlaylist

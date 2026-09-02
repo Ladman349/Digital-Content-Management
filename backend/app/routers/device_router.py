@@ -40,11 +40,17 @@ def get_device_status(device_id: str, db: Session = Depends(get_db)):
 
 from fastapi.responses import JSONResponse
 from app.core.cache import PlayerCache
+import time
+
+_last_seen_cache: dict[str, float] = {}
 
 @router.get("/{device_id}/current-playlist")
 def get_current_playlist(request: Request, device_id: str, db: Session = Depends(get_db)):
     # Record device activity so status is accurately Online on every poll
-    DeviceService.update_last_seen(db, device_id)
+    current_time = time.time()
+    if current_time - _last_seen_cache.get(device_id, 0) > 120:
+        DeviceService.update_last_seen(db, device_id)
+        _last_seen_cache[device_id] = current_time
     
     if_none_match = request.headers.get("if-none-match")
     

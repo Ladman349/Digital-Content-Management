@@ -98,7 +98,7 @@ class StartupValidator @Inject constructor(
                     url = item.url,
                     localFilePath = item.localFilePath,
                     expectedMd5 = item.md5Hash,
-                    expectedSha256 = item.sha256Hash,
+                    expectedSha256 = null,
                     expectedSize = null,
                     fileValidator = fileValidator
                 )
