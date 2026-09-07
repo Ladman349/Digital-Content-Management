@@ -55,8 +55,12 @@ class DeviceIdentityManager @Inject constructor(
         val availableBytes = stat.availableBlocksLong * stat.blockSizeLong
         val availableMb = availableBytes / (1024 * 1024)
         
-        val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-        val appVersion = pInfo.versionName
+        val appVersion: String = try {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName
+                ?: com.digitalsignage.player.BuildConfig.VERSION_NAME
+        } catch (e: Exception) {
+            com.digitalsignage.player.BuildConfig.VERSION_NAME
+        }
         
         return DeviceRegistrationMetadata(
             androidId = androidId,

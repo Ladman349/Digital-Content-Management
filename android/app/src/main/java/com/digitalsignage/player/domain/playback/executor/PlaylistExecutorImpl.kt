@@ -32,6 +32,9 @@ class PlaylistExecutorImpl @Inject constructor(
 
     override fun execute(playlist: Playlist) {
         com.digitalsignage.player.core.performance.PerformanceMonitor.onPlaylistSelected()
+        // Always make sure the engine exists (it may have been released by a previous Activity
+        // instance) before deciding that nothing changed.
+        scope.launch { playbackController.initialize() }
         if (playlist.playlistId == currentPlaylistId && playlist.version == currentPlaylistVersion) {
             return
         }

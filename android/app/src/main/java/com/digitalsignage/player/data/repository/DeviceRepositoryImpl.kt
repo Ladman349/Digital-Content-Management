@@ -58,7 +58,7 @@ class DeviceRepositoryImpl @Inject constructor(
             
             if (response.isSuccessful && response.body() != null) {
                 val body = response.body()!!
-                android.util.Log.i("RegisterTrace", "[Retrofit] API registration succeeded. Response Body: deviceId=${body.deviceId}, token=${body.deviceToken}, syncInterval=${body.syncInterval}")
+                android.util.Log.i("RegisterTrace", "[Retrofit] API registration succeeded. deviceId=${body.deviceId}, heartbeatInterval=${body.heartbeatInterval}s, syncInterval=${body.syncInterval}")
                 runtimeConfigStore.saveDeviceCredentials(
                     deviceIdStr = body.deviceId,
                     token = body.deviceToken,
@@ -114,7 +114,7 @@ class DeviceRepositoryImpl @Inject constructor(
     suspend fun validateLocalCredentials(): Boolean {
         android.util.Log.i("StartupTrace", "Trace: DeviceRepositoryImpl.validateLocalCredentials() started")
         val token = runtimeConfigStore.deviceToken.firstOrNull()
-        android.util.Log.i("StartupTrace", "Trace: DeviceRepositoryImpl.validateLocalCredentials() token=$token")
+        android.util.Log.i("StartupTrace", "Trace: DeviceRepositoryImpl.validateLocalCredentials() hasToken=${!token.isNullOrBlank()}")
         return if (!token.isNullOrBlank()) {
             _registrationState.value = RegistrationState.Registered
             true

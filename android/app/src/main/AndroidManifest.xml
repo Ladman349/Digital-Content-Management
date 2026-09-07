@@ -9,8 +9,6 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Declare Leanback / TV requirements -->
@@ -73,6 +71,8 @@
         <activity
             android:name=".ui.SplashActivity"
             android:exported="true"
+            android:launchMode="singleTop"
+            android:noHistory="true"
             android:theme="@style/Theme.DigitalSignage.Splash"
             android:screenOrientation="landscape"
             android:keepScreenOn="true">
@@ -86,6 +86,7 @@
         <activity
             android:name=".ui.PlaybackActivity"
             android:exported="false"
+            android:launchMode="singleTask"
             android:screenOrientation="landscape"
             android:keepScreenOn="true"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|keyboard|navigation|uiMode|layoutDirection" />

@@ -61,13 +61,20 @@ class PlaylistRepositoryImpl @Inject constructor(
                 return Result.Error(AppError.Recoverable("Missing device ID"))
             }
 
-            val currentETag = configStore.playlistETag.firstOrNull()
+            // Only send If-None-Match when we actually hold an ACTIVE playlist locally; otherwise a
+            // stale ETag would make the server answer 304 forever after a 204/deletion.
+            val hasActivePlaylist = database.playlistDao().getPlaylistByState(PlaylistState.ACTIVE) != null
+            val storedETag = configStore.playlistETag.firstOrNull()
+            val currentETag = if (hasActivePlaylist) storedETag else null
+            if (!hasActivePlaylist && storedETag != null) {
+                configStore.clearPlaylistETag()
+            }
             eventBus.publish(
                 PlayerEvent.DebugStage(
                     "ETAG_AT_SYNC = '$currentETag'"
                 )
             )
-            
+
             logger.d("PlaylistRepository", "Requesting playlist sync with If-None-Match: ${currentETag}")
             val response = apiService.getPlaylist(deviceId, currentETag)
             android.util.Log.i("SyncTrace", "Playlist response code = ${response.code()}")
@@ -91,7 +98,9 @@ class PlaylistRepositoryImpl @Inject constructor(
                     database.playlistDao().deletePlaylist(activePlaylist.playlistId)
                     android.util.Log.i("SyncTrace", "Cleared active playlist ${activePlaylist.playlistId} from local DB")
                 }
-                
+                // Forget the ETag so re-assigning the same playlist is not answered with 304.
+                configStore.clearPlaylistETag()
+
                 Result.Success(false)
             } else if (isSuccess) {
                 eventBus.publish(PlayerEvent.DebugStage("C. About to evaluate response.body()"))
@@ -102,8 +111,8 @@ class PlaylistRepositoryImpl @Inject constructor(
                 val rawJson = body?.string() ?: ""
                 eventBus.publish(PlayerEvent.DebugStage("F. Finished calling body.string(), length=${rawJson.length}"))
                 
-                eventBus.publish(PlayerEvent.DebugStage("2. COMPLETE response body:\n$rawJson"))
-                
+                logger.d("PlaylistRepository", "Playlist response body: $rawJson")
+
                 eventBus.publish(PlayerEvent.DebugStage("G. About to read headers"))
                 val newETag = response.headers()["ETag"]
                 eventBus.publish(PlayerEvent.DebugStage("H. Finished reading headers, ETag=$newETag"))
@@ -124,8 +133,7 @@ class PlaylistRepositoryImpl @Inject constructor(
                         configStore.saveDeviceOrientation(orientation)
                         
                         android.util.Log.i("PlaylistTrace", "Received playlist version=${syncData.version}, items=${syncData.items.map { it.media.mediaId }}")
-                        eventBus.publish(PlayerEvent.DebugStage("3. Parsed Playlist object:\n$syncData"))
-                        eventBus.publish(PlayerEvent.DebugStage("3a. Parsed Class: ${syncData::class.java.name}"))
+                        logger.d("PlaylistRepository", "Parsed playlist: $syncData")
                         eventBus.publish(PlayerEvent.DebugStage("4. playlist.id = ${syncData.playlistId}"))
                         eventBus.publish(PlayerEvent.DebugStage("5. playlist.mediaItems.size = ${syncData.items.size}"))
                         val currentActive = database.playlistDao().getPlaylistByState(PlaylistState.ACTIVE)

@@ -77,13 +77,17 @@ class StorageManager @Inject constructor(
         // 3. Direct mediaId filename
         candidatePaths.add(File(mediaDir, mediaId))
 
-        // 4. Direct file lookup
-        if (!url.isNullOrBlank()) {
-            val expected = File(mediaDir, getCanonicalFileName(mediaId, url))
-            if (expected.exists() && candidatePaths.none { it.absolutePath == expected.absolutePath }) {
-                candidatePaths.add(expected)
+        // 4. Prefix scan: any non-tmp file named "<mediaId>_*". Recovers assets whose recorded
+        //    localFilePath is stale (app data moved, file renamed) without re-downloading them.
+        //    Sorted so the choice is deterministic when several candidates match.
+        mediaDir.listFiles()
+            ?.filter { it.isFile && !it.name.endsWith(".tmp") && it.name.startsWith("${mediaId}_") }
+            ?.sortedBy { it.name }
+            ?.forEach { match ->
+                if (candidatePaths.none { it.absolutePath == match.absolutePath }) {
+                    candidatePaths.add(match)
+                }
             }
-        }
 
         // Validate candidates in order
         for (candidate in candidatePaths) {
