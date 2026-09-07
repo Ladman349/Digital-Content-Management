@@ -11,6 +11,9 @@
 # VS Code
 .vscode/
 
+# Claude Code local run configuration
+.claude/
+
 # Node dependencies
 node_modules/
 **/node_modules/
@@ -21,3 +24,29 @@ node_modules/
 # OS
 .DS_Store
 Thumbs.db
+
+# ── Signing material and credentials — never commit these ──────────────────
+# A committed keystore lets anyone sign releases as you.
+*.jks
+*.keystore
+*.p12
+*.pfx
+**/keystore.properties
+**/signing.properties
+.env
+**/.env
+!**/.env.example
+
+# ── Database dumps (may contain production data) ──────────────────────────
+*backup*.json
+
+# ── Build output and local scratch files ──────────────────────────────────
+build_output*.txt
+gradle-*-bin.zip
+*.db
+*.sqlite
+*.sqlite3
+logcat.txt
+*.zip
+*.lnk
+android/app/DownloadManager*.txt
