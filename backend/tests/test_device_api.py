@@ -39,10 +39,15 @@ def test_update_device(client):
     device_id = create_response.json()["id"]
     
     update_response = client.put(f"/devices/{device_id}", json={
-        "status": "Online"
+        "name": "Renamed Screen",
+        "location": "B"
     })
     assert update_response.status_code == 200
-    assert update_response.json()["status"] == "Online"
+    body = update_response.json()
+    assert body["name"] == "Renamed Screen"
+    assert body["location"] == "B"
+    # status is derived from heartbeat freshness, never from the request body
+    assert body["status"] == "Offline"
 
 def test_delete_device(client):
     create_response = client.post("/devices", json={
@@ -135,11 +140,11 @@ def test_device_status_transitions(client):
     # 30 seconds ago -> Online
     assert DeviceService.calculate_status(current_time - 30 * 1000) == "Online"
     
-    # 120 seconds ago -> Idle
-    assert DeviceService.calculate_status(current_time - 120 * 1000) == "Idle"
+    # 180 seconds ago -> Idle (boundary at 120s is still Online)
+    assert DeviceService.calculate_status(current_time - 180 * 1000) == "Idle"
     
-    # 400 seconds ago -> Offline
-    assert DeviceService.calculate_status(current_time - 400 * 1000) == "Offline"
+    # 700 seconds ago -> Offline (Idle window ends at 600s)
+    assert DeviceService.calculate_status(current_time - 700 * 1000) == "Offline"
 
 def test_repeated_heartbeats(client):
     create_res = client.post("/devices", json={

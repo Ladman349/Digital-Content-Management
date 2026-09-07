@@ -1,19 +1,39 @@
 import hashlib
+import logging
 import time
 import shutil
 from pathlib import Path
 from typing import Optional
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import UploadFile, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.storage import get_apk_storage_provider
 from app.models.app_update import AppUpdate
 from app.schemas.app_update import AppUpdateCheckResponse
 
+logger = logging.getLogger("api")
+
+
 class AppUpdateService:
+    @staticmethod
+    def build_download_url(filename: str) -> str:
+        """
+        The URL advertised to players. Always points at this API rather than directly at object
+        storage, so download counts are recorded and the storage backend can change without
+        invalidating URLs already written to the database.
+
+        Resolved from current settings on every read, so moving the API to a new domain does not
+        strand releases uploaded under the old one.
+        """
+        import os
+
+        base_url = os.getenv("PUBLIC_BASE_URL", settings.API_BASE_URL).rstrip("/")
+        return f"{base_url}/api/v1/app-updates/download/{filename}"
+
     @staticmethod
     def create_update(
         db: Session,
@@ -83,17 +103,46 @@ class AppUpdateService:
                 detail=f"File write failed: {str(e)}"
             )
             
-        # 5. Build dynamic download URL (using PUBLIC_BASE_URL if configured)
-        import os
-        base_url = os.getenv("PUBLIC_BASE_URL", settings.API_BASE_URL).rstrip('/')
-        apk_url = f"{base_url}/api/v1/app-updates/download/{safe_filename}"
-        
+        # 5. Push to object storage when configured, so the release survives a redeploy.
+        #    Railway's filesystem is ephemeral: without this the APK is gone on the next deploy
+        #    while the database still advertises it, and every player gets a 404.
+        storage_uri = None
+        provider = get_apk_storage_provider()
+        if provider.is_remote:
+            try:
+                with open(final_path, "rb") as fh:
+                    storage_uri = provider.upload(
+                        fh,
+                        safe_filename,
+                        "application/vnd.android.package-archive",
+                        total_bytes,
+                    )
+                logger.info(f"[OTA] Uploaded {safe_filename} to object storage as {storage_uri}")
+                # The local copy is only a staging buffer once the object is stored remotely.
+                try:
+                    final_path.unlink()
+                except OSError:
+                    pass
+            except Exception as e:
+                # Keep the local copy so the release is still installable from this instance,
+                # but make the degraded state obvious rather than silently ephemeral.
+                logger.error(f"[OTA] Object-storage upload failed for {safe_filename}: {e}")
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=(
+                        "The APK could not be saved to object storage, so it would be lost on the "
+                        f"next redeploy. Check the '{settings.SUPABASE_APK_BUCKET}' bucket and its "
+                        f"upload policy, then try again. Underlying error: {e}"
+                    ),
+                )
+
         # 6. Save metadata record to DB
         db_obj = AppUpdate(
             version_name=version_name,
             version_code=version_code,
             apk_filename=safe_filename,
-            apk_url=apk_url,
+            apk_url=AppUpdateService.build_download_url(safe_filename),
+            storage_uri=storage_uri,
             checksum_sha256=checksum,
             file_size=total_bytes,
             release_notes=release_notes,
@@ -140,7 +189,9 @@ class AppUpdateService:
             currentVersionCode=client_version_code,
             latestVersionCode=active_update.version_code,
             versionName=active_update.version_name,
-            apkUrl=active_update.apk_url,
+            # Recomputed rather than read from the row: a release uploaded under an old domain
+            # would otherwise hand players a dead URL forever.
+            apkUrl=AppUpdateService.build_download_url(active_update.apk_filename),
             checksum=active_update.checksum_sha256,
             fileSize=active_update.file_size,
             mandatory=active_update.mandatory,
@@ -154,7 +205,7 @@ class AppUpdateService:
             return None
         
         db_obj.download_count += 1
-        db_obj.last_downloaded_at = datetime.now()
+        db_obj.last_downloaded_at = datetime.now(timezone.utc)
         db.commit()
         db.refresh(db_obj)
         return db_obj
@@ -162,6 +213,21 @@ class AppUpdateService:
     @staticmethod
     def get_apk_path(filename: str) -> Path:
         return Path("uploads") / "apk" / filename
+
+    @staticmethod
+    def get_by_filename(db: Session, filename: str) -> AppUpdate | None:
+        return db.query(AppUpdate).filter(AppUpdate.apk_filename == filename).first()
+
+    @staticmethod
+    def resolve_storage_url(update: AppUpdate) -> str | None:
+        """Public object-storage URL for a release, or None when it is only on local disk."""
+        if not update.storage_uri:
+            return None
+        try:
+            return get_apk_storage_provider().get_public_url(update.storage_uri)
+        except Exception as e:  # noqa: BLE001 - a bad URI must not take the endpoint down
+            logger.error(f"[OTA] Could not resolve storage URI {update.storage_uri}: {e}")
+            return None
 
     @staticmethod
     def activate_update(db: Session, update_id: UUID) -> AppUpdate:
@@ -203,16 +269,23 @@ class AppUpdateService:
                 detail=f"App update with ID {update_id} not found."
             )
             
+        # Remove the stored object first; the local copy below is only a staging artefact.
+        if db_obj.storage_uri:
+            try:
+                get_apk_storage_provider().delete(db_obj.storage_uri)
+            except Exception as e:  # noqa: BLE001 - never block the DB delete on storage cleanup
+                logger.warning(f"[OTA] Could not delete {db_obj.storage_uri} from storage: {e}")
+
         # Move the physical file to uploads/apk/archive/ instead of hard-deleting
         apk_dir = Path("uploads") / "apk"
         file_path = apk_dir / db_obj.apk_filename
-        
+
         if file_path.exists():
             try:
                 archive_dir = apk_dir / "archive"
                 archive_dir.mkdir(parents=True, exist_ok=True)
                 # Generate timestamped archive filename
-                timestamp = datetime.now().strftime("%Y%m%dT%H%M%S")
+                timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
                 stem = Path(db_obj.apk_filename).stem
                 archive_filename = f"{stem}-{timestamp}.apk"
                 # Archive the file

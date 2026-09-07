@@ -1,7 +1,10 @@
+import logging
 from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy.orm import Session
 from app.core.time_util import now_ist
+
+logger = logging.getLogger("api")
 
 from app.models.device import Device
 from app.models.schedule import Schedule
@@ -77,7 +80,7 @@ class PlayerService:
     ) -> Optional[CurrentPlaylistResponse]:
         device = db.query(Device).filter(Device.id == device_id).first()
         if not device:
-            print(f"[204-DIAG] Device '{device_id}' not found in database.")
+            logger.debug(f"[204-DIAG] Device '{device_id}' not found in database.")
             return None
 
         utc_now = datetime.now(timezone.utc)
@@ -85,12 +88,12 @@ class PlayerService:
         current_date = now.strftime("%Y-%m-%d")
         current_time = now.strftime("%H:%M")
 
-        print(f"[204-DIAG] ── Resolving playlist for device '{device_id}' ──")
-        print(f"[204-DIAG]   UTC clock     : {utc_now.isoformat()}")
-        print(f"[204-DIAG]   IST clock     : {now.isoformat()}")
-        print(f"[204-DIAG]   current_date  : {current_date}")
-        print(f"[204-DIAG]   current_time  : {current_time}")
-        print(f"[204-DIAG]   timezone      : Asia/Kolkata")
+        logger.debug(f"[204-DIAG] ── Resolving playlist for device '{device_id}' ──")
+        logger.debug(f"[204-DIAG]   UTC clock     : {utc_now.isoformat()}")
+        logger.debug(f"[204-DIAG]   IST clock     : {now.isoformat()}")
+        logger.debug(f"[204-DIAG]   current_date  : {current_date}")
+        logger.debug(f"[204-DIAG]   current_time  : {current_time}")
+        logger.debug(f"[204-DIAG]   timezone      : Asia/Kolkata")
 
         # Find all active schedules assigned to this device
         # within the current date and time window
@@ -149,12 +152,12 @@ class PlayerService:
             .all()
         )
 
-        print("========== PLAYLIST RESPONSE ==========")
-        print("Playlist:", playlist.id)
-        print("Updated:", playlist.updatedAt)
+        logger.debug("========== PLAYLIST RESPONSE ==========")
+        logger.debug("Playlist: %s", playlist.id)
+        logger.debug("Updated: %s", playlist.updatedAt)
         for item, media in items_with_media:
-            print(media.id, item.order)
-        print("======================================")
+            logger.debug("%s %s", media.id, item.order)
+        logger.debug("======================================")
 
         response_items = []
         for item, media in items_with_media:

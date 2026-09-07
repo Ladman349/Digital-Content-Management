@@ -4,11 +4,13 @@ from sqlalchemy.orm import Session
 
 from app.database.database import get_db
 from app.schemas.schedule import ScheduleCreate, ScheduleUpdate, ScheduleResponse
+from app.core.auth import require_admin
 from app.services.schedule_service import ScheduleService
 
 router = APIRouter(
     prefix="/schedules",
-    tags=["Schedules"]
+    tags=["Schedules"],
+    dependencies=[Depends(require_admin)]
 )
 
 @router.get("", response_model=List[ScheduleResponse])

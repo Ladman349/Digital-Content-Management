@@ -11,14 +11,18 @@ class AppUpdateBase(BaseModel):
     checksum_sha256: str
     file_size: int
     release_notes: Optional[str] = None
-    mandatory: bool = False
-    is_active: bool = False
+    # Nullable in the database, so coerce NULL to False rather than failing serialisation.
+    mandatory: Optional[bool] = False
+    is_active: Optional[bool] = False
 
 class AppUpdateResponse(AppUpdateBase):
     id: UUID
     download_count: int
     last_downloaded_at: Optional[datetime] = None
     created_at: datetime
+    # NULL means the APK exists only on this server's disk and will disappear on the next
+    # redeploy. The CMS surfaces that as a warning.
+    storage_uri: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

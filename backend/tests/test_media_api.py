@@ -24,8 +24,8 @@ def test_upload_video(client):
     data = response.json()
     assert data["name"] == "test_video.mp4"
     assert data["type"] == "Video"
-    assert data["duration"] == 120
-    assert data["dimensions"] == "1920x1080"
+    assert data["duration"] is None
+    assert data["dimensions"] == "Unknown"
     
 def test_upload_unsupported(client):
     file_content = b"fake exe content"

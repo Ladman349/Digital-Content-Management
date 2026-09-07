@@ -18,16 +18,13 @@ class MediaCreate(MediaBase):
     pass
 
 class MediaUpdate(BaseModel):
+    # Only user-editable metadata. Storage URIs, type, size and upload
+    # provenance are owned by the server and must never be client-settable
+    # (the download proxy fetches whatever URI is stored).
     name: Optional[str] = None
-    type: Optional[str] = None
     category: Optional[str] = None
-    thumbnail: Optional[str] = None
-    originalFile: Optional[str] = None
-    size: Optional[int] = None
     dimensions: Optional[str] = None
     duration: Optional[int] = None
-    uploadedAt: Optional[int] = None
-    uploadedBy: Optional[str] = None
 
 class MediaResponse(MediaBase):
     id: str

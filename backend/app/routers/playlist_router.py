@@ -4,11 +4,13 @@ from sqlalchemy.orm import Session
 
 from app.database.database import get_db
 from app.schemas.playlist import PlaylistCreate, PlaylistUpdate, PlaylistResponse
+from app.core.auth import require_admin
 from app.services.playlist_service import PlaylistService
 
 router = APIRouter(
     prefix="/playlists",
-    tags=["Playlists"]
+    tags=["Playlists"],
+    dependencies=[Depends(require_admin)]
 )
 
 @router.get("", response_model=List[PlaylistResponse])

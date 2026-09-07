@@ -1,26 +1,34 @@
 import os
 import uuid
 import time
-import io
+import glob
 import hashlib
 import logging
+import mimetypes
 from typing import List
 
 from fastapi import UploadFile, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from PIL import Image
 
 from app.models.media import Media
+from app.models.playlist_item import PlaylistItem
 from app.schemas.media import MediaUpdate, MediaResponse
 from app.core.storage import get_storage_provider
 
 logger = logging.getLogger("api")
+
+# Shared with media_router: on-disk cache of proxied media downloads
+MEDIA_CACHE_DIR = os.getenv("MEDIA_CACHE_DIR", os.path.join(os.getcwd(), "media_cache"))
 
 class MediaService:
 
     MEDIA_FOLDER = "media"
     IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
     VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov"}
+    MAX_UPLOAD_BYTES = 100 * 1024 * 1024  # 100MB
+    CHUNK_SIZE = 4 * 1024 * 1024
 
     @staticmethod
     def upload_media(
@@ -28,38 +36,43 @@ class MediaService:
         db: Session
     ) -> Media:
 
-        ext = os.path.splitext(file.filename)[1].lower()
+        # Keep only the leaf name of whatever the client sent; it is used for display only
+        original_name = os.path.basename((file.filename or "").replace("\\", "/")).strip()
+        if not original_name:
+            raise HTTPException(status_code=400, detail="Filename is required")
+
+        ext = os.path.splitext(original_name)[1].lower()
         if not ext:
             ext = ".bin"
-        
+
         if ext not in MediaService.IMAGE_EXTENSIONS and ext not in MediaService.VIDEO_EXTENSIONS:
             raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}")
-            
+
         file.file.seek(0, os.SEEK_END)
         size = file.file.tell()
         file.file.seek(0)
-        
+
         if size == 0:
             raise HTTPException(status_code=400, detail="File is empty")
-        
-        if size > 100 * 1024 * 1024:  # 100MB
+
+        if size > MediaService.MAX_UPLOAD_BYTES:
             raise HTTPException(status_code=400, detail="File is too large")
-        
-        # Compute checksum incrementally
+
+        # Compute checksum incrementally without loading the file into memory
         sha256 = hashlib.sha256()
         while True:
-            chunk = file.file.read(4 * 1024 * 1024)
+            chunk = file.file.read(MediaService.CHUNK_SIZE)
             if not chunk:
                 break
             sha256.update(chunk)
         checksum = sha256.hexdigest()
-        
+
         file.file.seek(0)
-            
+
         dimensions = "Unknown"
         media_type = "Image"
         duration = None
-        
+
         if ext in MediaService.IMAGE_EXTENSIONS:
             media_type = "Image"
             try:
@@ -69,24 +82,26 @@ class MediaService:
                 dimensions = "Unknown"
             file.file.seek(0)
         else:
+            # Video metadata is not probed server-side; the CMS updates
+            # dimensions/duration via PUT /media/{id} after client-side probing.
             media_type = "Video"
-            dimensions = "1920x1080"
-            duration = 120
-            
-        safe_name = os.path.splitext(file.filename)[0].replace(" ", "_")
-        unique_filename = f"{safe_name}_{uuid.uuid4().hex[:8]}{ext}"
-        
-        provider = get_storage_provider()
-        logger.info(f"Uploading media filename={file.filename} size={size} provider={provider.__class__.__name__}")
-        
-        file_content = file.file.read()
-        file.file.seek(0)
-        storage_uri = provider.upload(file_content, unique_filename, file.content_type)
-        
+            dimensions = "Unknown"
+            duration = None
+
+        # Object names are generated server-side from the media ID and the
+        # validated extension so the client can never influence storage paths.
         media_id = f"MEDIA-{uuid.uuid4().hex[:8].upper()}"
+        object_name = f"{media_id}{ext}"
+        content_type = mimetypes.guess_type(object_name)[0] or "application/octet-stream"
+
+        provider = get_storage_provider()
+        logger.info(f"Uploading media filename={original_name} size={size} provider={provider.__class__.__name__}")
+
+        storage_uri = provider.upload(file.file, object_name, content_type, size)
+
         new_media = Media(
             id=media_id,
-            name=file.filename,
+            name=original_name,
             type=media_type,
             category="Announcement",
             thumbnail=storage_uri if media_type == "Image" else "",
@@ -98,11 +113,11 @@ class MediaService:
             uploadedBy="Admin",
             checksum=checksum
         )
-        
+
         db.add(new_media)
         db.commit()
         db.refresh(new_media)
-        
+
         logger.info(f"Media uploaded mediaId={media_id} provider={provider.__class__.__name__} uri={storage_uri}")
         return new_media
 
@@ -119,11 +134,11 @@ class MediaService:
         media = db.query(Media).filter(Media.id == media_id).first()
         if not media:
             return None
-        
+
         update_data = payload.model_dump(exclude_unset=True)
         for key, value in update_data.items():
             setattr(media, key, value)
-            
+
         db.commit()
         db.refresh(media)
         from app.core.cache import PlayerCache
@@ -136,9 +151,22 @@ class MediaService:
         media = db.query(Media).filter(Media.id == media_id).first()
         if not media:
             return False
-            
+
+        # The DB FK is ON DELETE CASCADE in production, so guard explicitly
+        # instead of relying on an IntegrityError that never fires.
+        playlist_count = (
+            db.query(func.count(func.distinct(PlaylistItem.playlistId)))
+            .filter(PlaylistItem.mediaId == media_id)
+            .scalar()
+        ) or 0
+        if playlist_count > 0:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Cannot delete media because it is used by {playlist_count} playlist(s). Remove it from those playlists first."
+            )
+
         provider = get_storage_provider()
-            
+
         try:
             db.delete(media)
             db.commit()
@@ -148,17 +176,15 @@ class MediaService:
         except IntegrityError:
             db.rollback()
             raise HTTPException(status_code=409, detail="Cannot delete media because it is referenced by one or more playlists.")
-            
+
         try:
             provider.delete(media.originalFile)
             logger.info(f"Media deleted from storage uri={media.originalFile}")
         except Exception as e:
             logger.error(f"Failed to delete media from storage uri={media.originalFile}: {str(e)}")
-            
+
         try:
-            import glob
-            cache_dir = os.path.join(os.getcwd(), "media_cache")
-            for f in glob.glob(os.path.join(cache_dir, f"{media_id}.*")):
+            for f in glob.glob(os.path.join(MEDIA_CACHE_DIR, f"{media_id}.*")):
                 if os.path.exists(f):
                     os.remove(f)
         except Exception as e:
