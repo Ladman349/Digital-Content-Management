@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/signage_chip_background" />
+    <corners android:radius="@dimen/signage_chip_radius" />
+    <stroke
+        android:width="@dimen/signage_card_stroke"
+        android:color="@color/signage_card_border" />
+</shape>

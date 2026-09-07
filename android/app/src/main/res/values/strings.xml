@@ -1,3 +1,65 @@
 <resources>
-    <string name="app_name">Digital Signage DEBUG</string>
+    <!-- app_name is supplied per product flavor via resValue() in app/build.gradle.kts -->
+
+    <string name="brand_wordmark">Digital Signage</string>
+    <string name="brand_mark_content_description">Digital Signage logo</string>
+    <string name="status_indicator_content_description">Current player status</string>
+
+    <!-- Status screen: primary lines -->
+    <string name="status_booting_title">Starting up</string>
+    <string name="status_registering_title">Registering with server…</string>
+    <string name="status_syncing_title">Checking for updates</string>
+    <string name="status_downloading_title">Downloading media %1$d of %2$d</string>
+    <string name="status_downloading_title_unknown">Downloading media</string>
+    <string name="status_offline_title">No network connection</string>
+    <string name="status_error_title">Something went wrong</string>
+    <string name="status_no_content_title">Waiting for content</string>
+    <string name="status_loading_title">Loading content</string>
+
+    <!-- Status screen: secondary lines -->
+    <string name="status_booting_subtitle">Preparing the player and restoring cached content.</string>
+    <string name="status_registering_subtitle">This device is requesting credentials from the management server.</string>
+    <string name="status_syncing_subtitle">Asking the server whether a newer playlist is available.</string>
+    <string name="status_downloading_subtitle">Media is being cached locally so playback keeps working offline.</string>
+    <string name="status_offline_subtitle">Check the network cable or Wi‑Fi. Cached content resumes automatically.</string>
+    <string name="status_no_content_subtitle">No playlist is assigned to this device yet. Assign one from the dashboard.</string>
+    <string name="status_loading_subtitle">The next item is being prepared.</string>
+
+    <!-- Bottom identity bar -->
+    <string name="identity_device_id_placeholder">Not registered</string>
+    <string name="identity_ip_unknown">IP unavailable</string>
+    <string name="identity_ip_format">IP %1$s</string>
+    <string name="identity_version_format">v%1$s</string>
+    <string name="identity_online">Online</string>
+    <string name="identity_offline">Offline</string>
+    <string name="identity_device_name_unknown">Unknown device</string>
+
+    <!-- Splash -->
+    <string name="splash_loading_content_description">Loading</string>
+
+    <!-- Maintenance dialog -->
+    <string name="maintenance_title">Maintenance mode</string>
+    <string name="maintenance_subtitle">Enter the maintenance PIN to unlock this device.</string>
+    <string name="maintenance_pin_hint">••••</string>
+    <string name="maintenance_unlock">Unlock</string>
+    <string name="maintenance_cancel">Cancel</string>
+    <string name="maintenance_hint">Long-press BACK on the remote to open this dialog</string>
+    <string name="maintenance_error_invalid_pin">Invalid PIN</string>
+    <string name="maintenance_error_not_provisioned">PIN not provisioned</string>
+    <string name="maintenance_error_too_short">Enter 4 to 8 digits</string>
+
+    <!-- Debug diagnostics panel (DEBUG builds only) -->
+    <string name="debug_panel_title">DIAGNOSTICS &amp; TELEMETRY PANEL</string>
+    <string name="debug_exception_details">EXCEPTION DETAILS:</string>
+    <string name="debug_copy_report">Copy Report</string>
+    <string name="debug_save_report">Save to Downloads</string>
+    <string name="debug_trigger_install">Trigger Install</string>
+    <string name="debug_report_copied">Diagnostics report copied</string>
+    <string name="debug_report_saved">Report saved: %1$s</string>
+    <string name="debug_report_save_failed">Save failed: %1$s</string>
+    <string name="debug_diagnostics_running">Running diagnostics…</string>
+    <string name="debug_diagnostics_complete">Diagnostics run complete.</string>
+    <string name="debug_state_format">State: %1$s</string>
+    <string name="debug_command_format">Command: %1$s</string>
+    <string name="debug_base_url_format">BASE_URL: %1$s</string>
 </resources>
