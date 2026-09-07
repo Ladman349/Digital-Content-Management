@@ -1,14 +1,16 @@
 import logging
 from fastapi import APIRouter, Depends, status, File, UploadFile, Form, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from uuid import UUID
+from pathlib import Path
 from typing import List, Optional
 
 from app.database.database import get_db
 
 logger = logging.getLogger("api")
 from app.schemas.app_update import AppUpdateResponse, AppUpdateCheckResponse
+from app.core.auth import require_admin, require_any_device
 from app.services.app_update_service import AppUpdateService
 
 router = APIRouter(
@@ -16,7 +18,7 @@ router = APIRouter(
     tags=["App Updates"]
 )
 
-@router.post("/", response_model=AppUpdateResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=AppUpdateResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_admin)])
 def create_update(
     file: UploadFile = File(...),
     version_name: str = Form(...),
@@ -36,11 +38,11 @@ def create_update(
         release_notes=release_notes
     )
 
-@router.get("/", response_model=List[AppUpdateResponse])
+@router.get("/", response_model=List[AppUpdateResponse], dependencies=[Depends(require_admin)])
 def get_all_updates(db: Session = Depends(get_db)):
     return AppUpdateService.get_all_updates(db)
 
-@router.get("/latest", response_model=AppUpdateResponse)
+@router.get("/latest", response_model=AppUpdateResponse, dependencies=[Depends(require_admin)])
 def get_latest_update(db: Session = Depends(get_db)):
     active_update = AppUpdateService.get_active_update(db)
     if not active_update:
@@ -54,7 +56,7 @@ def get_latest_update(db: Session = Depends(get_db)):
 def ping_updates():
     return {"status": "ok"}
 
-@router.get("/info")
+@router.get("/info", dependencies=[Depends(require_admin)])
 def get_app_updates_info(db: Session = Depends(get_db)):
     active_update = AppUpdateService.get_active_update(db)
     if not active_update:
@@ -69,47 +71,72 @@ def get_app_updates_info(db: Session = Depends(get_db)):
         "checksum": active_update.checksum_sha256
     }
 
-@router.get("/check", response_model=AppUpdateCheckResponse)
+# Players poll this for the active release.
+@router.get("/check", response_model=AppUpdateCheckResponse, dependencies=[Depends(require_any_device)])
 def check_for_update(version_code: int, db: Session = Depends(get_db)):
     return AppUpdateService.check_for_update(db, version_code)
 
-@router.get("/download/{filename}")
+@router.get("/download/{filename}", dependencies=[Depends(require_any_device)])
 def download_update(filename: str, db: Session = Depends(get_db)):
-    # 1. Retrieve the file path from service
-    file_path = AppUpdateService.get_apk_path(filename)
-    if not file_path.exists():
+    # 0. Reject anything that is not a plain leaf filename (no path traversal)
+    if not filename or "\\" in filename or Path(filename).name != filename:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Requested update file not found."
         )
-        
+
+    # 1. Locate the release record
+    update = AppUpdateService.get_by_filename(db, filename)
+    if not update:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Requested update file not found."
+        )
+
     # 2. Increment download count and update timestamp (best-effort)
     try:
         AppUpdateService.track_download(db, filename)
     except Exception as e:
         logger.warning(f"Failed to track download metrics for {filename}: {str(e)}", exc_info=True)
-    
+
+    # 3. Prefer object storage. Players follow the redirect, so the APK is served straight from
+    #    the bucket and stays available across backend redeploys.
+    storage_url = AppUpdateService.resolve_storage_url(update)
+    if storage_url:
+        return RedirectResponse(url=storage_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+
+    # 4. Fall back to the local staging copy (dev, or releases uploaded before object storage).
+    file_path = AppUpdateService.get_apk_path(filename)
+    if not file_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=(
+                "This release is recorded in the database but its APK is missing from disk and it "
+                "was never copied to object storage. Re-upload the release."
+            )
+        )
+
     # 3. Return FileResponse with custom disposition and no-cache headers
     return FileResponse(
         path=str(file_path),
         media_type="application/vnd.android.package-archive",
         headers={
-            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Disposition": f'attachment; filename="{filename}"',
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache",
             "Expires": "0"
         }
     )
 
-@router.put("/{id}/activate", response_model=AppUpdateResponse)
+@router.put("/{id}/activate", response_model=AppUpdateResponse, dependencies=[Depends(require_admin)])
 def activate_update(id: UUID, db: Session = Depends(get_db)):
     return AppUpdateService.activate_update(db, id)
 
-@router.put("/{id}/deactivate", response_model=AppUpdateResponse)
+@router.put("/{id}/deactivate", response_model=AppUpdateResponse, dependencies=[Depends(require_admin)])
 def deactivate_update(id: UUID, db: Session = Depends(get_db)):
     return AppUpdateService.deactivate_update(db, id)
 
-@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_admin)])
 def delete_update(id: UUID, db: Session = Depends(get_db)):
     AppUpdateService.delete_update(db, id)
     return None

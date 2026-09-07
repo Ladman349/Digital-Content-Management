@@ -4,7 +4,7 @@ from typing import List
 from sqlalchemy.orm import Session
 from app.models.device import Device
 from app.schemas.device import DeviceCreate, DeviceUpdate, HeartbeatRequest, DeviceStatusResponse, DeviceRegisterRequest, DeviceRegisterResponse
-from datetime import datetime
+from datetime import datetime, timezone
 
 class DeviceService:
 
@@ -53,6 +53,9 @@ class DeviceService:
             
         db.commit()
         db.refresh(device)
+        # Report the same freshness-derived status the list endpoint computes, so the
+        # response never echoes a stale value from the status column.
+        device.status = DeviceService.calculate_status(device.heartbeatAt)
         from app.core.cache import PlayerCache
         PlayerCache.invalidate_device(device_id)
         return device
@@ -67,6 +70,12 @@ class DeviceService:
             return False
             
         try:
+            # Junction rows are removed explicitly so behaviour does not depend
+            # on whether the DB FKs were created with ON DELETE CASCADE.
+            from app.models.device_playlist import DevicePlaylist
+            from app.models.schedule_device import ScheduleDevice
+            db.query(DevicePlaylist).filter(DevicePlaylist.deviceId == device_id).delete(synchronize_session=False)
+            db.query(ScheduleDevice).filter(ScheduleDevice.deviceId == device_id).delete(synchronize_session=False)
             db.delete(device)
             db.commit()
             from app.core.cache import PlayerCache
@@ -95,19 +104,21 @@ class DeviceService:
             return "Offline"
 
     @staticmethod
-    def update_last_seen(db: Session, device_id: str):
+    def update_last_seen(db: Session, device_id: str) -> bool:
+        """Bump heartbeat/lastSeen for an existing device. Returns False if no such device."""
         try:
-            from datetime import datetime, timezone
             current_time = int(datetime.now(timezone.utc).timestamp() * 1000)
-            db.query(Device).filter(Device.id == device_id).update({
+            updated = db.query(Device).filter(Device.id == device_id).update({
                 "heartbeatAt": current_time,
                 "lastSeenMs": current_time,
                 "lastSeen": "now",
                 "status": "Online"
-            })
+            }, synchronize_session=False)
             db.commit()
+            return updated > 0
         except Exception:
             db.rollback()
+            return False
 
     @staticmethod
     def process_heartbeat(db: Session, payload: HeartbeatRequest) -> Device:
@@ -158,7 +169,7 @@ class DeviceService:
                 return DeviceRegisterResponse(
                     deviceId=existing.id,
                     deviceToken=existing.deviceToken,
-                    backendTime=datetime.utcnow().isoformat() + "Z"
+                    backendTime=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
                 )
         
         new_id = f"TV-{uuid.uuid4().hex[:8].upper()}"
@@ -185,7 +196,7 @@ class DeviceService:
         return DeviceRegisterResponse(
             deviceId=device.id,
             deviceToken=device.deviceToken,
-            backendTime=datetime.utcnow().isoformat() + "Z"
+            backendTime=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
         )
 
     @staticmethod

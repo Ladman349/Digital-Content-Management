@@ -156,7 +156,16 @@ class PlaylistService:
         playlist = db.query(Playlist).filter(Playlist.id == playlist_id).first()
         if not playlist:
             return False
-            
+
+        # Guard explicitly: production FKs cascade, so IntegrityError never fires.
+        from app.models.schedule import Schedule
+        schedule_count = db.query(Schedule).filter(Schedule.playlistId == playlist_id).count()
+        if schedule_count > 0:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Cannot delete playlist because it is referenced by {schedule_count} schedule(s). Delete or reassign those schedules first."
+            )
+
         try:
             db.delete(playlist)
             db.commit()
