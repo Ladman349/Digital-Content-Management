@@ -16,6 +16,9 @@ class DigitalSignageApplication : Application(), Configuration.Provider {
     @Inject
     lateinit var workerFactory: HiltWorkerFactory
 
+    @Inject
+    lateinit var otaCoordinator: com.digitalsignage.player.core.ota.manager.OtaCoordinator
+
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
             .setWorkerFactory(workerFactory)
@@ -24,6 +27,9 @@ class DigitalSignageApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         logger.i("StartupTrace", "1. Application.onCreate() executed")
+
+        // OTA runs for the life of the process, not the life of an Activity.
+        otaCoordinator.start()
     }
 }
 
