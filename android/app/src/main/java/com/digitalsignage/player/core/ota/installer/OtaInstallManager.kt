@@ -8,6 +8,8 @@ import android.os.Build
 import android.util.Log
 import com.digitalsignage.player.core.kiosk.KioskManager
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,7 +32,14 @@ class OtaInstallManager @Inject constructor(
     private val _installState = MutableStateFlow<InstallResult>(InstallResult.Idle)
     val installState: StateFlow<InstallResult> = _installState.asStateFlow()
 
-    fun install(): InstallResult {
+    /**
+     * Parses, hashes and streams the APK; must never run on the main thread.
+     */
+    suspend fun install(): InstallResult = withContext(Dispatchers.IO) {
+        installBlocking()
+    }
+
+    private fun installBlocking(): InstallResult {
         _installState.value = InstallResult.Preparing
         Log.i(TAG, "[OTA] OtaInstallManager starting installation sequence...")
 
@@ -98,8 +107,14 @@ class OtaInstallManager @Inject constructor(
             return result
         }
 
-        // 2. Signature verification (diagnostic pre-check)
-        verifySignaturesDiagnostic(apkFile)
+        // 2. Signature verification (hard gate — a foreign signer can never replace this app)
+        val signatureError = verifySignatures(apkFile)
+        if (signatureError != null) {
+            Log.e(TAG, "[OTA] $signatureError")
+            val result = InstallResult.Failed(signatureError)
+            _installState.value = result
+            return result
+        }
 
         // 3. Select installation mechanism based on Device Owner status
         _installState.value = InstallResult.Installing
@@ -142,7 +157,16 @@ class OtaInstallManager @Inject constructor(
         return dpm?.isDeviceOwnerApp(context.packageName) ?: false
     }
 
-    private fun verifySignaturesDiagnostic(apkFile: File) {
+    /**
+     * Compares the full signer sets of the installed app and the downloaded APK.
+     *
+     * Returns a failure reason ONLY when both sets could be read, both are non-empty, and they
+     * share no certificate SHA-256 in common. When either set cannot be read (unparsable APK,
+     * platform quirk, exception) the check logs a warning and lets the install proceed — the
+     * platform installer performs its own signature enforcement, so a false rejection here would
+     * brick the update path for no gain.
+     */
+    private fun verifySignatures(apkFile: File): String? {
         try {
             val pm = context.packageManager
             val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -163,37 +187,36 @@ class OtaInstallManager @Inject constructor(
             // Get downloaded APK signatures
             val archiveInfo = pm.getPackageArchiveInfo(apkFile.absolutePath, flags)
             if (archiveInfo == null) {
-                Log.w(TAG, "[OTA] Signature pre-check: Failed to read downloaded APK signatures.")
-                return
+                Log.w(TAG, "[OTA] Signature check: Failed to read downloaded APK signatures. Proceeding.")
+                return null
             }
 
-            val currentSigs = getSignatures(appInfo)
-            val targetSigs = getSignatures(archiveInfo)
+            val currentHashes = getSignatures(appInfo).map { sha256Hex(it) }.toSet()
+            val targetHashes = getSignatures(archiveInfo).map { sha256Hex(it) }.toSet()
 
-            if (currentSigs.isEmpty() || targetSigs.isEmpty()) {
-                Log.w(TAG, "[OTA] Signature pre-check: Unable to extract signature lists.")
-                return
+            if (currentHashes.isEmpty() || targetHashes.isEmpty()) {
+                Log.w(TAG, "[OTA] Signature check: Unable to extract signature lists. Proceeding.")
+                return null
             }
 
-            // Compare first certificates as a best-effort diagnostic match
-            val currentCert = MessageDigest.getInstance("SHA-256").digest(currentSigs[0])
-            val targetCert = MessageDigest.getInstance("SHA-256").digest(targetSigs[0])
+            Log.i(TAG, "[OTA] Current app cert SHA-256 set: $currentHashes")
+            Log.i(TAG, "[OTA] Downloaded APK cert SHA-256 set: $targetHashes")
 
-            val currentHex = currentCert.joinToString("") { "%02x".format(it) }
-            val targetHex = targetCert.joinToString("") { "%02x".format(it) }
-
-            Log.i(TAG, "[OTA] Current app cert SHA-256: $currentHex")
-            Log.i(TAG, "[OTA] Downloaded APK cert SHA-256: $targetHex")
-
-            if (currentHex == targetHex) {
-                Log.i(TAG, "[OTA] Signature pre-check: Success. Signatures match.")
+            return if (currentHashes.intersect(targetHashes).isNotEmpty()) {
+                Log.i(TAG, "[OTA] Signature check: Success. Signer sets share a common certificate.")
+                null
             } else {
-                Log.w(TAG, "[OTA] Signature pre-check: Signature mismatch warning! Installation will likely fail.")
+                "Signature verification failed: the downloaded APK is signed by a different key " +
+                    "than the installed app. Installation aborted."
             }
         } catch (e: Exception) {
-            Log.w(TAG, "[OTA] Signature pre-check: Verification failed with exception: ${e.message}")
+            Log.w(TAG, "[OTA] Signature check: Verification failed with exception: ${e.message}. Proceeding.")
+            return null
         }
     }
+
+    private fun sha256Hex(bytes: ByteArray): String =
+        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 
     private fun getSignatures(packageInfo: PackageInfo): List<ByteArray> {
         val sigList = mutableListOf<ByteArray>()
