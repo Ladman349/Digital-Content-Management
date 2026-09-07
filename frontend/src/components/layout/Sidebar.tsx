@@ -1,203 +1,155 @@
-import {
-  Box,
-  Divider,
-  Drawer,
-  List,
-  Typography,
-  Paper,
-  Button,
-} from "@mui/material";
-
-import AutoAwesomeRoundedIcon from "@mui/icons-material/AutoAwesomeRounded";
-import HeadsetMicRoundedIcon from "@mui/icons-material/HeadsetMicRounded";
-
-import Logo from "./Logo";
-import SidebarItem from "./SidebarItem";
+import { Box, Drawer, IconButton, Tooltip, Typography } from "@mui/material";
+import { NavLink } from "react-router-dom";
+import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import { navigationItems } from "../../constants/navigation";
+import { useDevices, useSchedules } from "../../hooks/queries";
+import { isScheduleLiveNow } from "../../utils/schedule";
+import BrandMark from "./BrandMark";
 
-export const DRAWER_WIDTH = 280;
+export const SIDEBAR_WIDTH = 220;
+export const SIDEBAR_COLLAPSED_WIDTH = 60;
 
-export default function Sidebar({
-  open = true,
-  variant = "permanent",
-  onClose,
-  onItemClick,
-}: {
-  open?: boolean;
-  variant?: "permanent" | "temporary";
-  onClose?: () => void;
-  onItemClick?: () => void;
-}) {
-  const mainItems = navigationItems.filter(
-    (item) => item.section === "main"
+interface Props {
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
+  mobileOpen: boolean;
+  onMobileClose: () => void;
+}
+
+function NavBadge({ value, tone }: { value: number; tone: "error" | "success" }) {
+  if (!value) return null;
+  return (
+    <Box
+      component="span"
+      sx={(t) => ({
+        ml: "auto",
+        minWidth: 20,
+        height: 20,
+        px: 0.75,
+        borderRadius: 10,
+        fontSize: 11,
+        fontWeight: 700,
+        display: "grid",
+        placeItems: "center",
+        color: t.palette[tone].main,
+        bgcolor: `${t.palette[tone].main}1F`,
+        fontVariantNumeric: "tabular-nums",
+      })}
+    >
+      {value}
+    </Box>
   );
+}
 
-  const managementItems = navigationItems.filter(
-    (item) => item.section === "management"
+function NavList({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
+  const { data: devices = [] } = useDevices();
+  const { data: schedules = [] } = useSchedules();
+  const offline = devices.filter((d) => d.status === "Offline").length;
+  const liveNow = schedules.filter((s) => isScheduleLiveNow(s)).length;
+
+  return (
+    <Box component="nav" aria-label="Main" sx={{ display: "flex", flexDirection: "column", gap: 0.25, px: 1 }}>
+      {navigationItems.map((item) => {
+        const Icon = item.icon;
+        const badge = item.path === "/devices" ? <NavBadge value={offline} tone="error" /> : item.path === "/schedule" ? <NavBadge value={liveNow} tone="success" /> : null;
+        const link = (
+          <Box
+            key={item.path}
+            component={NavLink}
+            to={item.path}
+            end={item.path === "/"}
+            onClick={onNavigate}
+            sx={(t) => ({
+              display: "flex",
+              alignItems: "center",
+              gap: 1.25,
+              height: 36,
+              px: collapsed ? 0 : 1.25,
+              justifyContent: collapsed ? "center" : "flex-start",
+              borderRadius: 1.5,
+              color: "text.secondary",
+              textDecoration: "none",
+              fontSize: 13.5,
+              fontWeight: 600,
+              position: "relative",
+              "&:hover": { bgcolor: "surface.hover", color: "text.primary" },
+              "&.active": {
+                color: "primary.main",
+                bgcolor: `${t.palette.primary.main}14`,
+              },
+              "& svg": { fontSize: 20 },
+            })}
+          >
+            <Icon />
+            {!collapsed && <span>{item.title}</span>}
+            {!collapsed && badge}
+            {collapsed && badge && <Box sx={{ position: "absolute", top: 4, right: 6, "& > span": { minWidth: 16, height: 16, fontSize: 10, px: 0.5 } }}>{badge}</Box>}
+          </Box>
+        );
+        return collapsed ? (
+          <Tooltip key={item.path} title={item.title} placement="right">
+            {link}
+          </Tooltip>
+        ) : (
+          link
+        );
+      })}
+    </Box>
+  );
+}
+
+export default function Sidebar({ collapsed, onToggleCollapsed, mobileOpen, onMobileClose }: Props) {
+  const width = collapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH;
+
+  const content = (isMobile: boolean) => (
+    <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <Box sx={{ height: 52, display: "flex", alignItems: "center", px: collapsed && !isMobile ? 0 : 1.75, justifyContent: collapsed && !isMobile ? "center" : "flex-start", gap: 1.25 }}>
+        <BrandMark size={26} />
+        {(!collapsed || isMobile) && (
+          <Typography sx={{ fontWeight: 700, fontSize: 14.5, letterSpacing: "-0.01em" }}>Signage</Typography>
+        )}
+      </Box>
+      <Box sx={{ mt: 0.5 }}>
+        <NavList collapsed={collapsed && !isMobile} onNavigate={isMobile ? onMobileClose : undefined} />
+      </Box>
+      <Box sx={{ flex: 1 }} />
+      {!isMobile && (
+        <Box sx={{ p: 1, display: "flex", justifyContent: collapsed ? "center" : "flex-end" }}>
+          <Tooltip title={collapsed ? "Expand sidebar" : "Collapse sidebar"} placement="right">
+            <IconButton onClick={onToggleCollapsed} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
+              {collapsed ? <ChevronRightRoundedIcon fontSize="small" /> : <ChevronLeftRoundedIcon fontSize="small" />}
+            </IconButton>
+          </Tooltip>
+        </Box>
+      )}
+    </Box>
   );
 
   return (
-    <Drawer
-      variant={variant}
-      open={open}
-      onClose={onClose}
-      ModalProps={{
-        keepMounted: true,
-      }}
-      sx={{
-        width: variant === "permanent" ? (open ? DRAWER_WIDTH : 0) : 0,
-        flexShrink: 0,
-        transition: "width 0.2s",
-        "& .MuiDrawer-paper": {
-          width: DRAWER_WIDTH,
-          overflowX: "hidden",
-          transition: "width 0.2s",
-          border: "none",
-          color: "#fff",
-          background:
-            "linear-gradient(180deg,#0F172A 0%,#111827 100%)",
-        },
-      }}
-    >
-      <Logo />
-
-      <Box sx={{ mt: 2 }}>
-
-        <List>
-          {mainItems.map((item) => (
-            <SidebarItem
-              key={item.title}
-              title={item.title}
-              path={item.path}
-              icon={item.icon}
-              onClick={onItemClick}
-            />
-          ))}
-        </List>
-
-        {managementItems.length > 0 && (
-          <>
-            <Divider
-              sx={{
-                my: 3,
-                borderColor: "rgba(255,255,255,.08)",
-              }}
-            />
-
-            <Typography
-              sx={{
-                px: 3,
-                mb: 1,
-                color: "#64748B",
-                fontWeight: 700,
-                fontSize: 12,
-                letterSpacing: 1,
-              }}
-            >
-              MANAGEMENT
-            </Typography>
-
-            <List>
-              {managementItems.map((item) => (
-                <SidebarItem
-                  key={item.title}
-                  title={item.title}
-                  path={item.path}
-                  icon={item.icon}
-                  onClick={onItemClick}
-                />
-              ))}
-            </List>
-          </>
-        )}
+    <>
+      {/* Desktop */}
+      <Box
+        component="aside"
+        sx={{
+          display: { xs: "none", md: "block" },
+          width,
+          flexShrink: 0,
+          borderRight: 1,
+          borderColor: "surface.border",
+          bgcolor: "background.paper",
+          position: "sticky",
+          top: 0,
+          height: "100vh",
+          transition: "width .15s ease",
+        }}
+      >
+        {content(false)}
       </Box>
-
-      <Box sx={{ flexGrow: 1 }} />
-
-      <Box sx={{ p: 2 }}>
-
-        <Paper
-          sx={{
-            p: 3,
-            color: "#fff",
-            borderRadius: 4,
-
-            background:
-              "linear-gradient(135deg,#6C4CF1,#7C4DFF)",
-
-            boxShadow:
-              "0 20px 40px rgba(108,76,241,.35)",
-          }}
-        >
-          <AutoAwesomeRoundedIcon />
-
-          <Typography
-            sx={{
-              mt: 1,
-              fontWeight: 700,
-            }}
-          >
-            Pro Plan
-          </Typography>
-
-          <Typography
-            sx={{
-              mt: 1,
-              fontSize: 13,
-              opacity: .9,
-            }}
-          >
-            Unlock analytics, scheduling and advanced reporting.
-          </Typography>
-
-          <Button
-            fullWidth
-            variant="contained"
-            sx={{
-              mt: 3,
-              bgcolor: "#fff",
-              color: "#6C4CF1",
-
-              "&:hover": {
-                bgcolor: "#F3F4F6",
-              },
-            }}
-          >
-            Upgrade
-          </Button>
-        </Paper>
-
-        <Paper
-          sx={{
-            mt: 2,
-            p: 2.5,
-            bgcolor: "#182233",
-            color: "#fff",
-          }}
-        >
-          <HeadsetMicRoundedIcon />
-
-          <Typography
-            sx={{
-              mt: 1,
-              fontWeight: 700,
-            }}
-          >
-            Need Help?
-          </Typography>
-
-          <Typography
-            sx={{
-              fontSize: 13,
-              color: "#94A3B8",
-              mt: 1,
-            }}
-          >
-            Contact our support team anytime.
-          </Typography>
-        </Paper>
-
-      </Box>
-    </Drawer>
+      {/* Mobile */}
+      <Drawer open={mobileOpen} onClose={onMobileClose} sx={{ display: { md: "none" } }} slotProps={{ paper: { sx: { width: SIDEBAR_WIDTH } } }}>
+        {content(true)}
+      </Drawer>
+    </>
   );
 }
