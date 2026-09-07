@@ -76,7 +76,9 @@ CREATE INDEX ix_playlists_id ON playlists (id);
 CREATE TABLE playlist_items (
     id VARCHAR PRIMARY KEY,
     "playlistId" VARCHAR NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
-    "mediaId" VARCHAR NOT NULL REFERENCES media(id) ON DELETE CASCADE,
+    -- RESTRICT, not CASCADE: deleting media that is still used by a playlist must be refused
+    -- (the API returns 409) rather than silently emptying playlists and leaving totalDuration stale.
+    "mediaId" VARCHAR NOT NULL REFERENCES media(id) ON DELETE RESTRICT,
     "order" INTEGER NOT NULL DEFAULT 1,
     duration INTEGER NOT NULL DEFAULT 10,
     transition VARCHAR DEFAULT 'none'
@@ -95,7 +97,9 @@ CREATE TABLE device_playlists (
 CREATE TABLE schedules (
     id VARCHAR PRIMARY KEY,
     name VARCHAR NOT NULL,
-    "playlistId" VARCHAR NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
+    -- RESTRICT, not CASCADE: deleting a playlist that a schedule still references must be refused
+    -- (the API returns 409) rather than silently deleting the schedule with it.
+    "playlistId" VARCHAR NOT NULL REFERENCES playlists(id) ON DELETE RESTRICT,
     "startDate" DATE NOT NULL,
     "endDate" DATE NOT NULL,
     "startTime" TIME NOT NULL,

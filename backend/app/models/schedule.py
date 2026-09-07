@@ -8,7 +8,8 @@ class Schedule(Base):
 
     id = Column(String, primary_key=True, index=True)
     name = Column(String, nullable=False)
-    playlistId = Column(String, ForeignKey("playlists.id"), nullable=False)
+    # RESTRICT: a playlist referenced by a schedule must not be deletable out from under it.
+    playlistId = Column(String, ForeignKey("playlists.id", ondelete="RESTRICT"), nullable=False)
     startDate = Column(Date, nullable=False)
     endDate = Column(Date, nullable=False)
     startTime = Column(Time, nullable=False)
