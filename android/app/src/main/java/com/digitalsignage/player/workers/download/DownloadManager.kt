@@ -11,6 +11,7 @@ import com.digitalsignage.player.domain.model.DownloadState
 import com.digitalsignage.player.domain.model.PlaylistState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
@@ -30,9 +31,10 @@ class DownloadManager @Inject constructor(
     private val fileValidator: FileValidator,
     private val eventBus: PlayerEventBus,
     private val logger: Logger,
-    private val client: OkHttpClient
+    @javax.inject.Named("download") private val client: OkHttpClient
 ) {
-    private val scope = CoroutineScope(Dispatchers.IO)
+    // SupervisorJob: a failure in one download must never cancel the scope for the process lifetime.
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val isRunning = java.util.concurrent.atomic.AtomicBoolean(false)
     private val activeDownloads = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     
@@ -52,46 +54,57 @@ class DownloadManager @Inject constructor(
             eventBus.publish(PlayerEvent.DebugStage("3d. DownloadManager invoking processQueue()"))
             try {
                 processQueue()
+            } catch (e: Exception) {
+                logger.e("DownloadManager", "Download queue processing failed", e)
             } finally {
                 isRunning.set(false)
             }
         }
     }
-    
+
     private suspend fun processQueue() {
         eventBus.publish(PlayerEvent.DebugStage("3e. processQueue() while loop starting. isRunning = ${isRunning.get()}"))
         while (isRunning.get()) {
-            android.util.Log.i("SyncTrace", "Before getPendingTasks()")
-            val pendingSessions = database.downloadSessionDao().getPendingTasks()
-            android.util.Log.i("SyncTrace", "getPendingTasks returned ${pendingSessions.size}")
-            eventBus.publish(PlayerEvent.DebugStage("3f. Fetched pending tasks. Count: ${pendingSessions.size}"))
-            
-            if (pendingSessions.isEmpty()) {
-                eventBus.publish(PlayerEvent.DebugStage("3g. No pending tasks. Queue empty. Breaking loop and checking readiness."))
-                checkPlaylistReadiness()
-                break
-            }
-            
-            if (!storageManager.isStorageAvailable()) {
-                eventBus.publish(PlayerEvent.DebugStage("3h. Storage full. Returning early."))
-                logger.e("DownloadManager", "Storage full. Pausing downloads.")
-                pendingSessions.forEach {
-                    database.downloadSessionDao().updateSessionState(it.mediaId, DownloadState.PAUSED, System.currentTimeMillis())
+            try {
+                android.util.Log.i("SyncTrace", "Before getPendingTasks()")
+                val pendingSessions = database.downloadSessionDao().getPendingTasks()
+                android.util.Log.i("SyncTrace", "getPendingTasks returned ${pendingSessions.size}")
+                eventBus.publish(PlayerEvent.DebugStage("3f. Fetched pending tasks. Count: ${pendingSessions.size}"))
+
+                publishQueueProgress()
+
+                if (pendingSessions.isEmpty()) {
+                    eventBus.publish(PlayerEvent.DebugStage("3g. No pending tasks. Queue empty. Breaking loop and checking readiness."))
+                    checkPlaylistReadiness()
+                    break
                 }
-                break
-            }
-            
-            // Process concurrently up to maxConcurrentDownloads
-            val batch = pendingSessions.take(maxConcurrentDownloads)
-            eventBus.publish(PlayerEvent.DebugStage("3i. Processing batch of ${batch.size} items"))
-            
-            // Await all downloads in this batch
-            batch.map { session ->
-                scope.async {
-                    android.util.Log.i("SyncTrace", "Calling attemptDownload() for mediaId=${session.mediaId}")
-                    attemptDownload(session)
+
+                if (!storageManager.isStorageAvailable()) {
+                    eventBus.publish(PlayerEvent.DebugStage("3h. Storage full. Returning early."))
+                    logger.e("DownloadManager", "Storage full. Pausing downloads.")
+                    pendingSessions.forEach {
+                        database.downloadSessionDao().updateSessionState(it.mediaId, DownloadState.PAUSED, System.currentTimeMillis())
+                    }
+                    break
                 }
-            }.awaitAll()
+
+                // Process concurrently up to maxConcurrentDownloads
+                val batch = pendingSessions.take(maxConcurrentDownloads)
+                eventBus.publish(PlayerEvent.DebugStage("3i. Processing batch of ${batch.size} items"))
+
+                // Await all downloads in this batch
+                batch.map { session ->
+                    scope.async {
+                        android.util.Log.i("SyncTrace", "Calling attemptDownload() for mediaId=${session.mediaId}")
+                        attemptDownload(session)
+                    }
+                }.awaitAll()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                logger.e("DownloadManager", "Queue iteration failed; retrying shortly", e)
+                delay(5000L)
+            }
         }
     }
     
@@ -106,12 +119,14 @@ class DownloadManager @Inject constructor(
             logger.d("DownloadManager", "Download for mediaId=${session.mediaId} already active in memory. Skipping concurrent request.")
             return
         }
-        
-        val fileName = storageManager.getCanonicalFileName(session.mediaId, session.url)
-        val tempFile = File(storageManager.getMediaDirectory(), "${fileName}.tmp")
+
         var activeResponse: okhttp3.Response? = null
-        
+        var tempFile: File? = null
+
         try {
+            val fileName = storageManager.getCanonicalFileName(session.mediaId, session.url)
+            val tmp = File(storageManager.getMediaDirectory(), "${fileName}.tmp")
+            tempFile = tmp
             if (session.retryCount >= maxRetries) {
                 logger.e("DownloadManager", "Max retries reached for ${session.mediaId}")
                 database.downloadSessionDao().updateSessionState(session.mediaId, DownloadState.FAILED, now)
@@ -148,13 +163,13 @@ class DownloadManager @Inject constructor(
             
             val destFile = File(storageManager.getMediaDirectory(), fileName)
             android.util.Log.d("DownloadManager", "Destination: ${destFile.absolutePath}")
-            android.util.Log.i("DownloadTrace", "Step: destFile=${destFile.absolutePath}, tempFile=${tempFile.absolutePath}")
+            android.util.Log.i("DownloadTrace", "Step: destFile=${destFile.absolutePath}, tempFile=${tmp.absolutePath}")
             
             var downloadedBytes = session.currentByteOffset
-            if (tempFile.exists() && downloadedBytes == 0L) {
-                downloadedBytes = tempFile.length()
+            if (tmp.exists() && downloadedBytes == 0L) {
+                downloadedBytes = tmp.length()
             }
-            android.util.Log.i("DownloadTrace", "Step: if tempFile.exists() block finished")
+            android.util.Log.i("DownloadTrace", "Step: if tmp.exists() block finished")
             
             val requestBuilder = Request.Builder().url(session.url)
             val hasExistingLocalFile = destFile.exists() && destFile.length() > 0
@@ -214,51 +229,52 @@ class DownloadManager @Inject constructor(
                 val contentLength = body.contentLength()
                 val expectedSize = if (contentLength > 0) contentLength + downloadedBytes else null
                 
-                val inputStream: InputStream = body.byteStream()
-                android.util.Log.i("DownloadTrace", "Step: inputStream created")
-                val outputStream = FileOutputStream(tempFile, downloadedBytes > 0)
-                android.util.Log.i("DownloadTrace", "Step: outputStream created")
-                
-                val buffer = ByteArray(8192)
-                var read: Int
                 var totalRead = downloadedBytes
-                
-                var lastReportedProgress = 0
-                var lastDbSync = System.currentTimeMillis()
-                
-                var isFirstRead = true
-                android.util.Log.i("DownloadTrace", "Step: entering read loop")
-                while (inputStream.read(buffer).also { read = it } != -1) {
-                    if (isFirstRead) {
-                        android.util.Log.i("DownloadTrace", "Step: first bytes read")
-                        isFirstRead = false
-                    }
-                    if (enableThrottling) {
-                        // Sleep slightly to throttle bandwidth (placeholder logic)
-                        // delay(5)
-                    }
-                    
-                    outputStream.write(buffer, 0, read)
-                    totalRead += read
-                    
-                    val currentTime = System.currentTimeMillis()
-                    if (currentTime - lastDbSync > 5000) {
-                        database.downloadSessionDao().updateSessionOffset(session.mediaId, totalRead, currentTime)
-                        lastDbSync = currentTime
-                    }
-                    
-                    if (expectedSize != null && expectedSize > 0) {
-                        val progress = ((totalRead * 100) / expectedSize).toInt()
-                        if (progress - lastReportedProgress >= 5) {
-                            lastReportedProgress = progress
-                            eventBus.publish(PlayerEvent.DownloadProgress(session.mediaId, progress))
+
+                body.byteStream().use { inputStream: InputStream ->
+                    android.util.Log.i("DownloadTrace", "Step: inputStream created")
+                    FileOutputStream(tmp, downloadedBytes > 0).use { outputStream ->
+                        android.util.Log.i("DownloadTrace", "Step: outputStream created")
+
+                        val buffer = ByteArray(8192)
+                        var read: Int
+
+                        var lastReportedProgress = 0
+                        var lastDbSync = System.currentTimeMillis()
+
+                        var isFirstRead = true
+                        android.util.Log.i("DownloadTrace", "Step: entering read loop")
+                        while (inputStream.read(buffer).also { read = it } != -1) {
+                            if (isFirstRead) {
+                                android.util.Log.i("DownloadTrace", "Step: first bytes read")
+                                isFirstRead = false
+                            }
+                            if (enableThrottling) {
+                                // Sleep slightly to throttle bandwidth (placeholder logic)
+                                // delay(5)
+                            }
+
+                            outputStream.write(buffer, 0, read)
+                            totalRead += read
+
+                            val currentTime = System.currentTimeMillis()
+                            if (currentTime - lastDbSync > 5000) {
+                                database.downloadSessionDao().updateSessionOffset(session.mediaId, totalRead, currentTime)
+                                lastDbSync = currentTime
+                            }
+
+                            if (expectedSize != null && expectedSize > 0) {
+                                val progress = ((totalRead * 100) / expectedSize).toInt()
+                                if (progress - lastReportedProgress >= 5) {
+                                    lastReportedProgress = progress
+                                    eventBus.publish(PlayerEvent.DownloadProgress(session.mediaId, progress))
+                                }
+                            }
                         }
+                        outputStream.flush()
                     }
                 }
-                outputStream.flush()
-                outputStream.close()
-                inputStream.close()
-                
+
                 com.digitalsignage.player.core.performance.PerformanceMonitor.onDbWriteTriggered()
                 database.downloadSessionDao().updateSessionOffset(session.mediaId, totalRead, System.currentTimeMillis())
                 
@@ -266,7 +282,7 @@ class DownloadManager @Inject constructor(
                 com.digitalsignage.player.core.performance.PerformanceMonitor.onChecksumTriggered()
                 com.digitalsignage.player.core.performance.PerformanceMonitor.recordEvent("CHECKSUM", "Start validation for ${session.mediaId}")
                 val isValid = fileValidator.validateFile(
-                    file = tempFile,
+                    file = tmp,
                     expectedMd5 = session.expectedChecksumMd5,
                     expectedSha256 = session.expectedChecksumSha256,
                     expectedSize = if (expectedSize != null && expectedSize > 0L) expectedSize else null
@@ -274,9 +290,9 @@ class DownloadManager @Inject constructor(
                 com.digitalsignage.player.core.performance.PerformanceMonitor.recordEvent("CHECKSUM", "Completed validation for ${session.mediaId}. Result: $isValid")
                 
                 if (isValid) {
-                    val movedSuccessfully = if (tempFile.exists()) {
+                    val movedSuccessfully = if (tmp.exists()) {
                         if (destFile.exists()) destFile.delete()
-                        tempFile.renameTo(destFile) || (tempFile.copyTo(destFile, overwrite = true).also { tempFile.delete() }.exists())
+                        tmp.renameTo(destFile) || (tmp.copyTo(destFile, overwrite = true).also { tmp.delete() }.exists())
                     } else {
                         destFile.exists()
                     }
@@ -290,12 +306,12 @@ class DownloadManager @Inject constructor(
                         eventBus.publish(PlayerEvent.DownloadCompleted(session.mediaId))
                         checkPlaylistReadiness()
                     } else {
-                        tempFile.delete()
+                        tmp.delete()
                         destFile.delete()
                         throw Exception("File placement failed after download: file missing or empty")
                     }
                 } else {
-                    tempFile.delete()
+                    tmp.delete()
                     com.digitalsignage.player.core.performance.PerformanceMonitor.onDbWriteTriggered()
                     database.downloadSessionDao().updateSessionOffset(session.mediaId, 0L, System.currentTimeMillis())
                     throw Exception("Checksum or Size validation failed")
@@ -304,7 +320,7 @@ class DownloadManager @Inject constructor(
                 throw Exception("Empty response body")
             }
         } catch (e: Exception) {
-            if (tempFile.exists()) tempFile.delete()
+            if (tempFile?.exists() == true) tempFile.delete()
             android.util.Log.e("DownloadManager", "Download failed", e)
             android.util.Log.e("DownloadTrace", "Exception class: ${e.javaClass.name}, message: ${e.message}", e)
             logger.e("DownloadManager", "Failed downloading ${session.mediaId}", e)
@@ -325,7 +341,20 @@ class DownloadManager @Inject constructor(
         }
     }
     
+    /** Reports "N of M items on disk" for the pending playlist so the UI can show real progress. */
+    private suspend fun publishQueueProgress() {
+        try {
+            val pendingPlaylist = database.playlistDao().getPlaylistByState(PlaylistState.PENDING) ?: return
+            val items = database.playlistDao().getMediaItemsForPlaylist(pendingPlaylist.playlistId)
+            val completed = items.count { it.isDownloaded }
+            eventBus.publish(PlayerEvent.DownloadQueueProgress(completed, items.size))
+        } catch (e: Exception) {
+            logger.w("DownloadManager", "Failed to compute queue progress: ${e.message}")
+        }
+    }
+
     private suspend fun checkPlaylistReadiness() {
+        publishQueueProgress()
         com.digitalsignage.player.core.performance.PerformanceMonitor.onDbReadTriggered()
         val pendingPlaylist = database.playlistDao().getPlaylistByState(PlaylistState.PENDING)
         if (pendingPlaylist != null) {

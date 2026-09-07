@@ -64,7 +64,7 @@ class SilentInstaller @Inject constructor() {
             context.registerReceiver(
                 statusReceiver,
                 IntentFilter(ACTION_INSTALL_STATUS),
-                Context.RECEIVER_EXPORTED
+                Context.RECEIVER_NOT_EXPORTED
             )
         } else {
             @Suppress("UnspecifiedRegisterReceiverFlag")

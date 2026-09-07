@@ -11,6 +11,7 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import java.util.concurrent.TimeUnit
+import javax.inject.Named
 import javax.inject.Singleton
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -165,19 +166,51 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(): OkHttpClient {
+    fun provideOkHttpClient(authInterceptor: AuthInterceptor): OkHttpClient {
+        // Never log bodies: media downloads share this stack and BODY level buffers whole
+        // responses in memory; headers would also leak the device token in production.
         val logging = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
+            level = if (com.digitalsignage.player.BuildConfig.DEBUG) {
+                HttpLoggingInterceptor.Level.HEADERS
+            } else {
+                HttpLoggingInterceptor.Level.NONE
+            }
+            redactHeader("Authorization")
         }
         return OkHttpClient.Builder()
             .followRedirects(true)
             .followSslRedirects(true)
             .addInterceptor(logging)
             .addInterceptor(NetworkTraceInterceptor())
-            .addInterceptor(AuthInterceptor())
+            .addInterceptor(authInterceptor)
             .dns(LoggingDns)
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
+            .build()
+    }
+
+    /**
+     * Client for large file transfers (media + APK downloads). Shares the connection pool and
+     * DNS of the API client but carries no logging interceptors at all: the body logger would
+     * buffer an entire video or APK into memory before the stream reached the caller.
+     *
+     * The auth interceptor is dropped too. Download endpoints redirect to public object storage,
+     * and attaching the device token to a request bound for a third-party host would both leak
+     * the credential and risk the storage provider rejecting an Authorization header it did not
+     * expect. OkHttp strips Authorization across hosts on its own, but not adding it is safer
+     * than relying on that.
+     */
+    @Provides
+    @Singleton
+    @Named("download")
+    fun provideDownloadOkHttpClient(okHttpClient: OkHttpClient): OkHttpClient {
+        val builder = okHttpClient.newBuilder()
+        builder.interceptors().removeAll { it is HttpLoggingInterceptor || it is AuthInterceptor }
+        builder.networkInterceptors().removeAll { it is HttpLoggingInterceptor }
+        return builder
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .readTimeout(60, TimeUnit.SECONDS)
             .build()
     }
 

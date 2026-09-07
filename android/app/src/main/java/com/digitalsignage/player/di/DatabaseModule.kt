@@ -16,10 +16,11 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase {
-        val builder = Room.databaseBuilder(context, AppDatabase::class.java, "digital_signage.db")
-        if (com.digitalsignage.player.BuildConfig.DEBUG) {
-            builder.fallbackToDestructiveMigration()
-        }
-        return builder.build()
+        // The database is a rebuildable cache of server state (playlists, media metadata,
+        // download sessions). No Migration objects exist, so a schema bump must wipe and
+        // resync in every build type instead of crashing release upgrades.
+        return Room.databaseBuilder(context, AppDatabase::class.java, "digital_signage.db")
+            .fallbackToDestructiveMigration()
+            .build()
     }
 }

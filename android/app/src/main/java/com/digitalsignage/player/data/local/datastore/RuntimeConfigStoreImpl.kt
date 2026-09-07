@@ -6,9 +6,13 @@ import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import com.digitalsignage.player.core.config.RuntimeConfigStore
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import com.digitalsignage.player.data.remote.dto.DeviceOrientation
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -31,6 +35,25 @@ class RuntimeConfigStoreImpl @Inject constructor(
         val MAINTENANCE_PIN_HASH = stringPreferencesKey("maintenance_pin_hash")
         val MAINTENANCE_TIMEOUT = longPreferencesKey("maintenance_timeout")
         val DEVICE_ORIENTATION = stringPreferencesKey("device_orientation")
+
+        /** Default heartbeat interval in seconds (matches the backend default). */
+        const val DEFAULT_HEARTBEAT_INTERVAL_SECONDS = 60L
+    }
+
+    /**
+     * Synchronous view of the device token for the OkHttp interceptor. Refreshed from the
+     * DataStore on start-up and on every save/clear.
+     */
+    @Volatile
+    var cachedDeviceToken: String? = null
+        private set
+
+    private val storeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    init {
+        storeScope.launch {
+            context.dataStore.data.map { it[DEVICE_TOKEN] }.collect { cachedDeviceToken = it }
+        }
     }
 
     override val deviceToken: Flow<String?> = context.dataStore.data.map { prefs -> prefs[DEVICE_TOKEN] }
@@ -40,8 +63,8 @@ class RuntimeConfigStoreImpl @Inject constructor(
     val deploymentMode: Flow<String?> = context.dataStore.data.map { prefs -> prefs[DEPLOYMENT_MODE] }
     val maintenancePinHash: Flow<String?> = context.dataStore.data.map { prefs -> prefs[MAINTENANCE_PIN_HASH] }
     val maintenanceTimeoutMs: Flow<Long> = context.dataStore.data.map { prefs -> prefs[MAINTENANCE_TIMEOUT] ?: 60_000L }
-    
-    override val isRegistered: Flow<Boolean> = context.dataStore.data.map { prefs -> 
+
+    override val isRegistered: Flow<Boolean> = context.dataStore.data.map { prefs ->
         !prefs[DEVICE_TOKEN].isNullOrBlank() && !prefs[DEVICE_ID].isNullOrBlank()
     }
 
@@ -52,28 +75,44 @@ class RuntimeConfigStoreImpl @Inject constructor(
             prefs[HEARTBEAT_INTERVAL] = heartbeatInterval
             prefs[REGISTRATION_TIMESTAMP] = System.currentTimeMillis()
         }
+        cachedDeviceToken = token
     }
-    
+
     override suspend fun saveDeviceToken(token: String) {
         context.dataStore.edit { prefs ->
             prefs[DEVICE_TOKEN] = token
         }
+        cachedDeviceToken = token
     }
-    
+
     suspend fun clearRegistration() {
         context.dataStore.edit { prefs ->
             prefs.remove(DEVICE_TOKEN)
             prefs.remove(DEVICE_ID)
             prefs.remove(REGISTRATION_TIMESTAMP)
         }
+        cachedDeviceToken = null
     }
 
-    val heartbeatInterval: Flow<Long> = context.dataStore.data.map { it[HEARTBEAT_INTERVAL] ?: 15L }
+    suspend fun saveMaintenancePinHash(hash: String) {
+        context.dataStore.edit { prefs ->
+            prefs[MAINTENANCE_PIN_HASH] = hash
+        }
+    }
+
+    /** Heartbeat interval in seconds, as sent by the backend. */
+    val heartbeatInterval: Flow<Long> = context.dataStore.data.map { it[HEARTBEAT_INTERVAL] ?: DEFAULT_HEARTBEAT_INTERVAL_SECONDS }
     val playlistETag: Flow<String?> = context.dataStore.data.map { prefs -> prefs[PLAYLIST_ETAG] }
-    
+
     suspend fun savePlaylistETag(etag: String) {
         context.dataStore.edit { prefs ->
             prefs[PLAYLIST_ETAG] = etag
+        }
+    }
+
+    suspend fun clearPlaylistETag() {
+        context.dataStore.edit { prefs ->
+            prefs.remove(PLAYLIST_ETAG)
         }
     }
 
@@ -91,7 +130,7 @@ class RuntimeConfigStoreImpl @Inject constructor(
             }
         }
     }
-    
+
     suspend fun getOrCreateInstallationId(generator: () -> String): String {
         var id: String? = null
         context.dataStore.edit { prefs ->
@@ -104,6 +143,3 @@ class RuntimeConfigStoreImpl @Inject constructor(
         return id!!
     }
 }
-
-
-
