@@ -1,40 +1,76 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="300dp"
+    android:id="@+id/maintenanceCard"
+    android:layout_width="@dimen/signage_dialog_width"
     android:layout_height="wrap_content"
+    android:background="@drawable/bg_status_card"
     android:orientation="vertical"
-    android:padding="24dp">
+    android:padding="@dimen/signage_card_padding">
 
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Maintenance Mode"
-        android:textSize="20sp"
-        android:textStyle="bold"
-        android:gravity="center"
-        android:layout_marginBottom="16dp"/>
+        android:text="@string/maintenance_title"
+        style="@style/Text.Signage.DialogTitle" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/signage_gap_small"
+        android:text="@string/maintenance_subtitle"
+        style="@style/Text.Signage.StatusSecondary" />
 
     <EditText
         android:id="@+id/etPin"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/signage_gap_large"
+        android:hint="@string/maintenance_pin_hint"
+        android:importantForAutofill="no"
         android:inputType="numberPassword"
-        android:hint="Enter PIN"
-        android:gravity="center"
         android:maxLength="8"
-        android:layout_marginBottom="8dp"/>
+        style="@style/Text.Signage.PinEntry" />
 
     <TextView
         android:id="@+id/tvError"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textColor="#FF0000"
-        android:gravity="center"
-        android:layout_marginBottom="16dp"/>
+        android:layout_marginTop="@dimen/signage_gap"
+        android:visibility="invisible"
+        style="@style/Text.Signage.Error" />
 
-    <Button
-        android:id="@+id/btnSubmit"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Unlock"/>
+        android:layout_marginTop="@dimen/signage_gap"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btnSubmit"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="@dimen/signage_gap_small"
+            android:layout_weight="1"
+            android:nextFocusRight="@+id/btnCancel"
+            android:text="@string/maintenance_unlock"
+            style="@style/Widget.Signage.Button" />
+
+        <Button
+            android:id="@+id/btnCancel"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/signage_gap_small"
+            android:layout_weight="1"
+            android:nextFocusLeft="@+id/btnSubmit"
+            android:text="@string/maintenance_cancel"
+            style="@style/Widget.Signage.Button" />
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/signage_gap_large"
+        android:text="@string/maintenance_hint"
+        style="@style/Text.Signage.Hint" />
+
 </LinearLayout>
