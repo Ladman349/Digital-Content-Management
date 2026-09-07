@@ -1,172 +1,370 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { Box } from "@mui/material";
+import { useMemo, useState } from "react";
+import { Box, Button, Tooltip, Typography } from "@mui/material";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import PauseRoundedIcon from "@mui/icons-material/PauseRounded";
+import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
+import FilterListOffRoundedIcon from "@mui/icons-material/FilterListOffRounded";
+import EventRoundedIcon from "@mui/icons-material/EventRounded";
+import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
+import ViewListRoundedIcon from "@mui/icons-material/ViewListRounded";
+import ViewTimelineRoundedIcon from "@mui/icons-material/ViewTimelineRounded";
+import { ToggleButton, ToggleButtonGroup } from "@mui/material";
 import { useSnackbar } from "notistack";
+import { useSearchParams } from "react-router-dom";
 
-import SchedulePageHero from "../../components/schedule/SchedulePageHero";
-import ScheduleStatsRow from "../../components/schedule/ScheduleStatsRow";
-import ScheduleFiltersBar from "../../components/schedule/ScheduleFiltersBar";
-import ScheduleGrid from "../../components/schedule/ScheduleGrid";
-import ScheduleEditorDialog from "../../components/schedule/ScheduleEditorDialog";
-import SchedulePreviewDialog from "../../components/schedule/SchedulePreviewDialog";
-import ConfirmDialog from "../../components/common/ConfirmDialog";
+import PageHeader from "../../components/ui/PageHeader";
+import SearchField from "../../components/ui/SearchField";
+import SegmentedFilter from "../../components/ui/SegmentedFilter";
+import DataTable, { type Column, type SortState } from "../../components/ui/DataTable";
+import EmptyState from "../../components/ui/EmptyState";
+import ConfirmDialog from "../../components/ui/ConfirmDialog";
+import BulkBar from "../../components/ui/BulkBar";
+import StatusChip from "../../components/ui/StatusChip";
+import ScheduleEditor, { type ScheduleFormValues } from "./ScheduleEditor";
+import ScheduleDetailPanel from "./ScheduleDetailPanel";
+import DayTimeline from "./DayTimeline";
 
-import { useSchedules, usePlaylists, useDevices, useCreateSchedule, useUpdateSchedule, useDeleteSchedule } from "../../hooks/queries";
-import { hasActiveFilters, sortSchedules, findConflicts } from "../../components/schedule/utils";
+import { useCreateSchedule, useDeleteSchedules, useDevices, usePlaylists, useSchedules, useUpdateSchedule } from "../../hooks/queries";
+import { useFilterParam, useSelectParam } from "../../hooks/useSelectParam";
+import { usePersistedState } from "../../hooks/usePersistedState";
+import { useNow } from "../../hooks/useNow";
+import type { Schedule, ScheduleStatus } from "../../types/schedule";
+import { findConflicts, isScheduleExpired, isScheduleLiveNow } from "../../utils/schedule";
+import { formatDate, minutesOfDay } from "../../utils/format";
 
-import type { Schedule } from "../../types/schedule";
-import type { StatusFilter, SortField, SortDirection } from "../../components/schedule/types";
+type StatusFilter = "All" | "Live" | ScheduleStatus | "Conflict";
 
 export default function SchedulePage() {
   const { enqueueSnackbar } = useSnackbar();
+  const now = useNow(30_000);
+  const [params, setParams] = useSearchParams();
+  const { data: schedules = [], isLoading } = useSchedules();
+  const { data: playlists = [] } = usePlaylists();
+  const { data: devices = [] } = useDevices();
+  const createSchedule = useCreateSchedule();
+  const updateSchedule = useUpdateSchedule();
+  const deleteSchedules = useDeleteSchedules();
 
-  // ── React Query Hooks ───────────────────────────────────────────────────
-  const { data: items = [], isLoading: schedulesLoading, refetch, isRefetching: refreshing } = useSchedules();
-  const { data: playlists = [], isLoading: playlistsLoading } = usePlaylists();
-  const { data: devices = [], isLoading: devicesLoading } = useDevices();
-
-  const createScheduleMutation = useCreateSchedule();
-  const updateScheduleMutation = useUpdateSchedule();
-  const deleteScheduleMutation = useDeleteSchedule();
-
-  const loading = schedulesLoading || playlistsLoading || devicesLoading;
-
-  // ── Router state ─────────────────────────────────────────────────────────
-  const location = useLocation();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (location.state?.openCreateDialog) {
-      setEditorMode("create");
-      setEditorTarget(undefined);
-      setEditorOpen(true);
-      navigate(location.pathname, { replace: true, state: {} });
-    }
-  }, [location, navigate]);
-
-  // ── Filter & Sort State ──────────────────────────────────────────────────
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
-  const [sortField, setSortField] = useState<SortField>("startDate");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [statusFilter, setStatusFilter] = useFilterParam("status", "All");
+  const [deviceFilter, setDeviceFilter] = useFilterParam("device", "All");
+  const [sort, setSort] = useState<SortState>({ key: "time", direction: "asc" });
+  const [view, setView] = usePersistedState<"list" | "timeline">("signage.schedule.view", "list");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selectedId, setSelectedId] = useSelectParam();
+  // Seeded from ?new=1 so the dashboard button deep-links straight into the editor.
+  const [editorOpen, setEditorOpen] = useState(() => params.get("new") === "1");
+  const [editing, setEditing] = useState<Schedule | null>(null);
+  const [duplicating, setDuplicating] = useState<Schedule | null>(null);
+  const [deleteIds, setDeleteIds] = useState<string[] | null>(null);
 
-  // ── Dialog State ────────────────────────────────────────────────
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [editorMode, setEditorMode] = useState<"create" | "edit">("create");
-  const [editorTarget, setEditorTarget] = useState<Schedule | undefined>(undefined);
-  
-  const [previewTarget, setPreviewTarget] = useState<Schedule | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<Schedule | null>(null);
+  const closeEditor = () => {
+    setEditorOpen(false);
+    if (params.has("new")) {
+      setParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete("new");
+          return next;
+        },
+        { replace: true },
+      );
+    }
+  };
 
-  // ── Derived Data ─────────────────────────────────────────────────────────
-  const activeCount = useMemo(() => items.filter(i => i.status === "Active").length, [items]);
-  const pausedCount = useMemo(() => items.filter(i => i.status === "Paused").length, [items]);
-  
-  const conflictingIds = useMemo(() => {
-    const active = items.filter(i => i.status === "Active");
+  const playlistById = useMemo(() => new Map(playlists.map((p) => [p.id, p])), [playlists]);
+  const deviceById = useMemo(() => new Map(devices.map((d) => [d.id, d])), [devices]);
+
+  const conflictIds = useMemo(() => {
+    const active = schedules.filter((s) => s.status === "Active");
     const ids = new Set<string>();
-    active.forEach(s => {
-      if (findConflicts(active, s).length > 0) ids.add(s.id);
+    active.forEach((s) => {
+      if (findConflicts(active, s).length) ids.add(s.id);
     });
-    return Array.from(ids);
-  }, [items]);
+    return ids;
+  }, [schedules]);
 
-  const filtersActive = hasActiveFilters(search, statusFilter);
+  const liveIds = useMemo(() => new Set(schedules.filter((s) => isScheduleLiveNow(s, new Date(now))).map((s) => s.id)), [schedules, now]);
 
-  const filteredItems = useMemo(() => {
-    let result = items;
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      result = result.filter(i => i.name.toLowerCase().includes(q));
-    }
-    if (statusFilter === "Conflict") {
-      result = result.filter(i => conflictingIds.includes(i.id));
-    } else if (statusFilter !== "All") {
-      result = result.filter(i => i.status === statusFilter);
-    }
-    return sortSchedules(result, sortField, sortDirection);
-  }, [items, search, statusFilter, sortField, sortDirection, conflictingIds]);
+  const counts = useMemo(
+    () => ({
+      All: schedules.length,
+      Live: liveIds.size,
+      Active: schedules.filter((s) => s.status === "Active").length,
+      Draft: schedules.filter((s) => s.status === "Draft").length,
+      Paused: schedules.filter((s) => s.status === "Paused").length,
+      Conflict: conflictIds.size,
+    }),
+    [schedules, liveIds, conflictIds],
+  );
 
-  // ── Handlers ─────────────────────────────────────────────────────────────
-  const handleRefresh = useCallback(async () => {
-    await refetch();
-    enqueueSnackbar("Schedules refreshed", { variant: "success" });
-  }, [refetch, enqueueSnackbar]);
+  const rows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    let list = schedules;
+    if (q) list = list.filter((s) => s.name.toLowerCase().includes(q) || (playlistById.get(s.playlistId)?.name.toLowerCase().includes(q) ?? false));
+    if (deviceFilter !== "All") list = list.filter((s) => s.deviceIds.includes(deviceFilter));
+    if (statusFilter === "Live") list = list.filter((s) => liveIds.has(s.id));
+    else if (statusFilter === "Conflict") list = list.filter((s) => conflictIds.has(s.id));
+    else if (statusFilter !== "All") list = list.filter((s) => s.status === statusFilter);
+    const dir = sort.direction === "asc" ? 1 : -1;
+    return [...list].sort((a, b) => {
+      switch (sort.key) {
+        case "name":
+          return a.name.localeCompare(b.name) * dir;
+        case "dates":
+          return a.startDate.localeCompare(b.startDate) * dir;
+        case "screens":
+          return (a.deviceIds.length - b.deviceIds.length) * dir;
+        default:
+          return (minutesOfDay(a.startTime) - minutesOfDay(b.startTime)) * dir;
+      }
+    });
+  }, [schedules, search, statusFilter, deviceFilter, sort, liveIds, conflictIds, playlistById]);
 
-  const handleClearFilters = useCallback(() => {
+  const selectedSchedule = useMemo(() => schedules.find((s) => s.id === selectedId) ?? null, [schedules, selectedId]);
+  const selectedIndex = rows.findIndex((s) => s.id === selectedId);
+  const filtersActive = Boolean(search.trim()) || statusFilter !== "All" || deviceFilter !== "All";
+  const clearFilters = () => {
     setSearch("");
     setStatusFilter("All");
-  }, []);
+    setDeviceFilter("All");
+  };
 
-  const handleStatClick = useCallback((filter: StatusFilter) => {
-    setStatusFilter(filter === "All" ? "All" : filter);
-    setSearch("");
-  }, []);
-
-  // ── Editor Handlers ──────────────────────────────────────────────────────
-  const handleCreate = useCallback(() => {
-    setEditorMode("create");
-    setEditorTarget(undefined);
+  const openEditor = (s: Schedule | null, dup: Schedule | null = null) => {
+    setEditing(s);
+    setDuplicating(dup);
     setEditorOpen(true);
-  }, []);
+  };
 
-  const handleEdit = useCallback((schedule: Schedule) => {
-    setEditorMode("edit");
-    setEditorTarget(schedule);
-    setEditorOpen(true);
-  }, []);
-
-  const handleDuplicate = useCallback((schedule: Schedule) => {
-    const dup: Schedule = {
-      ...schedule,
-      id: `SCH-NEW-${Date.now()}`,
-      name: `${schedule.name} (Copy)`,
-      status: "Draft",
-    };
-    setEditorMode("create");
-    setEditorTarget(dup);
-    setEditorOpen(true);
-  }, []);
-
-  const handleSaveEditor = useCallback(async (schedule: Schedule) => {
+  const save = async (values: ScheduleFormValues) => {
     try {
-      const isExisting = items.some(s => s.id === schedule.id);
-
-      if (isExisting) {
-        await updateScheduleMutation.mutateAsync({ id: schedule.id, data: schedule });
+      if (editing) {
+        await updateSchedule.mutateAsync({ id: editing.id, data: values });
+        enqueueSnackbar("Schedule saved", { variant: "success" });
       } else {
-        await createScheduleMutation.mutateAsync(schedule);
+        const created = await createSchedule.mutateAsync(values);
+        enqueueSnackbar("Schedule created", { variant: "success" });
+        setSelectedId(created.id);
       }
-      enqueueSnackbar(`Schedule "${schedule.name}" saved successfully`, { variant: "success" });
-      setEditorOpen(false);
-    } catch (err: any) {
-      enqueueSnackbar(err.message || "Failed to save schedule", { variant: "error" });
+      closeEditor();
+    } catch (e) {
+      enqueueSnackbar((e as Error).message, { variant: "error" });
     }
-  }, [items, updateScheduleMutation, createScheduleMutation, enqueueSnackbar]);
+  };
 
-  // ── Delete Handlers ──────────────────────────────────────────────────────
-  const handleConfirmDelete = useCallback(async () => {
-    if (!deleteTarget) return;
+  const confirmDelete = async () => {
+    if (!deleteIds) return;
     try {
-      await deleteScheduleMutation.mutateAsync(deleteTarget.id);
-      enqueueSnackbar(`Deleted "${deleteTarget.name}"`, { variant: "success" });
-    } catch (err: any) {
-      enqueueSnackbar(err.message || "Failed to delete schedule", { variant: "error" });
+      const result = await deleteSchedules.mutateAsync(deleteIds);
+      if (result.failed.length) enqueueSnackbar(`${result.ok.length} deleted, ${result.failed.length} failed`, { variant: "warning" });
+      else enqueueSnackbar(`${result.ok.length} schedule${result.ok.length === 1 ? "" : "s"} deleted`, { variant: "success" });
+      setSelected(new Set());
+      if (selectedId && result.ok.includes(selectedId)) setSelectedId(null);
+    } catch (e) {
+      enqueueSnackbar((e as Error).message, { variant: "error" });
     } finally {
-      setDeleteTarget(null);
+      setDeleteIds(null);
     }
-  }, [deleteTarget, deleteScheduleMutation, enqueueSnackbar]);
+  };
+
+  const bulkStatus = async (status: ScheduleStatus) => {
+    const ids = [...selected];
+    const results = await Promise.allSettled(ids.map((id) => updateSchedule.mutateAsync({ id, data: { status } })));
+    const failed = results.filter((r) => r.status === "rejected").length;
+    enqueueSnackbar(failed ? `${ids.length - failed} updated, ${failed} refused by the server (conflicting windows)` : `${ids.length} schedule${ids.length === 1 ? "" : "s"} set to ${status}`, { variant: failed ? "warning" : "success" });
+  };
+
+  const columns: Column<Schedule>[] = [
+    {
+      key: "name",
+      label: "Schedule",
+      sortable: true,
+      render: (s) => (
+        <Box sx={{ minWidth: 0 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+            <Typography sx={{ fontWeight: 600, fontSize: 13 }} noWrap title={s.name}>
+              {s.name}
+            </Typography>
+            {liveIds.has(s.id) && <StatusChip label="Live" tone="success" pulse />}
+            {conflictIds.has(s.id) && (
+              <Tooltip title="Overlaps another active schedule on a shared screen">
+                <WarningAmberRoundedIcon sx={{ fontSize: 15, color: "warning.main" }} />
+              </Tooltip>
+            )}
+          </Box>
+          <Typography variant="caption" color="text.secondary" noWrap>
+            {playlistById.get(s.playlistId)?.name ?? `Missing playlist ${s.playlistId}`}
+          </Typography>
+        </Box>
+      ),
+    },
+    { key: "status", label: "Status", width: 100, render: (s) => <StatusChip label={s.status} /> },
+    {
+      key: "time",
+      label: "Daily window",
+      width: 150,
+      sortable: true,
+      render: (s) => (
+        <Typography variant="body2" sx={{ fontVariantNumeric: "tabular-nums" }}>
+          {s.startTime}–{s.endTime}
+          <Typography component="span" variant="caption" color="text.secondary">
+            {" "}
+            · {s.repeat}
+          </Typography>
+        </Typography>
+      ),
+    },
+    {
+      key: "dates",
+      label: "Runs",
+      width: 170,
+      sortable: true,
+      hideBelow: "md",
+      render: (s) => (
+        <Typography variant="body2" color={isScheduleExpired(s, new Date(now)) ? "error.main" : "text.secondary"}>
+          {s.startDate === s.endDate ? formatDate(s.startDate) : `${formatDate(s.startDate)} → ${formatDate(s.endDate)}`}
+        </Typography>
+      ),
+    },
+    {
+      key: "screens",
+      label: "Screens",
+      width: 150,
+      sortable: true,
+      hideBelow: "lg",
+      render: (s) => (
+        <Typography variant="body2" color="text.secondary" noWrap>
+          {s.deviceIds.length === 0 ? "—" : s.deviceIds.length <= 2 ? s.deviceIds.map((id) => deviceById.get(id)?.name ?? id).join(", ") : `${s.deviceIds.length} screens`}
+        </Typography>
+      ),
+    },
+    { key: "priority", label: "Priority", width: 100, hideBelow: "md", render: (s) => <StatusChip label={s.priority} dot={false} /> },
+  ];
 
   return (
     <Box>
-      <SchedulePageHero totalSchedules={activeCount} onCreate={handleCreate} onRefresh={handleRefresh} refreshing={refreshing} />
-      <ScheduleStatsRow total={items.length} active={activeCount} paused={pausedCount} conflicts={conflictingIds.length} onStatClick={handleStatClick} loading={loading} />
-      <ScheduleFiltersBar search={search} statusFilter={statusFilter} sortField={sortField} sortDirection={sortDirection} resultCount={filteredItems.length} refreshing={refreshing} onSearchChange={setSearch} onStatusFilterChange={setStatusFilter} onSortChange={(field, dir) => { setSortField(field); setSortDirection(dir); }} onClearFilters={handleClearFilters} onRefresh={handleRefresh} />
-      <ScheduleGrid schedules={filteredItems} playlists={playlists} conflictingIds={conflictingIds} hasActiveFilters={filtersActive} loading={loading} onEdit={handleEdit} onDuplicate={handleDuplicate} onPreview={setPreviewTarget} onDelete={setDeleteTarget} onClearFilters={handleClearFilters} onCreate={handleCreate} />
-      
-      <ScheduleEditorDialog open={editorOpen} mode={editorMode} initialSchedule={editorTarget} existingSchedules={items} playlists={playlists} devices={devices} onClose={() => setEditorOpen(false)} onSave={handleSaveEditor} />
-      <SchedulePreviewDialog open={!!previewTarget} schedule={previewTarget} playlists={playlists} devices={devices} onClose={() => setPreviewTarget(null)} />
-      <ConfirmDialog open={!!deleteTarget} title="Delete Schedule" message={deleteTarget ? `Are you sure you want to delete "${deleteTarget.name}"? This action cannot be undone.` : ""} onConfirm={handleConfirmDelete} onClose={() => setDeleteTarget(null)} />
+      <PageHeader
+        title="Schedule"
+        meta={!isLoading && <span>{counts.Live} live now · {counts.Active} active · {counts.All} total</span>}
+        actions={
+          <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => openEditor(null)}>
+            New schedule
+          </Button>
+        }
+      >
+        <SearchField value={search} onChange={setSearch} placeholder="Search schedules…" />
+        <SegmentedFilter<StatusFilter>
+          ariaLabel="Filter by status"
+          value={statusFilter as StatusFilter}
+          onChange={setStatusFilter}
+          options={[
+            { value: "All", label: "All", count: counts.All },
+            { value: "Live", label: "Live now", count: counts.Live },
+            { value: "Active", label: "Active", count: counts.Active },
+            { value: "Paused", label: "Paused", count: counts.Paused },
+            { value: "Draft", label: "Draft", count: counts.Draft },
+            { value: "Conflict", label: "Conflicts", count: counts.Conflict },
+          ]}
+        />
+        {filtersActive && (
+          <Button size="small" onClick={clearFilters} startIcon={<FilterListOffRoundedIcon />}>
+            Clear
+          </Button>
+        )}
+        <Box sx={{ flex: 1 }} />
+        <Typography variant="body2" color="text.secondary">
+          {rows.length === schedules.length ? `${rows.length} schedules` : `${rows.length} of ${schedules.length}`}
+        </Typography>
+        <ToggleButtonGroup size="small" exclusive value={view} onChange={(_, v) => v && setView(v)} aria-label="View mode">
+          <ToggleButton value="list" aria-label="List view">
+            <ViewListRoundedIcon sx={{ fontSize: 18 }} />
+          </ToggleButton>
+          <ToggleButton value="timeline" aria-label="Day timeline view">
+            <ViewTimelineRoundedIcon sx={{ fontSize: 18 }} />
+          </ToggleButton>
+        </ToggleButtonGroup>
+      </PageHeader>
+
+      <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          {view === "timeline" ? (
+            <DayTimeline schedules={rows} devices={devices} playlists={playlists} now={now} selectedId={selectedId} onSelect={setSelectedId} deviceFilter={deviceFilter} onDeviceFilter={setDeviceFilter} />
+          ) : (
+            <DataTable<Schedule>
+              columns={columns}
+              rows={rows}
+              rowKey={(s) => s.id}
+              loading={isLoading}
+              selectable
+              selected={selected}
+              onSelectionChange={setSelected}
+              onRowClick={(s) => setSelectedId(s.id === selectedId ? null : s.id)}
+              activeRowKey={selectedId}
+              sort={sort}
+              onSortChange={setSort}
+              rowHighlight={(s) => (conflictIds.has(s.id) ? "warning" : undefined)}
+              emptyState={
+                filtersActive ? (
+                  <EmptyState icon={FilterListOffRoundedIcon} title="No schedules match" description="Try a different search or clear the filters." actionLabel="Clear filters" onAction={clearFilters} />
+                ) : (
+                  <EmptyState icon={EventRoundedIcon} title="No schedules yet" description="A schedule plays a published playlist on chosen screens during a daily time window. Without one, screens play their directly assigned playlist." actionLabel="New schedule" onAction={() => openEditor(null)} />
+                )
+              }
+            />
+          )}
+
+          <BulkBar count={selected.size} noun="schedule" onClear={() => setSelected(new Set())} onSelectAll={() => setSelected(new Set(rows.map((s) => s.id)))} total={rows.length}>
+            <Button variant="outlined" startIcon={<PlayArrowRoundedIcon />} onClick={() => bulkStatus("Active")}>
+              Activate
+            </Button>
+            <Button variant="outlined" startIcon={<PauseRoundedIcon />} onClick={() => bulkStatus("Paused")}>
+              Pause
+            </Button>
+            <Button variant="outlined" color="error" startIcon={<DeleteOutlineRoundedIcon />} onClick={() => setDeleteIds([...selected])}>
+              Delete
+            </Button>
+          </BulkBar>
+        </Box>
+
+        <ScheduleDetailPanel
+          schedule={selectedSchedule}
+          playlists={playlists}
+          devices={devices}
+          allSchedules={schedules}
+          now={now}
+          onClose={() => setSelectedId(null)}
+          onPrev={selectedIndex > 0 ? () => setSelectedId(rows[selectedIndex - 1].id) : undefined}
+          onNext={selectedIndex >= 0 && selectedIndex < rows.length - 1 ? () => setSelectedId(rows[selectedIndex + 1].id) : undefined}
+          position={selectedIndex >= 0 ? `${selectedIndex + 1} / ${rows.length}` : undefined}
+          onEdit={(s) => openEditor(s)}
+          onDuplicate={(s) => openEditor(null, s)}
+          onDelete={(s) => setDeleteIds([s.id])}
+        />
+      </Box>
+
+      {editorOpen && (
+        <ScheduleEditor
+          key={editing?.id ?? duplicating?.id ?? "new"}
+          schedule={editing}
+          duplicateOf={duplicating}
+          playlists={playlists}
+          devices={devices}
+          allSchedules={schedules}
+          saving={createSchedule.isPending || updateSchedule.isPending}
+          onClose={closeEditor}
+          onSave={save}
+        />
+      )}
+
+      <ConfirmDialog
+        open={Boolean(deleteIds)}
+        title={deleteIds && deleteIds.length > 1 ? `Delete ${deleteIds.length} schedules?` : "Delete schedule?"}
+        message="Screens fall back to their directly assigned playlist once the schedule is gone."
+        loading={deleteSchedules.isPending}
+        onConfirm={confirmDelete}
+        onClose={() => setDeleteIds(null)}
+      />
     </Box>
   );
 }

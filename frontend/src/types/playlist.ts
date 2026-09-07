@@ -1,9 +1,9 @@
 export type PlaylistStatus = "Draft" | "Published" | "Archived";
 
 export interface PlaylistItem {
-  id: string; // Unique ID for the timeline entry
-  mediaId: string; // References MediaItem
-  duration: number; // Playback duration in seconds
+  id: string;
+  mediaId: string;
+  duration: number;
 }
 
 export interface Playlist {
@@ -11,8 +11,11 @@ export interface Playlist {
   name: string;
   description: string;
   items: PlaylistItem[];
-  assignedDeviceIds: string[]; // References Device IDs
-  totalDuration: number; // Sum of items duration
+  assignedDeviceIds: string[];
+  totalDuration: number;
   status: PlaylistStatus;
   updatedAt: number;
 }
+
+export type PlaylistCreatePayload = Omit<Playlist, "id">;
+export type PlaylistUpdatePayload = Partial<Omit<Playlist, "id">>;
