@@ -80,11 +80,30 @@ cd android && .\gradlew.bat assembleRelease
 The SHA-256 fingerprint must differ from the old key's. If it matches, the build is still picking up
 the old keystore and nothing has actually rotated.
 
-## 5. Destroy the old key
+## 5. Destroy the old key — but not yet
 
-Once a screen is running a build signed with the new key, the old keystore has no legitimate use.
-Delete `android/app/release.jks` from disk and from any backup that holds it. Keeping it around
-only preserves the ability to sign as the compromised identity.
+The old keystore keeps exactly one legitimate use until the rollout finishes: signing a final
+build that the *currently installed* screens will still accept. If you ever want to push a last
+over-the-air update to the old fleet — a notice, a version bump, anything — it has to be signed
+with the old key, because that is the signature those screens trust.
+
+So keep `android/app/release.jks` until at least one screen is confirmed running the new key, then
+delete it from disk and from every backup that holds it. After that it only preserves someone
+else's ability to sign as the compromised identity.
+
+## 5a. Signature schemes
+
+`build.gradle.kts` pins the schemes explicitly:
+
+- **v1 off.** JAR signing only matters below Android 7.0 and `minSdk` is 24, so it buys nothing and
+  slows installation.
+- **v2 on.** This is what actually verifies the APK on every device this project supports.
+- **v3 on.** This carries the certificate's rotation lineage. The original build shipped v2 only,
+  which is part of why this rotation costs a physical visit to every screen: without v3 there is no
+  signed proof that the new key supersedes the old one. With it enabled now, a future rotation can
+  be delivered over the air instead.
+
+Confirm all three with `apksigner verify --verbose` after any change to the signing config.
 
 ## 6. Roll out
 
