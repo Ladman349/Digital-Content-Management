@@ -10,20 +10,27 @@ interface Props {
   compact?: boolean;
 }
 
+/** An unlit slat: the board's empty state keeps the row shape rather than dropping into a blank panel. */
 export default function EmptyState({ icon: Icon, title, description, actionLabel, onAction, compact }: Props) {
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", py: compact ? 4 : 7, px: 3 }}>
-      <Box sx={{ width: 44, height: 44, borderRadius: 2, bgcolor: "surface.hover", display: "grid", placeItems: "center", mb: 1.5, color: "text.secondary" }}>
-        <Icon sx={{ fontSize: 24 }} />
-      </Box>
-      <Typography sx={{ fontWeight: 600, fontSize: 14 }}>{title}</Typography>
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        textAlign: "center",
+        py: compact ? 4 : 7,
+        px: 3,
+        bgcolor: "board.cell",
+      }}
+    >
+      <Icon sx={{ fontSize: 26, color: "text.disabled", mb: 1.5 }} />
+      <Typography sx={{ fontSize: 15, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.02em" }}>{title}</Typography>
       {description && (
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, maxWidth: 380 }}>
-          {description}
-        </Typography>
+        <Typography sx={{ mt: 0.75, maxWidth: 420, fontSize: 12.5, color: "text.secondary", lineHeight: 1.55 }}>{description}</Typography>
       )}
       {actionLabel && onAction && (
-        <Button variant="contained" onClick={onAction} sx={{ mt: 2 }}>
+        <Button variant="contained" onClick={onAction} sx={{ mt: 2.5 }}>
           {actionLabel}
         </Button>
       )}

@@ -18,6 +18,7 @@ import ConfirmDialog from "../../components/ui/ConfirmDialog";
 import BulkBar from "../../components/ui/BulkBar";
 import StatusChip from "../../components/ui/StatusChip";
 import MediaThumb from "../../components/ui/MediaThumb";
+import RowLead from "../../components/ui/RowLead";
 import PlaylistEditor from "./PlaylistEditor";
 import PlaylistDetailPanel from "./PlaylistDetailPanel";
 
@@ -172,27 +173,24 @@ export default function PlaylistsPage() {
       label: "Playlist",
       sortable: true,
       render: (p) => (
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, minWidth: 0 }}>
-          <Box sx={{ display: "flex", gap: 0.25 }}>
-            {p.items.slice(0, 3).map((i) => (
-              <MediaThumb key={i.id} media={mediaById.get(i.mediaId)} width={26} height={30} />
-            ))}
-            {p.items.length === 0 && <MediaThumb media={null} width={26} height={30} />}
-          </Box>
-          <Box sx={{ minWidth: 0 }}>
-            <Typography sx={{ fontWeight: 600, fontSize: 13 }} noWrap title={p.name}>
-              {p.name}
-            </Typography>
-            <Typography variant="caption" color="text.secondary" noWrap>
-              {p.description || p.id}
-            </Typography>
-          </Box>
-        </Box>
+        <RowLead
+          before={
+            <Box sx={{ display: "flex", gap: "2px" }}>
+              {p.items.slice(0, 3).map((i) => (
+                <MediaThumb key={i.id} media={mediaById.get(i.mediaId)} width={26} height={40} />
+              ))}
+              {p.items.length === 0 && <MediaThumb media={null} width={26} height={40} />}
+            </Box>
+          }
+          name={p.name}
+          sub={p.description || p.id}
+          title={p.name}
+        />
       ),
     },
-    { key: "status", label: "Status", width: 110, render: (p) => <StatusChip label={p.status} /> },
-    { key: "items", label: "Items", width: 80, align: "right", sortable: true, render: (p) => <Typography variant="body2">{p.items.length}</Typography> },
-    { key: "duration", label: "Duration", width: 100, align: "right", sortable: true, render: (p) => <Typography variant="body2" sx={{ fontVariantNumeric: "tabular-nums" }}>{formatDuration(p.totalDuration)}</Typography> },
+    { key: "status", label: "Status", width: 120, onCard: true, render: (p) => <StatusChip label={p.status} /> },
+    { key: "items", label: "Items", width: 80, align: "right", sortable: true, onCard: true, render: (p) => <Typography variant="caption" sx={{ fontSize: 14 }}>{p.items.length}</Typography> },
+    { key: "duration", label: "Runs for", width: 110, align: "right", sortable: true, onCard: true, render: (p) => <Typography variant="caption" sx={{ fontSize: 14, fontVariantNumeric: "tabular-nums" }}>{formatDuration(p.totalDuration)}</Typography> },
     {
       key: "screens",
       label: "Screens",
@@ -243,7 +241,7 @@ export default function PlaylistsPage() {
         </Typography>
       </PageHeader>
 
-      <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
+      <Box sx={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <DataTable<Playlist>
             columns={columns}

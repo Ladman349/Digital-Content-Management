@@ -9,7 +9,7 @@ interface ThemeModeContextValue {
   toggle: () => void;
 }
 
-const ThemeModeContext = createContext<ThemeModeContextValue>({ mode: "light", toggle: () => {} });
+const ThemeModeContext = createContext<ThemeModeContextValue>({ mode: "dark", toggle: () => {} });
 
 function initialMode(): PaletteMode {
   try {
@@ -18,7 +18,8 @@ function initialMode(): PaletteMode {
   } catch {
     /* storage unavailable */
   }
-  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  // The board is a dark-first design: default to dark unless the viewer has asked for light.
+  return window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark";
 }
 
 export function ThemeModeProvider({ children }: { children: ReactNode }) {

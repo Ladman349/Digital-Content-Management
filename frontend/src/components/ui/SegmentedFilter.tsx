@@ -1,4 +1,4 @@
-import { Box, ButtonBase, alpha } from "@mui/material";
+import { Box, ButtonBase } from "@mui/material";
 
 export interface SegmentOption<T extends string> {
   value: T;
@@ -13,14 +13,10 @@ interface Props<T extends string> {
   ariaLabel?: string;
 }
 
-/** Row of pill toggles with optional counts; used for status filters so every bucket is visible at a glance. */
+/** Square filter chips carrying their own counts, so every bucket is legible without opening a menu. */
 export default function SegmentedFilter<T extends string>({ options, value, onChange, ariaLabel }: Props<T>) {
   return (
-    <Box
-      role="tablist"
-      aria-label={ariaLabel}
-      sx={{ display: "inline-flex", p: 0.375, gap: 0.25, bgcolor: "surface.hover", borderRadius: 1.5, border: 1, borderColor: "surface.border", flexWrap: "wrap" }}
-    >
+    <Box role="tablist" aria-label={ariaLabel} sx={{ display: "inline-flex", gap: 0.5, flexWrap: "wrap" }}>
       {options.map((o) => {
         const active = o.value === value;
         return (
@@ -29,25 +25,27 @@ export default function SegmentedFilter<T extends string>({ options, value, onCh
             role="tab"
             aria-selected={active}
             onClick={() => onChange(o.value)}
-            sx={{
+            sx={(t) => ({
               px: 1.25,
-              py: 0.5,
-              borderRadius: 1,
-              fontSize: 12.5,
-              fontWeight: 600,
-              color: active ? "text.primary" : "text.secondary",
-              bgcolor: active ? "background.paper" : "transparent",
-              boxShadow: active ? `0 1px 2px ${alpha("#000", 0.12)}` : "none",
-              transition: "background-color .15s",
-              "&:hover": { color: "text.primary" },
+              py: 0.65,
               gap: 0.75,
+              borderRadius: 0.5,
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.11em",
+              textTransform: "uppercase",
+              border: 1,
+              borderColor: active ? t.palette.surface.borderStrong : "transparent",
+              bgcolor: active ? t.palette.board.cell : "transparent",
+              color: active ? "text.primary" : "text.secondary",
               display: "inline-flex",
               alignItems: "center",
-            }}
+              "&:hover": { color: "text.primary", borderColor: t.palette.surface.border },
+            })}
           >
             {o.label}
             {o.count !== undefined && (
-              <Box component="span" sx={{ fontSize: 11, fontWeight: 600, color: active ? "primary.main" : "text.disabled", fontVariantNumeric: "tabular-nums" }}>
+              <Box component="span" sx={{ fontFamily: (t) => t.typography.caption.fontFamily, fontSize: 10.5, color: active ? "primary.main" : "text.disabled", fontVariantNumeric: "tabular-nums" }}>
                 {o.count}
               </Box>
             )}

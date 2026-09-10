@@ -21,6 +21,8 @@ import EmptyState from "../../components/ui/EmptyState";
 import ConfirmDialog from "../../components/ui/ConfirmDialog";
 import BulkBar from "../../components/ui/BulkBar";
 import StatusChip from "../../components/ui/StatusChip";
+import RowLead from "../../components/ui/RowLead";
+import { MONO } from "../../app/theme";
 import ScheduleEditor, { type ScheduleFormValues } from "./ScheduleEditor";
 import ScheduleDetailPanel from "./ScheduleDetailPanel";
 import DayTimeline from "./DayTimeline";
@@ -181,38 +183,33 @@ export default function SchedulePage() {
       label: "Schedule",
       sortable: true,
       render: (s) => (
-        <Box sx={{ minWidth: 0 }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-            <Typography sx={{ fontWeight: 600, fontSize: 13 }} noWrap title={s.name}>
-              {s.name}
-            </Typography>
-            {liveIds.has(s.id) && <StatusChip label="Live" tone="success" pulse />}
-            {conflictIds.has(s.id) && (
-              <Tooltip title="Overlaps another active schedule on a shared screen">
-                <WarningAmberRoundedIcon sx={{ fontSize: 15, color: "warning.main" }} />
-              </Tooltip>
-            )}
-          </Box>
-          <Typography variant="caption" color="text.secondary" noWrap>
-            {playlistById.get(s.playlistId)?.name ?? `Missing playlist ${s.playlistId}`}
-          </Typography>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, minWidth: 0 }}>
+          <RowLead
+            name={s.name}
+            sub={`${s.repeat} · ${playlistById.get(s.playlistId)?.name ?? `missing playlist ${s.playlistId}`}`}
+            title={s.name}
+          />
+          {liveIds.has(s.id) && <StatusChip label="Live" tone="success" pulse />}
+          {conflictIds.has(s.id) && (
+            <Tooltip title="Overlaps another active schedule on a shared screen">
+              <WarningAmberRoundedIcon sx={{ fontSize: 15, color: "warning.main", flexShrink: 0 }} />
+            </Tooltip>
+          )}
         </Box>
       ),
     },
-    { key: "status", label: "Status", width: 100, render: (s) => <StatusChip label={s.status} /> },
+    { key: "status", label: "Status", width: 120, onCard: true, render: (s) => <StatusChip label={s.status} /> },
     {
       key: "time",
-      label: "Daily window",
-      width: 150,
+      label: "Window",
+      width: 120,
+      onCard: true,
       sortable: true,
       render: (s) => (
-        <Typography variant="body2" sx={{ fontVariantNumeric: "tabular-nums" }}>
-          {s.startTime}–{s.endTime}
-          <Typography component="span" variant="caption" color="text.secondary">
-            {" "}
-            · {s.repeat}
-          </Typography>
-        </Typography>
+        <Box>
+          <Typography sx={{ fontFamily: MONO, fontSize: 15, fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>{s.startTime}</Typography>
+          <Typography sx={{ fontFamily: MONO, fontSize: 11, color: "text.secondary", mt: 0.3 }}>→ {s.endTime}</Typography>
+        </Box>
       ),
     },
     {
@@ -286,7 +283,7 @@ export default function SchedulePage() {
         </ToggleButtonGroup>
       </PageHeader>
 
-      <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
+      <Box sx={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           {view === "timeline" ? (
             <DayTimeline schedules={rows} devices={devices} playlists={playlists} now={now} selectedId={selectedId} onSelect={setSelectedId} deviceFilter={deviceFilter} onDeviceFilter={setDeviceFilter} />

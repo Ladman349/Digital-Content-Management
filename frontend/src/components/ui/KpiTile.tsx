@@ -1,6 +1,7 @@
 import { Box, ButtonBase, Skeleton, Typography } from "@mui/material";
 import type { ReactNode } from "react";
 import type { Tone } from "./tone";
+import { MONO } from "../../app/theme";
 
 interface Props {
   label: string;
@@ -13,53 +14,50 @@ interface Props {
   active?: boolean;
 }
 
-/** Small, dense stat tile. Clickable tiles act as filters/links. */
-export default function KpiTile({ label, value, hint, tone = "neutral", icon, loading, onClick, active }: Props) {
+/**
+ * A totals cell from the foot of the board: the label small and lettered, the figure large in mono.
+ * Tone colours the figure only — a whole tile washed in red reads as an error state rather than a count.
+ */
+export default function KpiTile({ label, value, hint, tone = "neutral", loading, onClick, active }: Props) {
   const content = (
-    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, width: "100%", textAlign: "left" }}>
-      {icon && (
-        <Box
-          sx={(theme) => ({
-            width: 34,
-            height: 34,
-            borderRadius: 1.5,
-            display: "grid",
-            placeItems: "center",
-            flexShrink: 0,
-            color: tone === "neutral" ? theme.palette.text.secondary : theme.palette[tone].main,
-            bgcolor: tone === "neutral" ? theme.palette.surface.hover : `${theme.palette[tone].main}1A`,
+    <Box sx={{ minWidth: 0, width: "100%", textAlign: "left" }}>
+      <Typography variant="subtitle2" sx={{ color: "text.secondary", display: "block", lineHeight: 1.3 }}>
+        {label}
+      </Typography>
+      {loading ? (
+        <Skeleton width={52} height={30} />
+      ) : (
+        <Typography
+          component="div"
+          sx={(t) => ({
+            fontFamily: MONO,
+            fontSize: 24,
+            fontWeight: 700,
+            lineHeight: 1.2,
+            mt: 0.5,
+            fontVariantNumeric: "tabular-nums",
+            color: tone === "neutral" ? t.palette.text.primary : t.palette[tone].main,
           })}
         >
-          {icon}
-        </Box>
-      )}
-      <Box sx={{ minWidth: 0, flex: 1 }}>
-        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: "block", lineHeight: 1.2 }}>
-          {label}
+          {value}
         </Typography>
-        {loading ? (
-          <Skeleton width={56} height={26} />
-        ) : (
-          <Typography sx={{ fontSize: 20, fontWeight: 700, lineHeight: 1.25, fontVariantNumeric: "tabular-nums" }}>{value}</Typography>
-        )}
-        {hint && (
-          <Typography variant="caption" color="text.secondary" component="div" sx={{ lineHeight: 1.3, mt: 0.25 }}>
-            {hint}
-          </Typography>
-        )}
-      </Box>
+      )}
+      {hint && (
+        <Typography component="div" sx={{ fontSize: 11.5, color: "text.secondary", lineHeight: 1.35, mt: 0.4 }}>
+          {hint}
+        </Typography>
+      )}
     </Box>
   );
 
   const baseSx = {
-    p: 1.5,
-    borderRadius: 2,
-    border: 1,
-    borderColor: active ? "primary.main" : "surface.border",
-    bgcolor: "background.paper",
+    p: 1.75,
+    bgcolor: "board.cell",
     width: "100%",
-    minHeight: 68,
-    transition: "border-color .15s, background-color .15s",
+    minHeight: 84,
+    display: "flex",
+    alignItems: "flex-start",
+    boxShadow: active ? (t: { palette: { board: { amber: string } } }) => `inset 3px 0 0 ${t.palette.board.amber}` : "none",
   } as const;
 
   if (onClick) {

@@ -20,6 +20,7 @@ import EmptyState from "../../components/ui/EmptyState";
 import ConfirmDialog from "../../components/ui/ConfirmDialog";
 import BulkBar from "../../components/ui/BulkBar";
 import MediaThumb from "../../components/ui/MediaThumb";
+import RowLead from "../../components/ui/RowLead";
 import StatusChip from "../../components/ui/StatusChip";
 import MediaDetailPanel from "./MediaDetailPanel";
 import UploadDialog from "./UploadDialog";
@@ -45,7 +46,8 @@ export default function MediaPage() {
   const [typeFilter, setTypeFilter] = useFilterParam("type", "All");
   const [categoryFilter, setCategoryFilter] = useFilterParam("category", "All");
   const [sortKey, setSortKey] = useState<SortKey>("newest");
-  const [view, setView] = usePersistedState<"grid" | "list">("signage.media.view", "grid");
+  // The board is the default read; the grid is there for when you are choosing artwork rather than auditing it.
+  const [view, setView] = usePersistedState<"grid" | "list">("signage.media.view", "list");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selectedId, setSelectedId] = useSelectParam();
   // Seeded from ?upload=1 so the dashboard button deep-links straight into the dialog.
@@ -165,25 +167,33 @@ export default function MediaPage() {
       key: "name",
       label: "File",
       render: (m) => (
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, minWidth: 0 }}>
-          <MediaThumb media={m} width={48} height={30} />
-          <Box sx={{ minWidth: 0 }}>
-            <Typography sx={{ fontWeight: 600, fontSize: 13 }} noWrap title={m.name}>
-              {m.name}
-            </Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "ui-monospace, monospace" }}>
-              {m.id}
-            </Typography>
-          </Box>
-        </Box>
+        <RowLead
+          size="compact"
+          before={<MediaThumb media={m} width={64} height={40} />}
+          name={m.name}
+          sub={`${m.id}${m.type === "Video" && m.duration ? ` · ${formatDuration(m.duration)}` : ""}`}
+          title={m.name}
+        />
       ),
     },
     { key: "type", label: "Type", width: 90, render: (m) => <StatusChip label={m.type} dot={false} /> },
     { key: "category", label: "Category", hideBelow: "md", render: (m) => <Typography variant="body2">{m.category}</Typography> },
     { key: "dimensions", label: "Dimensions", hideBelow: "lg", render: (m) => <Typography variant="body2" color="text.secondary">{m.dimensions || "—"}</Typography> },
     { key: "duration", label: "Duration", hideBelow: "lg", width: 90, render: (m) => <Typography variant="body2" color="text.secondary">{m.type === "Video" ? (m.duration ? formatDuration(m.duration) : "?") : "—"}</Typography> },
-    { key: "size", label: "Size", width: 90, align: "right", render: (m) => <Typography variant="body2" sx={{ fontVariantNumeric: "tabular-nums" }}>{formatBytes(m.size)}</Typography> },
-    { key: "used", label: "Used in", width: 90, align: "right", hideBelow: "md", render: (m) => <Typography variant="body2" color={usage.get(m.id) ? "text.primary" : "text.disabled"}>{usage.get(m.id) ? `${usage.get(m.id)} playlist${usage.get(m.id) === 1 ? "" : "s"}` : "—"}</Typography> },
+    { key: "size", label: "Size", width: 100, align: "right", onCard: true, render: (m) => <Typography variant="body2" sx={{ fontVariantNumeric: "tabular-nums" }}>{formatBytes(m.size)}</Typography> },
+    {
+      key: "used",
+      label: "Used in",
+      width: 130,
+      hideBelow: "md",
+      onCard: true,
+      render: (m) =>
+        usage.get(m.id) ? (
+          <StatusChip label={`${usage.get(m.id)} playlist${usage.get(m.id) === 1 ? "" : "s"}`} tone="warning" />
+        ) : (
+          <StatusChip label="Unused" tone="neutral" />
+        ),
+    },
     { key: "uploaded", label: "Uploaded", width: 110, hideBelow: "sm", render: (m) => <Typography variant="body2" color="text.secondary">{formatDate(m.uploadedAt)}</Typography> },
   ];
 
@@ -255,7 +265,7 @@ export default function MediaPage() {
         </ToggleButtonGroup>
       </PageHeader>
 
-      <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
+      <Box sx={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           {view === "list" ? (
             <DataTable<MediaItem>
@@ -268,6 +278,7 @@ export default function MediaPage() {
               onSelectionChange={setSelected}
               onRowClick={(m) => setSelectedId(m.id === selectedId ? null : m.id)}
               activeRowKey={selectedId}
+              rowDim={(m) => !usage.get(m.id)}
               emptyState={empty}
               sort={undefined as SortState | undefined}
             />

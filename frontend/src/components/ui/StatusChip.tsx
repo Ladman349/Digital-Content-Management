@@ -1,4 +1,4 @@
-import { Chip, alpha } from "@mui/material";
+import { Box, Typography } from "@mui/material";
 import type { Tone } from "./tone";
 import StatusDot from "./StatusDot";
 
@@ -20,21 +20,27 @@ const TONE_FOR: Record<string, Tone> = {
   Video: "primary",
 };
 
+/**
+ * A flag, not a chip. On a board, status is a lit dot and a word — the enclosing pill adds a second
+ * shape to parse and makes a column of them read as buttons.
+ */
 export default function StatusChip({ label, tone, dot = true, pulse }: { label: string; tone?: Tone; dot?: boolean; pulse?: boolean }) {
   const t = tone ?? TONE_FOR[label] ?? "neutral";
   return (
-    <Chip
-      icon={dot ? <StatusDot tone={t} pulse={pulse} size={7} /> : undefined}
-      label={label}
-      sx={(theme) => {
-        const color = t === "neutral" ? theme.palette.text.secondary : theme.palette[t].main;
-        return {
-          color,
-          bgcolor: alpha(color, theme.palette.mode === "light" ? 0.1 : 0.18),
-          border: `1px solid ${alpha(color, 0.25)}`,
-          "& .MuiChip-icon": { ml: "7px", mr: "-3px" },
-        };
-      }}
-    />
+    <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.9, whiteSpace: "nowrap" }}>
+      {dot && <StatusDot tone={t} pulse={pulse} size={7} />}
+      <Typography
+        component="span"
+        sx={(theme) => ({
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: "0.13em",
+          textTransform: "uppercase",
+          color: t === "neutral" ? theme.palette.text.disabled : theme.palette[t].main,
+        })}
+      >
+        {label}
+      </Typography>
+    </Box>
   );
 }
