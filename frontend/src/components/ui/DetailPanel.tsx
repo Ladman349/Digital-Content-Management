@@ -1,4 +1,4 @@
-import { Box, Divider, Drawer, IconButton, Tooltip, Typography, useMediaQuery, useTheme } from "@mui/material";
+import { Box, Drawer, IconButton, Tooltip, Typography, useMediaQuery, useTheme } from "@mui/material";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import KeyboardArrowUpRoundedIcon from "@mui/icons-material/KeyboardArrowUpRounded";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
@@ -11,6 +11,7 @@ interface Props {
   subtitle?: ReactNode;
   actions?: ReactNode;
   children: ReactNode;
+  /** Retained for call-site compatibility; the bench always spans the board. */
   width?: number;
   onPrev?: () => void;
   onNext?: () => void;
@@ -18,13 +19,15 @@ interface Props {
 }
 
 /**
- * Inspector panel docked to the right of a list. On desktop it sits beside the table (which stays clickable, so you
- * can move between records without closing anything); on small screens it becomes a full-height drawer.
- * ↑/↓ step through records when the parent supplies onPrev/onNext; Esc closes.
+ * The bench — the quiet second register beneath the board.
+ *
+ * A board this loud cannot also do dense work, so detail and editing sit on a lifted panel below the
+ * rows: smaller type, mono figures, columns that flow. The board keeps its full width, and moving
+ * between records with ↑/↓ never closes anything. On a phone it becomes a bottom sheet.
  */
-export default function DetailPanel({ open, onClose, title, subtitle, actions, children, width = 400, onPrev, onNext, position }: Props) {
+export default function DetailPanel({ open, onClose, title, subtitle, actions, children, onPrev, onNext, position }: Props) {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const isPhone = useMediaQuery(theme.breakpoints.down("md"));
 
   useEffect(() => {
     if (!open) return;
@@ -48,15 +51,18 @@ export default function DetailPanel({ open, onClose, title, subtitle, actions, c
   }, [open, onClose, onNext, onPrev]);
 
   const header = (
-    <Box sx={{ px: 2, pt: 1.5, pb: 1.25, display: "flex", alignItems: "flex-start", gap: 1 }}>
+    <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1, px: { xs: 2, md: 2.5 }, pt: 2, pb: 1.5 }}>
       <Box sx={{ minWidth: 0, flex: 1 }}>
-        <Typography component="div" sx={{ fontWeight: 700, fontSize: 15, lineHeight: 1.3, overflowWrap: "anywhere" }}>
+        <Typography
+          component="div"
+          sx={{ fontSize: 17, fontWeight: 700, textTransform: "uppercase", letterSpacing: "-0.005em", lineHeight: 1.2, overflowWrap: "anywhere" }}
+        >
           {title}
         </Typography>
         {subtitle && (
-          <Typography component="div" variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+          <Box sx={{ mt: 0.5, display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap", color: "text.secondary", fontSize: 12 }}>
             {subtitle}
-          </Typography>
+          </Box>
         )}
       </Box>
       {(onPrev || onNext) && (
@@ -76,7 +82,7 @@ export default function DetailPanel({ open, onClose, title, subtitle, actions, c
             </span>
           </Tooltip>
           {position && (
-            <Typography variant="caption" color="text.secondary" sx={{ mx: 0.5, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+            <Typography variant="caption" color="text.secondary" sx={{ mx: 0.5, whiteSpace: "nowrap" }}>
               {position}
             </Typography>
           )}
@@ -88,24 +94,51 @@ export default function DetailPanel({ open, onClose, title, subtitle, actions, c
     </Box>
   );
 
-  const body = (
-    <Box sx={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
-      {header}
-      <Divider />
-      <Box sx={{ flex: 1, overflowY: "auto", p: 2 }}>{children}</Box>
-      {actions && (
-        <>
-          <Divider />
-          <Box sx={{ p: 1.5, display: "flex", gap: 1, flexWrap: "wrap", justifyContent: "flex-end" }}>{actions}</Box>
-        </>
-      )}
+  /** Sections flow into columns, so the bench fills its width instead of running as one long strip. */
+  const content = (
+    <Box
+      sx={{
+        px: { xs: 2, md: 2.5 },
+        pb: 2.5,
+        display: "grid",
+        gridTemplateColumns: { xs: "1fr", md: "repeat(auto-fit, minmax(260px, 1fr))" },
+        gap: { xs: 2, md: 3.5 },
+        alignItems: "start",
+      }}
+    >
+      {children}
     </Box>
   );
 
-  if (isMobile) {
+  const footer = actions && (
+    <Box
+      sx={{
+        px: { xs: 2, md: 2.5 },
+        py: 1.5,
+        display: "flex",
+        gap: 1,
+        flexWrap: "wrap",
+        borderTop: 1,
+        borderColor: "surface.border",
+      }}
+    >
+      {actions}
+    </Box>
+  );
+
+  if (isPhone) {
     return (
-      <Drawer anchor="right" open={open} onClose={onClose} slotProps={{ paper: { sx: { width: "min(100vw, 460px)" } } }}>
-        {body}
+      <Drawer
+        anchor="bottom"
+        open={open}
+        onClose={onClose}
+        slotProps={{ paper: { sx: { maxHeight: "88vh", borderTop: 2, borderColor: "board.amber" } } }}
+      >
+        <Box sx={{ overflowY: "auto" }}>
+          {header}
+          {content}
+        </Box>
+        {footer}
       </Drawer>
     );
   }
@@ -114,21 +147,15 @@ export default function DetailPanel({ open, onClose, title, subtitle, actions, c
 
   return (
     <Box
-      sx={{
-        width,
-        flexShrink: 0,
-        position: "sticky",
-        top: 64,
-        alignSelf: "flex-start",
-        height: "calc(100vh - 80px)",
-        border: 1,
-        borderColor: "surface.border",
-        borderRadius: 2,
-        bgcolor: "background.paper",
-        overflow: "hidden",
-      }}
+      sx={(t) => ({
+        mt: "2px",
+        bgcolor: "board.bench",
+        borderTop: `2px solid ${t.palette.board.amber}`,
+      })}
     >
-      {body}
+      {header}
+      {content}
+      {footer}
     </Box>
   );
 }

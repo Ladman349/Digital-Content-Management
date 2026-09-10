@@ -5,10 +5,10 @@ import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
-import PlaylistPlayRoundedIcon from "@mui/icons-material/PlaylistPlayRounded";
 import TvRoundedIcon from "@mui/icons-material/TvRounded";
 import FilterListOffRoundedIcon from "@mui/icons-material/FilterListOffRounded";
 import PlaceOutlinedIcon from "@mui/icons-material/PlaceOutlined";
+import PlaylistPlayRoundedIcon from "@mui/icons-material/PlaylistPlayRounded";
 import { useSnackbar } from "notistack";
 
 import PageHeader from "../../components/ui/PageHeader";
@@ -19,7 +19,8 @@ import DataTable, { type Column, type SortState } from "../../components/ui/Data
 import EmptyState from "../../components/ui/EmptyState";
 import ConfirmDialog from "../../components/ui/ConfirmDialog";
 import BulkBar from "../../components/ui/BulkBar";
-import StatusDot from "../../components/ui/StatusDot";
+import StatusChip from "../../components/ui/StatusChip";
+import RowLead from "../../components/ui/RowLead";
 import { deviceTone } from "../../components/ui/tone";
 import DeviceDetailPanel from "./DeviceDetailPanel";
 import DeviceFormDialog, { type DeviceFormValues } from "./DeviceFormDialog";
@@ -194,29 +195,16 @@ export default function DevicesPage() {
     {
       key: "status",
       label: "Status",
-      width: 96,
+      width: 110,
       sortable: true,
-      render: (d) => (
-        <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-          <StatusDot tone={deviceTone(d.status)} pulse={d.status === "Online"} />
-          <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: d.status === "Offline" ? "error.main" : d.status === "Idle" ? "warning.main" : "success.main" }}>{d.status}</Typography>
-        </Box>
-      ),
+      onCard: true,
+      render: (d) => <StatusChip label={d.status} tone={deviceTone(d.status)} pulse={d.status === "Online"} />,
     },
     {
       key: "name",
-      label: "Device",
+      label: "Screen",
       sortable: true,
-      render: (d) => (
-        <Box sx={{ minWidth: 0 }}>
-          <Typography sx={{ fontWeight: 600, fontSize: 13 }} noWrap title={d.name}>
-            {d.name}
-          </Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "ui-monospace, monospace" }}>
-            {d.id}
-          </Typography>
-        </Box>
-      ),
+      render: (d) => <RowLead name={d.name} sub={d.id} title={d.name} />,
     },
     {
       key: "location",
@@ -227,21 +215,21 @@ export default function DevicesPage() {
     },
     {
       key: "playing",
-      label: "Now playing",
+      label: "Showing",
       sortable: true,
       hideBelow: "sm",
+      onCard: true,
       render: (d) => {
         const p = playback.get(d.id);
         if (!p?.effective)
           return (
-            <Typography variant="body2" color="text.disabled">
-              Nothing assigned
+            <Typography sx={{ fontSize: 15, fontWeight: 600, textTransform: "uppercase", color: "text.disabled" }}>
+              — nothing —
             </Typography>
           );
         return (
           <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, minWidth: 0 }}>
-            <PlaylistPlayRoundedIcon sx={{ fontSize: 16, color: "text.disabled" }} />
-            <Typography sx={{ fontSize: 13 }} noWrap>
+            <Typography sx={{ fontSize: 15, fontWeight: 600, textTransform: "uppercase", color: "primary.main" }} noWrap>
               {p.effective.name}
             </Typography>
             {p.liveSchedule && <Chip label="scheduled" variant="outlined" sx={{ height: 18, fontSize: 10.5 }} />}
@@ -282,7 +270,7 @@ export default function DevicesPage() {
           <Tooltip title={`${formatMegabytes(d.storageUsed)} of ${formatMegabytes(d.storageTotal)} used`}>
             <Box>
               <LinearProgress variant="determinate" value={pct} color={pct > 90 ? "error" : "primary"} sx={{ height: 5 }} />
-              <Typography variant="caption" color="text.secondary">
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.4 }}>
                 {Math.round(pct)}% used
               </Typography>
             </Box>
@@ -295,7 +283,7 @@ export default function DevicesPage() {
       label: "App",
       hideBelow: "lg",
       render: (d) => (
-        <Typography variant="body2" color="text.secondary" noWrap sx={{ fontFamily: "ui-monospace, monospace", fontSize: 12 }}>
+        <Typography variant="caption" color="text.secondary" noWrap>
           {d.appVersion?.split(" ")[0] || "—"}
         </Typography>
       ),
@@ -305,9 +293,10 @@ export default function DevicesPage() {
       label: "Last seen",
       sortable: true,
       width: 110,
+      onCard: true,
       render: (d) => (
         <Tooltip title={formatDateTime(d.heartbeatAt ?? d.lastSeenMs)}>
-          <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "nowrap" }}>
+          <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: "nowrap" }}>
             {relativeTime(d.heartbeatAt ?? d.lastSeenMs, now)}
           </Typography>
         </Tooltip>
@@ -385,7 +374,7 @@ export default function DevicesPage() {
         </Typography>
       </PageHeader>
 
-      <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
+      <Box sx={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <DataTable<Device>
             columns={columns}
@@ -417,7 +406,6 @@ export default function DevicesPage() {
           <BulkBar count={selected.size} noun="device" onClear={() => setSelected(new Set())} onSelectAll={() => setSelected(new Set(rows.map((d) => d.id)))} total={rows.length}>
             <Button
               variant="outlined"
-              startIcon={<PlaylistPlayRoundedIcon />}
               onClick={() => {
                 setAssignValue("");
                 setAssignOpen(true);

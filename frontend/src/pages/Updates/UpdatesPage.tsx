@@ -157,27 +157,42 @@ export default function UpdatesPage() {
 
         <Paper sx={{ border: 1, borderColor: "surface.border", borderRadius: 2 }}>
           <Box sx={{ px: 1.75, py: 1.25, borderBottom: 1, borderColor: "surface.border" }}>
-            <Typography sx={{ fontWeight: 700, fontSize: 13.5 }}>Versions in the fleet</Typography>
+            <Typography variant="subtitle2" sx={{ color: "text.secondary" }}>Versions in the fleet</Typography>
           </Box>
           {fleet.length === 0 ? (
             <Typography variant="body2" color="text.secondary" sx={{ p: 1.75 }}>
               No devices registered.
             </Typography>
           ) : (
-            <Box>
-              {fleet.map(([version, count]) => (
-                <Box key={version} component={RouterLink} to="/devices" sx={{ display: "flex", justifyContent: "space-between", gap: 1, px: 1.75, py: 1, borderBottom: 1, borderColor: "surface.border", textDecoration: "none", color: "inherit", "&:last-child": { borderBottom: 0 }, "&:hover": { bgcolor: "surface.hover" } }}>
-                  <Typography variant="body2" sx={{ fontFamily: "ui-monospace, monospace", fontSize: 12 }} noWrap>
-                    {version}
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    {count} device{count === 1 ? "" : "s"}
-                  </Typography>
-                </Box>
-              ))}
+            <Box sx={{ px: 1.75, py: 1 }}>
+              {fleet.map(([version, count]) => {
+                const total = fleet.reduce((sum, [, c]) => sum + c, 0) || 1;
+                const known = version !== "unknown";
+                return (
+                  <Box key={version} component={RouterLink} to="/devices" sx={{ display: "block", textDecoration: "none", color: "inherit", py: 0.85 }}>
+                    <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1, alignItems: "baseline" }}>
+                      <Typography variant="caption" sx={{ color: known ? "text.primary" : "text.disabled" }} noWrap>
+                        {version}
+                      </Typography>
+                      <Typography variant="caption" sx={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+                        {count}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ mt: 0.6, height: 4, bgcolor: "surface.border" }}>
+                      <Box
+                        sx={(t) => ({
+                          height: "100%",
+                          width: `${(count / total) * 100}%`,
+                          bgcolor: known ? t.palette.board.amber : t.palette.text.disabled,
+                        })}
+                      />
+                    </Box>
+                  </Box>
+                );
+              })}
             </Box>
           )}
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block", p: 1.75, pt: 1 }}>
+          <Typography color="text.secondary" sx={{ display: "block", p: 1.75, pt: 1, fontSize: 12, lineHeight: 1.55 }}>
             Only one release can be active at a time. Deactivating it stops further rollout immediately, though screens that already installed it stay on that version until you publish a newer build.
           </Typography>
         </Paper>

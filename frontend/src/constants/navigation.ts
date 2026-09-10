@@ -12,13 +12,14 @@ export interface NavigationItem {
   icon: SvgIconComponent;
 }
 
+// Names match the board: a screen is a screen, and the home page answers "what is on right now".
 export const navigationItems: NavigationItem[] = [
-  { title: "Dashboard", path: "/", icon: DashboardRoundedIcon },
-  { title: "Devices", path: "/devices", icon: TvRoundedIcon },
+  { title: "Now", path: "/", icon: DashboardRoundedIcon },
+  { title: "Screens", path: "/devices", icon: TvRoundedIcon },
   { title: "Media", path: "/media", icon: PermMediaRoundedIcon },
   { title: "Playlists", path: "/playlists", icon: PlaylistPlayRoundedIcon },
   { title: "Schedule", path: "/schedule", icon: EventRoundedIcon },
-  { title: "App updates", path: "/updates", icon: SystemUpdateAltRoundedIcon },
+  { title: "Updates", path: "/updates", icon: SystemUpdateAltRoundedIcon },
 ];
 
 export function pageTitleFor(pathname: string): string {

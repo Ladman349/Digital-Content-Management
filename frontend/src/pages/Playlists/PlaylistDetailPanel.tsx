@@ -101,24 +101,52 @@ export default function PlaylistDetailPanel({ playlist, media, devices, schedule
             {missing} item{missing === 1 ? "" : "s"} reference deleted media. Edit the playlist to remove them.
           </Typography>
         )}
-        <Box sx={{ display: "grid", gap: 0.5 }}>
+        <Box sx={{ display: "grid", gap: "2px" }}>
           {playlist.items.map((item, i) => {
             const m = mediaById.get(item.mediaId);
+            const startsAt = playlist.items.slice(0, i).reduce((sum, x) => sum + x.duration, 0);
             return (
-              <Box key={item.id} sx={{ display: "flex", alignItems: "center", gap: 1, p: 0.75, borderRadius: 1, border: 1, borderColor: "surface.border" }}>
-                <Typography variant="caption" color="text.secondary" sx={{ width: 16, textAlign: "right" }}>
-                  {i + 1}
+              <Box
+                key={item.id}
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "26px 44px 1fr 52px 56px",
+                  alignItems: "center",
+                  gap: 1,
+                  px: 1,
+                  py: 0.75,
+                  bgcolor: "board.cell",
+                }}
+              >
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                  {String(i + 1).padStart(2, "0")}
                 </Typography>
-                <MediaThumb media={m} width={44} height={28} />
-                <Typography sx={{ flex: 1, fontSize: 12.5, fontWeight: 600 }} noWrap>
+                <MediaThumb media={m} width={44} height={26} />
+                <Typography sx={{ fontSize: 12.5, fontWeight: 500 }} noWrap title={m?.name}>
                   {m?.name ?? `Missing (${item.mediaId})`}
                 </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {item.duration}s
+                <Typography variant="caption" sx={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                  {formatDuration(item.duration)}
+                </Typography>
+                <Typography variant="caption" sx={{ textAlign: "right", color: "primary.main", fontVariantNumeric: "tabular-nums" }}>
+                  {formatDuration(startsAt)}
                 </Typography>
               </Box>
             );
           })}
+          {playlist.items.length > 0 && (
+            <Box sx={{ display: "grid", gridTemplateColumns: "26px 44px 1fr 52px 56px", alignItems: "center", gap: 1, px: 1, py: 0.75 }}>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                ↻
+              </Typography>
+              <Box />
+              <Typography sx={{ fontSize: 12, color: "text.secondary" }}>loop returns to item 01</Typography>
+              <Box />
+              <Typography variant="caption" sx={{ textAlign: "right", color: "primary.main", fontVariantNumeric: "tabular-nums" }}>
+                {formatDuration(playlist.totalDuration)}
+              </Typography>
+            </Box>
+          )}
         </Box>
       </Section>
 
@@ -137,7 +165,15 @@ export default function PlaylistDetailPanel({ playlist, media, devices, schedule
         ) : (
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
             {assigned.map((d) => (
-              <Chip key={d.id} component={RouterLink} to={`/devices?select=${encodeURIComponent(d.id)}`} clickable label={d.name} variant="outlined" />
+              <Chip
+                key={d.id}
+                component={RouterLink}
+                to={`/devices?select=${encodeURIComponent(d.id)}`}
+                clickable
+                label={d.name}
+                variant="outlined"
+                sx={{ maxWidth: "100%", height: "auto", py: 0.4, "& .MuiChip-label": { whiteSpace: "normal", lineHeight: 1.35 } }}
+              />
             ))}
           </Box>
         )}

@@ -24,7 +24,6 @@ const MINUTES_IN_DAY = 1440;
 const ROW_HEIGHT = 34;
 const LABEL_WIDTH = 150;
 
-const BAND_TONES = ["primary", "info", "success", "warning", "error"] as const;
 
 /**
  * One row per screen showing today's active schedule windows as horizontal bands, so overlaps
@@ -41,18 +40,16 @@ export default function DayTimeline({ schedules, devices, playlists, now, select
     return list.filter((d) => deviceFilter !== "All" || schedules.some((s) => s.deviceIds.includes(d.id)));
   }, [devices, deviceFilter, schedules]);
 
-  const colorFor = (id: string) => BAND_TONES[Math.abs([...id].reduce((a, c) => a + c.charCodeAt(0), 0)) % BAND_TONES.length];
-
   if (devices.length === 0) {
     return (
-      <Box sx={{ border: 1, borderColor: "surface.border", borderRadius: 2, bgcolor: "background.paper" }}>
+      <Box sx={{ bgcolor: "board.cell" }}>
         <EmptyState icon={EventRoundedIcon} title="No devices" description="Register a screen to see its day plan." />
       </Box>
     );
   }
 
   return (
-    <Box sx={{ border: 1, borderColor: "surface.border", borderRadius: 2, bgcolor: "background.paper", overflow: "hidden" }}>
+    <Box sx={{ bgcolor: "board.cell", overflow: "hidden" }}>
       <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, px: 1.75, py: 1.25, borderBottom: 1, borderColor: "surface.border", flexWrap: "wrap" }}>
         <Typography sx={{ fontWeight: 700, fontSize: 13.5 }}>Today by screen</Typography>
         <Typography variant="caption" color="text.secondary">
@@ -120,7 +117,6 @@ export default function DayTimeline({ schedules, devices, playlists, now, select
                       const end = minutesOfDay(s.endTime);
                       const left = (start / MINUTES_IN_DAY) * 100;
                       const width = Math.max(0.8, ((end - start) / MINUTES_IN_DAY) * 100);
-                      const tone = colorFor(s.id);
                       const active = selectedId === s.id;
                       const live = isScheduleLiveNow(s, today);
                       return (
@@ -133,21 +129,33 @@ export default function DayTimeline({ schedules, devices, playlists, now, select
                               width: `${width}%`,
                               top: 4 + (i % 2) * 3,
                               height: ROW_HEIGHT - 10,
-                              borderRadius: 1,
+                              borderRadius: 0,
                               px: 0.75,
                               display: "flex",
                               alignItems: "center",
                               cursor: "pointer",
                               overflow: "hidden",
-                              bgcolor: `${t.palette[tone].main}${active ? "40" : "26"}`,
+                              bgcolor: live ? t.palette.board.amber : `${t.palette.board.amber}${active ? "66" : "3D"}`,
                               border: 1,
-                              borderColor: active ? t.palette[tone].main : `${t.palette[tone].main}66`,
-                              boxShadow: live ? `inset 0 0 0 1px ${t.palette[tone].main}` : "none",
+                              borderColor: live || active ? t.palette.board.amber : `${t.palette.board.amber}66`,
                               zIndex: active ? 3 : 1,
-                              "&:hover": { bgcolor: `${t.palette[tone].main}40` },
+                              "&:hover": { bgcolor: live ? t.palette.board.amber : `${t.palette.board.amber}66` },
                             })}
                           >
-                            <Typography sx={{ fontSize: 11.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: `${tone}.main` }}>{s.name}</Typography>
+                            <Typography
+                              sx={(t) => ({
+                                fontSize: 11,
+                                fontWeight: 700,
+                                letterSpacing: "0.06em",
+                                textTransform: "uppercase",
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                color: live ? t.palette.board.amberInk : t.palette.primary.main,
+                              })}
+                            >
+                              {s.name}
+                            </Typography>
                           </Box>
                         </Tooltip>
                       );

@@ -1,25 +1,93 @@
-import { Box, ButtonBase, IconButton, Tooltip, Typography } from "@mui/material";
-import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
+import { Box, IconButton, Tooltip, Typography } from "@mui/material";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import DarkModeRoundedIcon from "@mui/icons-material/DarkModeRounded";
 import LightModeRoundedIcon from "@mui/icons-material/LightModeRounded";
 import { useIsFetching, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
-import { pageTitleFor } from "../../constants/navigation";
+import { NavLink, useLocation } from "react-router-dom";
+import { navigationItems, pageTitleFor } from "../../constants/navigation";
 import { useThemeMode } from "../../app/ThemeModeProvider";
 import { API_ROOT, checkApiReady } from "../../api/client";
+import { useNow } from "../../hooks/useNow";
+import { MONO } from "../../app/theme";
 import StatusDot from "../ui/StatusDot";
 
 interface Props {
-  onOpenMenu: () => void;
   onOpenSearch: () => void;
 }
 
 const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
 
-export default function TopBar({ onOpenMenu, onOpenSearch }: Props) {
+/** Board clock: the time and date the whole page is read against, in the viewer's own timezone. */
+function Clock() {
+  const now = useNow(30_000);
+  const d = new Date(now);
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone?.split("/").pop()?.replace(/_/g, " ") ?? "";
+  return (
+    <Box sx={{ textAlign: "right", display: { xs: "none", sm: "block" }, lineHeight: 1.1 }}>
+      <Typography
+        component="div"
+        sx={{ fontFamily: MONO, fontSize: 16, fontWeight: 700, letterSpacing: "0.06em", fontVariantNumeric: "tabular-nums" }}
+      >
+        {d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false })}
+      </Typography>
+      <Typography
+        component="div"
+        sx={{ fontSize: 9.5, letterSpacing: "0.18em", textTransform: "uppercase", color: "text.secondary", whiteSpace: "nowrap" }}
+      >
+        {d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}
+        {zone ? ` · ${zone}` : ""}
+      </Typography>
+    </Box>
+  );
+}
+
+/** Horizontal tab strip. Scrolls sideways on narrow screens rather than collapsing into a menu. */
+function Tabs() {
+  return (
+    <Box
+      component="nav"
+      aria-label="Main"
+      sx={{
+        display: "flex",
+        gap: 0.75,
+        minWidth: 0,
+        overflowX: "auto",
+        scrollbarWidth: "none",
+        "&::-webkit-scrollbar": { display: "none" },
+      }}
+    >
+      {navigationItems.map((item) => (
+        <Box
+          key={item.path}
+          component={NavLink}
+          to={item.path}
+          end={item.path === "/"}
+          sx={(t) => ({
+            flex: "none",
+            px: 1.4,
+            py: 0.7,
+            borderRadius: 0.5,
+            fontSize: 11,
+            fontWeight: 600,
+            letterSpacing: "0.13em",
+            textTransform: "uppercase",
+            textDecoration: "none",
+            color: "text.secondary",
+            whiteSpace: "nowrap",
+            "&:hover": { color: "text.primary", backgroundColor: t.palette.surface.hover },
+            "&.active": { backgroundColor: t.palette.board.amber, color: t.palette.board.amberInk },
+          })}
+        >
+          {item.title}
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
+export default function TopBar({ onOpenSearch }: Props) {
   const location = useLocation();
   const { mode, toggle } = useThemeMode();
   const qc = useQueryClient();
@@ -47,88 +115,67 @@ export default function TopBar({ onOpenMenu, onOpenSearch }: Props) {
         position: "sticky",
         top: 0,
         zIndex: 20,
-        height: 52,
-        display: "flex",
-        alignItems: "center",
-        gap: 1,
-        px: { xs: 1.5, md: 2.5 },
-        bgcolor: "background.paper",
-        borderBottom: 1,
-        borderColor: "surface.border",
+        bgcolor: "background.default",
+        borderBottom: 2,
+        borderColor: (t) => (t.palette.mode === "dark" ? "#1E1E21" : "surface.borderStrong"),
       }}
     >
-      <IconButton onClick={onOpenMenu} sx={{ display: { md: "none" } }} aria-label="Open navigation">
-        <MenuRoundedIcon />
-      </IconButton>
-      <Typography sx={{ fontWeight: 700, fontSize: 15 }}>{pageTitleFor(location.pathname)}</Typography>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 2, px: { xs: 2, md: 3.25 }, pt: 2, pb: { xs: 1.25, md: 1.75 } }}>
+        <Typography variant="h1" component="h1" sx={{ color: "primary.main", whiteSpace: "nowrap" }}>
+          {pageTitleFor(location.pathname)}
+        </Typography>
 
-      <Box sx={{ flex: 1 }} />
-
-      <ButtonBase
-        onClick={onOpenSearch}
-        aria-label="Search everything"
-        sx={{
-          height: 32,
-          px: 1.25,
-          gap: 1,
-          borderRadius: 1.5,
-          border: 1,
-          borderColor: "surface.borderStrong",
-          color: "text.secondary",
-          fontSize: 13,
-          minWidth: { xs: 0, sm: 220 },
-          justifyContent: "flex-start",
-          "&:hover": { bgcolor: "surface.hover" },
-        }}
-      >
-        <SearchRoundedIcon sx={{ fontSize: 18 }} />
-        <Box component="span" sx={{ display: { xs: "none", sm: "inline" }, flex: 1, textAlign: "left" }}>
-          Search devices, media, playlists…
+        {/* Desktop: tabs sit beside the title. */}
+        <Box sx={{ display: { xs: "none", md: "flex" }, minWidth: 0, ml: 1 }}>
+          <Tabs />
         </Box>
-        <Box
-          component="kbd"
-          sx={{
-            display: { xs: "none", sm: "inline" },
-            fontFamily: "inherit",
-            fontSize: 11,
-            px: 0.6,
-            py: 0.1,
-            borderRadius: 0.75,
-            border: 1,
-            borderColor: "surface.borderStrong",
-            color: "text.disabled",
-          }}
-        >
-          {isMac ? "⌘K" : "Ctrl K"}
+
+        <Box sx={{ flex: 1, minWidth: 8 }} />
+
+        <Clock />
+
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.25 }}>
+          <Tooltip title={`Search everything · ${isMac ? "⌘K" : "Ctrl K"}`}>
+            <IconButton onClick={onOpenSearch} aria-label="Search everything">
+              <SearchRoundedIcon sx={{ fontSize: 19 }} />
+            </IconButton>
+          </Tooltip>
+
+          <Tooltip title="Refresh all data">
+            <IconButton onClick={() => qc.invalidateQueries()} aria-label="Refresh all data">
+              <RefreshRoundedIcon
+                sx={{
+                  fontSize: 19,
+                  animation: fetching ? "sig-spin 0.9s linear infinite" : "none",
+                  "@keyframes sig-spin": { to: { transform: "rotate(360deg)" } },
+                }}
+              />
+            </IconButton>
+          </Tooltip>
+
+          <Tooltip title={mode === "light" ? "Switch to dark" : "Switch to light"}>
+            <IconButton onClick={toggle} aria-label="Toggle theme">
+              {mode === "light" ? <DarkModeRoundedIcon sx={{ fontSize: 19 }} /> : <LightModeRoundedIcon sx={{ fontSize: 19 }} />}
+            </IconButton>
+          </Tooltip>
+
+          <Tooltip title={apiUp === null ? `Checking ${API_ROOT}` : apiUp ? `API reachable · ${API_ROOT}` : `API unreachable · ${API_ROOT}`}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, pl: 0.75 }}>
+              <StatusDot tone={apiUp === null ? "neutral" : apiUp ? "success" : "error"} pulse={apiUp === true} />
+              <Typography
+                sx={{ display: { xs: "none", lg: "inline" }, fontSize: 10, fontWeight: 700, letterSpacing: "0.11em", textTransform: "uppercase", color: "text.secondary" }}
+              >
+                {apiUp === null ? "API" : apiUp ? "API online" : "API offline"}
+              </Typography>
+            </Box>
+          </Tooltip>
         </Box>
-      </ButtonBase>
+      </Box>
 
-      <Tooltip title="Refresh all data">
-        <IconButton onClick={() => qc.invalidateQueries()} aria-label="Refresh all data">
-          <RefreshRoundedIcon
-            sx={{
-              fontSize: 20,
-              animation: fetching ? "sig-spin 0.9s linear infinite" : "none",
-              "@keyframes sig-spin": { to: { transform: "rotate(360deg)" } },
-            }}
-          />
-        </IconButton>
-      </Tooltip>
-
-      <Tooltip title={mode === "light" ? "Switch to dark theme" : "Switch to light theme"}>
-        <IconButton onClick={toggle} aria-label="Toggle theme">
-          {mode === "light" ? <DarkModeRoundedIcon sx={{ fontSize: 20 }} /> : <LightModeRoundedIcon sx={{ fontSize: 20 }} />}
-        </IconButton>
-      </Tooltip>
-
-      <Tooltip title={apiUp === null ? `Checking ${API_ROOT}` : apiUp ? `API reachable · ${API_ROOT}` : `API unreachable · ${API_ROOT}`}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, pl: 0.5 }}>
-          <StatusDot tone={apiUp === null ? "neutral" : apiUp ? "success" : "error"} pulse={apiUp === true} />
-          <Typography variant="caption" color="text.secondary" sx={{ display: { xs: "none", lg: "inline" }, fontWeight: 600 }}>
-            {apiUp === null ? "API" : apiUp ? "API online" : "API offline"}
-          </Typography>
-        </Box>
-      </Tooltip>
+      {/* Mobile: tabs get their own scrolling row. */}
+      <Box sx={{ display: { xs: "block", md: "none" }, px: 2, pb: 1.25 }}>
+        <Tabs />
+      </Box>
     </Box>
   );
 }
