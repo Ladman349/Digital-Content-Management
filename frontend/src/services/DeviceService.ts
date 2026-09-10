@@ -1,20 +1,9 @@
-import { apiClient } from "../api/apiClient";
-import type { Device } from "../types/device";
+import { api } from "../api/client";
+import type { Device, DeviceCreatePayload, DeviceUpdatePayload } from "../types/device";
 
 export const DeviceService = {
-  getDevices: async (): Promise<Device[]> => {
-    return apiClient.get<Device[]>("/devices");
-  },
-
-  createDevice: async (data: Omit<Device, "id">): Promise<Device> => {
-    return apiClient.post<Device>("/devices", data);
-  },
-
-  updateDevice: async (id: string, data: Partial<Device>): Promise<Device> => {
-    return apiClient.put<Device>(`/devices/${id}`, data);
-  },
-
-  deleteDevice: async (id: string): Promise<void> => {
-    return apiClient.delete(`/devices/${id}`);
-  }
+  list: () => api.get<Device[]>("/devices"),
+  create: (data: DeviceCreatePayload) => api.post<Device>("/devices", data),
+  update: (id: string, data: DeviceUpdatePayload) => api.put<Device>(`/devices/${encodeURIComponent(id)}`, data),
+  remove: (id: string) => api.delete(`/devices/${encodeURIComponent(id)}`),
 };

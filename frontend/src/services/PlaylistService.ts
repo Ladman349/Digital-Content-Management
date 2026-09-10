@@ -1,20 +1,9 @@
-import { apiClient } from "../api/apiClient";
-import type { Playlist } from "../types/playlist";
+import { api } from "../api/client";
+import type { Playlist, PlaylistCreatePayload, PlaylistUpdatePayload } from "../types/playlist";
 
 export const PlaylistService = {
-  getPlaylists: async (): Promise<Playlist[]> => {
-    return apiClient.get<Playlist[]>("/playlists");
-  },
-
-  createPlaylist: async (data: Omit<Playlist, "id">): Promise<Playlist> => {
-    return apiClient.post<Playlist>("/playlists", data);
-  },
-
-  updatePlaylist: async (id: string, data: Partial<Playlist>): Promise<Playlist> => {
-    return apiClient.put<Playlist>(`/playlists/${id}`, data);
-  },
-
-  deletePlaylist: async (id: string): Promise<void> => {
-    return apiClient.delete(`/playlists/${id}`);
-  }
+  list: () => api.get<Playlist[]>("/playlists"),
+  create: (data: PlaylistCreatePayload) => api.post<Playlist>("/playlists", data),
+  update: (id: string, data: PlaylistUpdatePayload) => api.put<Playlist>(`/playlists/${encodeURIComponent(id)}`, data),
+  remove: (id: string) => api.delete(`/playlists/${encodeURIComponent(id)}`),
 };

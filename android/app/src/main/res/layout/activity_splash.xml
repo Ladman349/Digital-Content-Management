@@ -2,7 +2,7 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/black">
+    android:background="@color/signage_background">
 
     <LinearLayout
         android:layout_width="wrap_content"
@@ -11,38 +11,34 @@
         android:gravity="center"
         android:orientation="vertical">
 
-        <TextView
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/app_name"
-            android:textColor="@color/white"
-            android:textSize="32sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="24dp"/>
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:contentDescription="@string/brand_mark_content_description"
+                android:src="@drawable/ic_brand_mark" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/signage_gap"
+                android:text="@string/brand_wordmark"
+                style="@style/Text.Signage.SplashWordmark" />
+        </LinearLayout>
 
         <ProgressBar
             android:id="@+id/progressBar"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginTop="@dimen/signage_gap_large"
+            android:contentDescription="@string/splash_loading_content_description"
             android:indeterminate="true"
-            android:theme="@style/Widget.AppCompat.ProgressBar" />
-            
-        <TextView
-            android:id="@+id/tvStatus"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Initializing..."
-            android:textColor="@color/white"
-            android:textSize="16sp"
-            android:layout_marginTop="16dp" />
-
-        <Button
-            android:id="@+id/btnRetry"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Retry"
-            android:layout_marginTop="16dp"
-            android:visibility="gone" />
+            android:indeterminateTint="@color/signage_accent" />
 
     </LinearLayout>
 

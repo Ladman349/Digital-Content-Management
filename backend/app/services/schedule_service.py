@@ -26,8 +26,10 @@ class ScheduleService:
     def _validate_dates_and_times(start_date: datetime.date, end_date: datetime.date, start_time: datetime.time, end_time: datetime.time):
         if start_date > end_date:
             raise HTTPException(status_code=400, detail="Start date cannot be after end date.")
-        if start_date == end_date and start_time >= end_time:
-            raise HTTPException(status_code=400, detail="Start time must be before end time on the same day.")
+        # The player matches startTime <= now <= endTime within a single day, so
+        # overnight windows (start >= end) can never be active. Always reject them.
+        if start_time >= end_time:
+            raise HTTPException(status_code=400, detail="Start time must be before end time.")
 
     @staticmethod
     def _check_conflicts(db: Session, device_ids: List[str], start_date: datetime.date, end_date: datetime.date, start_time: datetime.time, end_time: datetime.time, priority: str, exclude_schedule_id: str = None):

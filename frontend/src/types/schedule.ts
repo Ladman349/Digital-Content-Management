@@ -1,8 +1,9 @@
 export type ScheduleStatus = "Draft" | "Active" | "Paused" | "Expired";
-
 export type ScheduleRepeat = "Once" | "Daily" | "Weekdays" | "Weekends" | "Weekly" | "Monthly";
-
 export type SchedulePriority = "Low" | "Normal" | "High" | "Emergency";
+
+export const SCHEDULE_REPEATS: ScheduleRepeat[] = ["Once", "Daily", "Weekdays", "Weekends", "Weekly", "Monthly"];
+export const SCHEDULE_PRIORITIES: SchedulePriority[] = ["Emergency", "High", "Normal", "Low"];
 
 export interface Schedule {
   id: string;
@@ -16,4 +17,9 @@ export interface Schedule {
   repeat: ScheduleRepeat;
   priority: SchedulePriority;
   status: ScheduleStatus;
+  createdAt?: number;
+  updatedAt?: number;
 }
+
+export type ScheduleCreatePayload = Omit<Schedule, "id" | "createdAt" | "updatedAt">;
+export type ScheduleUpdatePayload = Partial<ScheduleCreatePayload>;

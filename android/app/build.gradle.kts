@@ -77,6 +77,9 @@ android {
             
             buildConfigField("String", "BASE_URL", "\"$finalBaseUrl\"")
             buildConfigField("String", "ENVIRONMENT", "\"development\"")
+            // Fallback maintenance PIN, used only when no PIN hash has been provisioned on the device.
+            buildConfigField("String", "MAINTENANCE_PIN", "\"0000\"")
+            resValue("string", "app_name", "Digital Signage (Dev)")
         }
         create("staging") {
             dimension = "environment"
@@ -92,6 +95,8 @@ android {
             }
             buildConfigField("String", "BASE_URL", "\"$url\"")
             buildConfigField("String", "ENVIRONMENT", "\"staging\"")
+            buildConfigField("String", "MAINTENANCE_PIN", "\"\"")
+            resValue("string", "app_name", "Digital Signage (Staging)")
         }
         create("prod") {
             dimension = "environment"
@@ -105,6 +110,8 @@ android {
             }
             buildConfigField("String", "BASE_URL", "\"$url\"")
             buildConfigField("String", "ENVIRONMENT", "\"production\"")
+            buildConfigField("String", "MAINTENANCE_PIN", "\"\"")
+            resValue("string", "app_name", "Digital Signage")
         }
     }
 
@@ -124,6 +131,15 @@ android {
                 // Fails the build during packaging if not properly configured
                 storeFile = file("unconfigured_keystore")
             }
+
+            // v1 (JAR signing) is for Android 6 and below; minSdk is 24, so it only slows installs.
+            // v2 is what actually verifies the APK on every device we support.
+            // v3 carries the signing certificate's rotation lineage. Without it a future key change
+            // means physically revisiting every screen again, which is the situation we are in now
+            // precisely because the original build never enabled it.
+            enableV1Signing = false
+            enableV2Signing = true
+            enableV3Signing = true
         }
     }
 
@@ -181,6 +197,7 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-moshi:2.11.0")
     implementation("com.squareup.moshi:moshi-kotlin:1.15.1")
+    ksp("com.squareup.moshi:moshi-kotlin-codegen:1.15.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 

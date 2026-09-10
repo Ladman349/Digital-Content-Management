@@ -1,20 +1,14 @@
-import { apiClient } from "../api/apiClient";
-import type { Schedule } from "../types/schedule";
+import { api } from "../api/client";
+import type { Schedule, ScheduleCreatePayload, ScheduleUpdatePayload } from "../types/schedule";
+import { toHHmm } from "../utils/format";
+
+function normalise(s: Schedule): Schedule {
+  return { ...s, startTime: toHHmm(s.startTime), endTime: toHHmm(s.endTime) };
+}
 
 export const ScheduleService = {
-  getSchedules: async (): Promise<Schedule[]> => {
-    return apiClient.get<Schedule[]>("/schedules");
-  },
-
-  createSchedule: async (data: Omit<Schedule, "id">): Promise<Schedule> => {
-    return apiClient.post<Schedule>("/schedules", data);
-  },
-
-  updateSchedule: async (id: string, data: Partial<Schedule>): Promise<Schedule> => {
-    return apiClient.put<Schedule>(`/schedules/${id}`, data);
-  },
-
-  deleteSchedule: async (id: string): Promise<void> => {
-    return apiClient.delete(`/schedules/${id}`);
-  }
+  list: async () => (await api.get<Schedule[]>("/schedules")).map(normalise),
+  create: async (data: ScheduleCreatePayload) => normalise(await api.post<Schedule>("/schedules", data)),
+  update: async (id: string, data: ScheduleUpdatePayload) => normalise(await api.put<Schedule>(`/schedules/${encodeURIComponent(id)}`, data)),
+  remove: (id: string) => api.delete(`/schedules/${encodeURIComponent(id)}`),
 };

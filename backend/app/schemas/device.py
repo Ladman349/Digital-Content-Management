@@ -26,14 +26,17 @@ class DeviceCreate(DeviceBase):
     id: str
 
 class DeviceUpdate(BaseModel):
+    """
+    Operator-editable device fields.
+
+    Liveness fields (status, lastSeen, lastSeenMs, heartbeatAt, ipAddress, storage, appVersion,
+    uptimeSeconds, firmwareVersion) are deliberately excluded: they are owned by the player's
+    heartbeat, and `status` is recomputed from heartbeat freshness on every read, so accepting a
+    client-supplied value would silently be discarded on the next request.
+    """
     name: Optional[str] = None
     location: Optional[str] = None
     resolution: Optional[str] = None
-    status: Optional[str] = None
-    lastSeen: Optional[str] = None
-    lastSeenMs: Optional[int] = None
-    ipAddress: Optional[str] = None
-    storage: Optional[str] = None
     orientation: Optional[str] = None
 
 class DeviceResponse(DeviceBase):

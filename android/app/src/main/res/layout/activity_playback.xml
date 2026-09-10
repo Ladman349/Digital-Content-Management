@@ -3,8 +3,9 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/black">
+    android:background="@color/signage_background">
 
+    <!-- Everything inside this container is rotated together by applyOrientation(). -->
     <FrameLayout
         android:id="@+id/playbackRootContainer"
         android:layout_width="match_parent"
@@ -24,37 +25,159 @@
             android:id="@+id/imageView"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:contentDescription="@null"
             android:scaleType="fitCenter"
             android:visibility="gone" />
 
-        <LinearLayout
-            android:id="@+id/idleView"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:visibility="gone">
+        <!-- ==================== Status screen ==================== -->
+        <FrameLayout
+            android:id="@+id/statusView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/signage_background"
+            android:visibility="visible">
 
-            <TextView
-                android:id="@+id/tvIdleTitle"
+            <!-- Brand mark + wordmark, top-left -->
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="No Content Assigned"
-                android:textColor="@color/white"
-                android:textSize="36sp"
-                android:textStyle="bold"
-                android:layout_marginBottom="12dp" />
+                android:layout_gravity="top|start"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="@dimen/signage_screen_padding">
 
-            <TextView
-                android:id="@+id/tvIdleSubtitle"
+                <ImageView
+                    android:id="@+id/imgBrandMark"
+                    android:layout_width="@dimen/signage_brand_mark_size"
+                    android:layout_height="@dimen/signage_brand_mark_size"
+                    android:contentDescription="@string/brand_mark_content_description"
+                    android:src="@drawable/ic_brand_mark" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/signage_gap"
+                    android:text="@string/brand_wordmark"
+                    style="@style/Text.Signage.Wordmark" />
+            </LinearLayout>
+
+            <!-- Centred status card -->
+            <LinearLayout
+                android:id="@+id/statusCard"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Waiting for playlist..."
-                android:textColor="#80FFFFFF"
-                android:textSize="20sp" />
+                android:layout_gravity="center"
+                android:minWidth="@dimen/signage_status_card_min_width"
+                style="@style/Widget.Signage.Card">
 
-        </LinearLayout>
+                <!-- Indicator: indeterminate spinner while busy, static icon otherwise -->
+                <FrameLayout
+                    android:layout_width="@dimen/signage_status_indicator_size"
+                    android:layout_height="@dimen/signage_status_indicator_size"
+                    android:layout_marginBottom="@dimen/signage_gap_large">
+
+                    <ProgressBar
+                        android:id="@+id/statusSpinner"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:indeterminate="true"
+                        android:indeterminateTint="@color/signage_accent"
+                        android:visibility="visible" />
+
+                    <ImageView
+                        android:id="@+id/statusIcon"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:contentDescription="@string/status_indicator_content_description"
+                        android:src="@drawable/ic_status_waiting"
+                        android:visibility="gone" />
+                </FrameLayout>
+
+                <TextView
+                    android:id="@+id/tvStatusPrimary"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/status_booting_title"
+                    style="@style/Text.Signage.StatusPrimary" />
+
+                <TextView
+                    android:id="@+id/tvStatusSecondary"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/signage_gap"
+                    android:maxWidth="800dp"
+                    android:text="@string/status_booting_subtitle"
+                    style="@style/Text.Signage.StatusSecondary" />
+
+                <!-- Determinate bar; visible only while downloading -->
+                <ProgressBar
+                    android:id="@+id/pbDownloadProgress"
+                    android:layout_width="@dimen/signage_progress_width"
+                    android:layout_height="@dimen/signage_progress_height"
+                    android:layout_marginTop="@dimen/signage_gap_large"
+                    android:progress="0"
+                    android:visibility="gone"
+                    style="@style/Widget.Signage.ProgressBar.Determinate" />
+            </LinearLayout>
+
+            <!-- Identity bar, bottom -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="@dimen/signage_screen_padding"
+                android:paddingEnd="@dimen/signage_screen_padding"
+                android:paddingTop="@dimen/signage_gap"
+                android:paddingBottom="@dimen/signage_screen_padding">
+
+                <TextView
+                    android:id="@+id/tvDeviceName"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="@dimen/signage_gap_large"
+                    android:text="@string/identity_device_name_unknown"
+                    style="@style/Text.Signage.Footer" />
+
+                <TextView
+                    android:id="@+id/tvDeviceIdChip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="@dimen/signage_gap_large"
+                    android:text="@string/identity_device_id_placeholder"
+                    style="@style/Text.Signage.DeviceIdChip" />
+
+                <TextView
+                    android:id="@+id/tvDeviceIp"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="@dimen/signage_gap_large"
+                    android:text="@string/identity_ip_unknown"
+                    style="@style/Text.Signage.Footer" />
+
+                <TextView
+                    android:id="@+id/tvAppVersion"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    style="@style/Text.Signage.Footer" />
+
+                <View
+                    android:id="@+id/viewOnlineDot"
+                    android:layout_width="@dimen/signage_status_dot_size"
+                    android:layout_height="@dimen/signage_status_dot_size"
+                    android:layout_marginEnd="@dimen/signage_gap_small"
+                    android:background="@drawable/dot_status_offline" />
+
+                <TextView
+                    android:id="@+id/tvOnlineLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/identity_offline"
+                    style="@style/Text.Signage.Footer" />
+            </LinearLayout>
+        </FrameLayout>
 
     </FrameLayout>
 
@@ -64,186 +187,81 @@
         android:layout_height="wrap_content"
         android:layout_gravity="center"
         android:indeterminate="true"
-        android:theme="@style/Widget.AppCompat.ProgressBar"
-        android:visibility="visible" />
+        android:indeterminateTint="@color/signage_accent"
+        android:visibility="gone" />
 
-    <!-- Enhanced Debug / Exception Screen -->
+    <!-- DEBUG-only diagnostics / exception panel -->
     <ScrollView
         android:id="@+id/debugExceptionView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#DD000000"
+        android:background="@color/signage_scrim"
         android:padding="24dp"
         android:visibility="gone">
-        
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical">
-            
+
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="DIAGNOSTICS &amp; TELEMETRY PANEL"
-                android:textColor="#EF5350"
+                android:layout_marginBottom="16dp"
+                android:text="@string/debug_panel_title"
+                android:textColor="@color/signage_error"
                 android:textSize="24sp"
-                android:textStyle="bold"
-                android:layout_marginBottom="16dp" />
+                android:textStyle="bold" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginBottom="16dp">
-                
+                android:layout_marginBottom="16dp"
+                android:orientation="horizontal">
+
                 <Button
                     android:id="@+id/btnCopyDiagnostics"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Copy Report"
-                    android:layout_marginRight="12dp" />
-                    
+                    android:layout_marginEnd="12dp"
+                    android:text="@string/debug_copy_report"
+                    style="@style/Widget.Signage.Button" />
+
                 <Button
                     android:id="@+id/btnSaveDiagnostics"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Save to Downloads"
-                    android:layout_marginRight="12dp" />
+                    android:layout_marginEnd="12dp"
+                    android:text="@string/debug_save_report"
+                    style="@style/Widget.Signage.Button" />
 
                 <Button
                     android:id="@+id/btnTriggerInstall"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Trigger Install" />
+                    android:text="@string/debug_trigger_install"
+                    style="@style/Widget.Signage.Button" />
             </LinearLayout>
 
-            <TextView android:id="@+id/tvDebugState" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/white" android:textSize="16sp" android:layout_marginBottom="4dp"/>
-            <TextView android:id="@+id/tvDebugCommand" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/white" android:textSize="16sp" android:layout_marginBottom="4dp"/>
-            <TextView android:id="@+id/tvDebugBaseUrl" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/white" android:textSize="16sp" android:layout_marginBottom="4dp"/>
-            <TextView android:id="@+id/tvDebugRegStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/white" android:textSize="16sp" android:layout_marginBottom="4dp"/>
-            <TextView android:id="@+id/tvDebugDeviceIdStr" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/white" android:textSize="16sp" android:layout_marginBottom="4dp"/>
-            <TextView android:id="@+id/tvDebugCleartext" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/white" android:textSize="16sp" android:layout_marginBottom="4dp"/>
-            <TextView android:id="@+id/tvDebugRetrofit" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/white" android:textSize="16sp" android:layout_marginBottom="16dp"/>
+            <TextView android:id="@+id/tvDebugState" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/signage_text_primary" android:textSize="16sp" android:layout_marginBottom="4dp" />
+            <TextView android:id="@+id/tvDebugCommand" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/signage_text_primary" android:textSize="16sp" android:layout_marginBottom="4dp" />
+            <TextView android:id="@+id/tvDebugBaseUrl" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/signage_text_primary" android:textSize="16sp" android:layout_marginBottom="4dp" />
+            <TextView android:id="@+id/tvDebugCleartext" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/signage_text_primary" android:textSize="16sp" android:layout_marginBottom="16dp" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="EXCEPTION DETAILS:"
-                android:textColor="#FFEB3B"
+                android:layout_marginBottom="8dp"
+                android:text="@string/debug_exception_details"
+                android:textColor="@color/signage_accent"
                 android:textSize="20sp"
-                android:textStyle="bold"
-                android:layout_marginBottom="8dp" />
+                android:textStyle="bold" />
 
-            <TextView android:id="@+id/tvDebugExceptionClass" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#EF9A9A" android:textSize="16sp" android:textStyle="bold" android:layout_marginBottom="4dp"/>
-            <TextView android:id="@+id/tvDebugExceptionMessage" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/white" android:textSize="16sp" android:textStyle="italic" android:layout_marginBottom="12dp"/>
-            <TextView android:id="@+id/tvDebugExceptionTrace" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#B0BEC5" android:textSize="12sp" android:fontFamily="monospace"/>
-            
+            <TextView android:id="@+id/tvDebugExceptionClass" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/signage_error" android:textSize="16sp" android:textStyle="bold" android:layout_marginBottom="4dp" />
+            <TextView android:id="@+id/tvDebugExceptionMessage" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/signage_text_primary" android:textSize="16sp" android:textStyle="italic" android:layout_marginBottom="12dp" />
+            <TextView android:id="@+id/tvDebugExceptionTrace" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/signage_text_muted" android:textSize="12sp" android:fontFamily="monospace" />
+
         </LinearLayout>
     </ScrollView>
-
-    <LinearLayout
-        android:id="@+id/debugView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:gravity="center"
-        android:orientation="vertical"
-        android:padding="48dp"
-        android:visibility="gone">
-
-        <TextView
-            android:id="@+id/tvDebugDeviceId"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="@color/white"
-            android:textSize="20sp"
-            android:layout_marginBottom="8dp" />
-
-        <TextView
-            android:id="@+id/tvDebugConnection"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="@color/teal_200"
-            android:textSize="18sp"
-            android:layout_marginBottom="16dp" />
-
-        <View
-            android:layout_width="200dp"
-            android:layout_height="1dp"
-            android:background="#33FFFFFF"
-            android:layout_marginBottom="16dp" />
-
-        <TextView
-            android:id="@+id/tvDebugPlaylistName"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="@color/white"
-            android:textSize="28sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="8dp" />
-
-        <TextView
-            android:id="@+id/tvDebugPlaylistVersion"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="#B0FFFFFF"
-            android:textSize="16sp"
-            android:layout_marginBottom="4dp" />
-
-        <TextView
-            android:id="@+id/tvDebugItemCount"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="#B0FFFFFF"
-            android:textSize="16sp"
-            android:layout_marginBottom="16dp" />
-
-        <View
-            android:layout_width="200dp"
-            android:layout_height="1dp"
-            android:background="#33FFFFFF"
-            android:layout_marginBottom="16dp" />
-
-        <TextView
-            android:id="@+id/tvDebugDownloadStatus"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="@color/teal_200"
-            android:textSize="18sp"
-            android:layout_marginBottom="8dp" />
-
-        <ProgressBar
-            android:id="@+id/downloadProgressBar"
-            style="?android:attr/progressBarStyleHorizontal"
-            android:layout_width="300dp"
-            android:layout_height="wrap_content"
-            android:max="100"
-            android:progress="0"
-            android:layout_marginBottom="8dp" />
-
-        <TextView
-            android:id="@+id/tvDebugCachedCount"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="#B0FFFFFF"
-            android:textSize="16sp"
-            android:layout_marginBottom="4dp" />
-
-        <TextView
-            android:id="@+id/tvDebugLastSync"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="#80FFFFFF"
-            android:textSize="14sp"
-            android:layout_marginBottom="4dp" />
-
-        <TextView
-            android:id="@+id/tvDebugError"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="#FFFF5252"
-            android:textSize="14sp"
-            android:visibility="gone" />
-
-    </LinearLayout>
 
 </FrameLayout>

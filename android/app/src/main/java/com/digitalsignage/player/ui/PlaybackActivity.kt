@@ -4,14 +4,18 @@ import android.content.Context
 import android.os.Bundle
 import android.os.Environment
 import android.view.KeyEvent
+import android.view.View
 import java.io.File
 import java.io.FileOutputStream
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.ui.PlayerView
+import com.digitalsignage.player.R
 import com.digitalsignage.player.core.event.PlayerEvent
 import com.digitalsignage.player.core.event.PlayerEventBus
+import com.digitalsignage.player.core.identity.DeviceIdentityManager
+import com.digitalsignage.player.core.network.NetworkMonitor
 import com.digitalsignage.player.databinding.ActivityPlaybackBinding
 import com.digitalsignage.player.domain.orchestrator.PlayerOrchestrator
 import com.digitalsignage.player.domain.playback.PlaybackController
@@ -43,9 +47,9 @@ class PlaybackActivity : AppCompatActivity() {
     @Inject lateinit var playbackController: PlaybackController
     @Inject lateinit var eventBus: PlayerEventBus
     @Inject lateinit var runtimeConfigStore: RuntimeConfigStoreImpl
-    @Inject lateinit var otaUpdateManager: com.digitalsignage.player.core.ota.manager.OtaUpdateManager
-    @Inject lateinit var apkDownloadManager: com.digitalsignage.player.core.ota.downloader.ApkDownloadManager
-    @Inject lateinit var otaInstallManager: com.digitalsignage.player.core.ota.installer.OtaInstallManager
+    @Inject lateinit var otaCoordinator: com.digitalsignage.player.core.ota.manager.OtaCoordinator
+    @Inject lateinit var networkMonitor: NetworkMonitor
+    @Inject lateinit var deviceIdentityManager: DeviceIdentityManager
 
     private val viewModel: PlaybackViewModel by viewModels()
 
@@ -90,6 +94,10 @@ class PlaybackActivity : AppCompatActivity() {
         // Hide system UI immediately
         hideSystemUI()
 
+        // Cold start shows the "Starting up" status screen, never "No content".
+        renderState(PresentationState.Booting)
+        bindIdentityBar()
+
         binding.btnCopyDiagnostics.setOnClickListener {
             copyDiagnosticsToClipboard()
         }
@@ -98,42 +106,49 @@ class PlaybackActivity : AppCompatActivity() {
         }
         binding.btnTriggerInstall.setOnClickListener {
             android.util.Log.i("KioskTrace", "[OTA] Trigger Install clicked. Initiating manual installation pre-checks...")
-            otaInstallManager.install()
+            otaCoordinator.triggerInstallNow()
         }
 
-        // Collect and trace installation states
+        // The OTA pipeline itself lives in OtaCoordinator (application scope). The Activity is a
+        // pure observer: it logs progress and never drives check/download/install.
         lifecycleScope.launch {
-            otaInstallManager.installState.collect { state ->
+            otaCoordinator.otaState.collect { state ->
                 when (state) {
-                    is com.digitalsignage.player.core.ota.installer.InstallResult.Idle -> {
-                        android.util.Log.i("KioskTrace", "[OTA] Installation State: Idle")
+                    is com.digitalsignage.player.core.ota.model.OtaState.Idle -> {
+                        android.util.Log.i("KioskTrace", "[OTA] State: Idle")
                     }
-                    is com.digitalsignage.player.core.ota.installer.InstallResult.Preparing -> {
-                        android.util.Log.i("KioskTrace", "[OTA] Installation State: Preparing")
+                    is com.digitalsignage.player.core.ota.model.OtaState.Checking -> {
+                        android.util.Log.i("KioskTrace", "[OTA] State: Checking for updates")
                     }
-                    is com.digitalsignage.player.core.ota.installer.InstallResult.Validating -> {
-                        android.util.Log.i("KioskTrace", "[OTA] Installation State: Validating package identity and signatures")
+                    is com.digitalsignage.player.core.ota.model.OtaState.UpToDate -> {
+                        android.util.Log.i("KioskTrace", "[OTA] State: App is up to date")
                     }
-                    is com.digitalsignage.player.core.ota.installer.InstallResult.Installing -> {
-                        android.util.Log.i("KioskTrace", "[OTA] Installation State: Triggering package installation")
+                    is com.digitalsignage.player.core.ota.model.OtaState.UpdateFound -> {
+                        android.util.Log.i(
+                            "KioskTrace",
+                            "[OTA] State: Update found ${state.versionName} (${state.versionCode}), mandatory=${state.mandatory}"
+                        )
                     }
-                    is com.digitalsignage.player.core.ota.installer.InstallResult.InstallCommitted -> {
-                        android.util.Log.i("KioskTrace", "[OTA] Installation State: Install Session Committed. Waiting for callback...")
+                    is com.digitalsignage.player.core.ota.model.OtaState.Downloading -> {
+                        android.util.Log.i("KioskTrace", "[OTA] State: Downloading ${state.percent}%")
                     }
-                    is com.digitalsignage.player.core.ota.installer.InstallResult.Installed -> {
-                        android.util.Log.i("KioskTrace", "[OTA] Installation State: Installation Completed successfully!")
+                    is com.digitalsignage.player.core.ota.model.OtaState.Verifying -> {
+                        android.util.Log.i("KioskTrace", "[OTA] State: Verifying checksum")
                     }
-                    is com.digitalsignage.player.core.ota.installer.InstallResult.RequiresUserConfirmation -> {
-                        android.util.Log.w("KioskTrace", "[OTA] Installation State: Requires user confirmation to proceed.")
+                    is com.digitalsignage.player.core.ota.model.OtaState.ReadyForInstall -> {
+                        android.util.Log.i("KioskTrace", "[OTA] State: Ready for installation")
                     }
-                    is com.digitalsignage.player.core.ota.installer.InstallResult.WaitingForReboot -> {
-                        android.util.Log.i("KioskTrace", "[OTA] Installation State: Waiting for device reboot/package replacement.")
+                    is com.digitalsignage.player.core.ota.model.OtaState.Installing -> {
+                        android.util.Log.i("KioskTrace", "[OTA] State: Installing")
                     }
-                    is com.digitalsignage.player.core.ota.installer.InstallResult.Cancelled -> {
-                        android.util.Log.i("KioskTrace", "[OTA] Installation State: Cancelled.")
+                    is com.digitalsignage.player.core.ota.model.OtaState.Installed -> {
+                        android.util.Log.i("KioskTrace", "[OTA] State: Installed")
                     }
-                    is com.digitalsignage.player.core.ota.installer.InstallResult.Failed -> {
-                        android.util.Log.e("KioskTrace", "[OTA] Installation State: Failed (reason: ${state.reason})")
+                    is com.digitalsignage.player.core.ota.model.OtaState.Offline -> {
+                        android.util.Log.i("KioskTrace", "[OTA] State: Offline, pipeline skipped")
+                    }
+                    is com.digitalsignage.player.core.ota.model.OtaState.Failed -> {
+                        android.util.Log.e("KioskTrace", "[OTA] State: Failed (reason: ${state.reason})")
                     }
                 }
             }
@@ -173,8 +188,8 @@ class PlaybackActivity : AppCompatActivity() {
                         }
                     }
                     is PlayerEvent.PlaybackStarted -> {
-                        binding.loadingIndicator.visibility = android.view.View.GONE
-                        binding.debugExceptionView.visibility = android.view.View.GONE
+                        binding.loadingIndicator.visibility = View.GONE
+                        binding.debugExceptionView.visibility = View.GONE
 
                         android.util.Log.i("PlayerViewTrace", "PlaybackStarted")
                         android.util.Log.i("PlayerViewTrace", "playerNull=${binding.playerView.player == null}")
@@ -186,22 +201,23 @@ class PlaybackActivity : AppCompatActivity() {
                     }
                     is PlayerEvent.StartupException -> {
                         if (com.digitalsignage.player.BuildConfig.DEBUG) {
-                            binding.loadingIndicator.visibility = android.view.View.GONE
-                            binding.debugExceptionView.visibility = android.view.View.VISIBLE
-                            
-                            binding.tvDebugState.text = "State: ${event.state}"
-                            binding.tvDebugCommand.text = "Command: ${event.command}"
-                            binding.tvDebugBaseUrl.text = "BASE_URL: ${com.digitalsignage.player.BuildConfig.BASE_URL}"
+                            binding.loadingIndicator.visibility = View.GONE
+                            binding.debugExceptionView.visibility = View.VISIBLE
+
+                            binding.tvDebugState.text = getString(R.string.debug_state_format, event.state)
+                            binding.tvDebugCommand.text = getString(R.string.debug_command_format, event.command)
+                            binding.tvDebugBaseUrl.text =
+                                getString(R.string.debug_base_url_format, com.digitalsignage.player.BuildConfig.BASE_URL)
                             binding.tvDebugExceptionClass.text = event.exceptionClass
                             binding.tvDebugExceptionMessage.text = event.exceptionMessage
-                            binding.tvDebugExceptionTrace.text = "Initializing diagnostics framework..."
-                            
+                            binding.tvDebugExceptionTrace.setText(R.string.debug_diagnostics_running)
+
                             lifecycleScope.launch(Dispatchers.IO) {
                                 com.digitalsignage.player.core.diagnostics.DiagnosticsFramework.runDiagnostics(this@PlaybackActivity) { report ->
                                     lastDiagnosticsReport = report
                                     lifecycleScope.launch(Dispatchers.Main) {
                                         binding.tvDebugExceptionTrace.text = report
-                                        binding.tvDebugCleartext.text = "Diagnostics run complete."
+                                        binding.tvDebugCleartext.setText(R.string.debug_diagnostics_complete)
                                     }
                                 }
                             }
@@ -229,61 +245,9 @@ class PlaybackActivity : AppCompatActivity() {
             applyOrientation(currentOrientation)
         }
 
-        // Trigger OTA Update Check (Phase 1)
-        lifecycleScope.launch {
-            when (val result = otaUpdateManager.checkForUpdates()) {
-                is com.digitalsignage.player.core.ota.model.OtaCheckResult.UpdateAvailable -> {
-                    android.util.Log.i("KioskTrace", """
-                        ==================================================
-                        [OTA] UPDATE AVAILABLE
-                        Current Version : ${result.currentVersionCode}
-                        Latest Version  : ${result.latestVersionCode} (name: ${result.versionName})
-                        Mandatory       : ${result.mandatory}
-                        APK URL         : ${result.apkUrl}
-                        Checksum        : ${result.checksum}
-                        File Size       : ${result.fileSize} bytes
-                        Release Notes   : ${result.releaseNotes ?: "None"}
-                        ==================================================
-                    """.trimIndent())
-
-                    // Trigger Phase 2 Background Download Flow
-                    lifecycleScope.launch {
-                        apkDownloadManager.downloadState.collect { state ->
-                            when (state) {
-                                is com.digitalsignage.player.core.ota.downloader.DownloadState.Idle -> {
-                                    android.util.Log.i("KioskTrace", "[OTA] Download State: Idle")
-                                }
-                                is com.digitalsignage.player.core.ota.downloader.DownloadState.Downloading -> {
-                                    android.util.Log.i("KioskTrace", "[OTA] Download State: Downloading")
-                                }
-                                is com.digitalsignage.player.core.ota.downloader.DownloadState.Progress -> {
-                                    android.util.Log.i("KioskTrace", "[OTA] Download State: Progress ${state.percent}%")
-                                }
-                                is com.digitalsignage.player.core.ota.downloader.DownloadState.Verifying -> {
-                                    android.util.Log.i("KioskTrace", "[OTA] Download State: Verifying checksum")
-                                }
-                                is com.digitalsignage.player.core.ota.downloader.DownloadState.ReadyForInstall -> {
-                                    android.util.Log.i("KioskTrace", "[OTA] Download State: ReadyForInstall. [OTA] Ready for installation")
-                                }
-                                is com.digitalsignage.player.core.ota.downloader.DownloadState.Failed -> {
-                                    android.util.Log.e("KioskTrace", "[OTA] Download State: Failed (reason: ${state.reason})")
-                                }
-                            }
-                        }
-                    }
-
-                    lifecycleScope.launch {
-                        apkDownloadManager.download(result)
-                    }
-                }
-                is com.digitalsignage.player.core.ota.model.OtaCheckResult.NoUpdate -> {
-                    android.util.Log.i("KioskTrace", "[OTA] No update available. App is up to date.")
-                }
-                is com.digitalsignage.player.core.ota.model.OtaCheckResult.Failure -> {
-                    android.util.Log.w("KioskTrace", "[OTA] Check failed: ${result.message}")
-                }
-            }
-        }
+        // OTA check/download/install is scheduled by OtaCoordinator from Application.onCreate();
+        // the call below is a defensive no-op if the coordinator is already running.
+        otaCoordinator.start()
     }
 
     override fun onStart() {
@@ -323,7 +287,7 @@ class PlaybackActivity : AppCompatActivity() {
 
     override fun onStop() {
         super.onStop()
-        playerOrchestrator.detachActivity()
+        playerOrchestrator.detachActivity(this)
     }
 
     override fun onDestroy() {
@@ -424,7 +388,7 @@ class PlaybackActivity : AppCompatActivity() {
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
         val clip = android.content.ClipData.newPlainText("Diagnostics Report", lastDiagnosticsReport)
         clipboard.setPrimaryClip(clip)
-        android.widget.Toast.makeText(this, "Diagnostics report copied!", android.widget.Toast.LENGTH_SHORT).show()
+        android.widget.Toast.makeText(this, R.string.debug_report_copied, android.widget.Toast.LENGTH_SHORT).show()
     }
 
     private fun saveDiagnosticsToDownloads() {
@@ -444,52 +408,214 @@ class PlaybackActivity : AppCompatActivity() {
             FileOutputStream(file).use { fos ->
                 fos.write(lastDiagnosticsReport.toByteArray())
             }
-            android.widget.Toast.makeText(this, "Report saved: ${file.name}", android.widget.Toast.LENGTH_LONG).show()
+            android.widget.Toast.makeText(
+                this,
+                getString(R.string.debug_report_saved, file.name),
+                android.widget.Toast.LENGTH_LONG
+            ).show()
         } catch (e: Exception) {
             android.util.Log.e("RegisterTrace", "Failed to save diagnostics file", e)
-            android.widget.Toast.makeText(this, "Save failed: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+            android.widget.Toast.makeText(
+                this,
+                getString(R.string.debug_report_save_failed, e.message ?: ""),
+                android.widget.Toast.LENGTH_LONG
+            ).show()
         }
     }
 
+    // -------------------------------------------------------------------------------------------
+    // Status / media rendering
+    // -------------------------------------------------------------------------------------------
+
+    /**
+     * Renders every [PresentationState] branch. Media states show the player/image surfaces;
+     * every other state shows the status screen inside [ActivityPlaybackBinding.statusView]
+     * (which lives inside playbackRootContainer, so it rotates with the content).
+     */
     private fun renderState(state: PresentationState) {
         android.util.Log.i("PlaybackActivity", "UI rendering state: ${state::class.java.simpleName}")
         when (state) {
-            is PresentationState.Idle -> {
-                binding.playerView.visibility = android.view.View.GONE
-                binding.imageView.visibility = android.view.View.GONE
-                binding.imageView.dispose()
-                binding.imageView.setImageDrawable(null)
-                binding.loadingIndicator.visibility = android.view.View.GONE
-                binding.idleView.visibility = android.view.View.VISIBLE
-            }
-            is PresentationState.Loading -> {
-                binding.idleView.visibility = android.view.View.GONE
-                binding.loadingIndicator.visibility = android.view.View.VISIBLE
-            }
             is PresentationState.Image -> {
-                binding.idleView.visibility = android.view.View.GONE
-                binding.loadingIndicator.visibility = android.view.View.GONE
-                
-                binding.imageView.visibility = android.view.View.VISIBLE
-                binding.playerView.visibility = android.view.View.VISIBLE
-                
+                hideStatusScreen()
+                binding.loadingIndicator.visibility = View.GONE
+                binding.imageView.visibility = View.VISIBLE
+                binding.playerView.visibility = View.VISIBLE
                 binding.imageView.load(state.file) {
                     crossfade(true)
                     placeholder(android.R.color.black)
                     error(android.R.color.black)
                 }
             }
+
             is PresentationState.Video -> {
-                binding.idleView.visibility = android.view.View.GONE
-                binding.loadingIndicator.visibility = android.view.View.GONE
-                
-                binding.imageView.visibility = android.view.View.GONE
-                binding.imageView.dispose()
-                binding.imageView.setImageDrawable(null)
-                
-                binding.playerView.visibility = android.view.View.VISIBLE
+                hideStatusScreen()
+                binding.loadingIndicator.visibility = View.GONE
+                clearImage()
+                binding.playerView.visibility = View.VISIBLE
+            }
+
+            // Transient: keep whatever is on screen and show only the small spinner, so
+            // switching between playlist items never flashes the full status screen.
+            is PresentationState.Loading -> {
+                hideStatusScreen()
+                binding.loadingIndicator.visibility = View.VISIBLE
+            }
+
+            is PresentationState.Booting -> showStatus(
+                busy = true,
+                iconRes = R.drawable.ic_status_waiting,
+                primary = getString(R.string.status_booting_title),
+                secondary = getString(R.string.status_booting_subtitle)
+            )
+
+            is PresentationState.Registering -> showStatus(
+                busy = true,
+                iconRes = R.drawable.ic_status_waiting,
+                primary = getString(R.string.status_registering_title),
+                secondary = getString(R.string.status_registering_subtitle)
+            )
+
+            is PresentationState.Syncing -> showStatus(
+                busy = true,
+                iconRes = R.drawable.ic_status_waiting,
+                primary = getString(R.string.status_syncing_title),
+                secondary = getString(R.string.status_syncing_subtitle)
+            )
+
+            is PresentationState.Downloading -> showStatus(
+                busy = true,
+                iconRes = R.drawable.ic_status_waiting,
+                primary = if (state.total > 0) {
+                    getString(
+                        R.string.status_downloading_title,
+                        (state.completed + 1).coerceAtMost(state.total),
+                        state.total
+                    )
+                } else {
+                    getString(R.string.status_downloading_title_unknown)
+                },
+                secondary = getString(R.string.status_downloading_subtitle),
+                progressPercent = state.percent
+            )
+
+            is PresentationState.Offline -> showStatus(
+                busy = false,
+                iconRes = R.drawable.ic_status_offline,
+                primary = getString(R.string.status_offline_title),
+                secondary = getString(R.string.status_offline_subtitle)
+            )
+
+            is PresentationState.Error -> showStatus(
+                busy = false,
+                iconRes = R.drawable.ic_status_error,
+                primary = getString(R.string.status_error_title),
+                secondary = state.message
+            )
+
+            is PresentationState.NoContent, is PresentationState.Idle -> showStatus(
+                busy = false,
+                iconRes = R.drawable.ic_status_waiting,
+                primary = getString(R.string.status_no_content_title),
+                secondary = getString(R.string.status_no_content_subtitle)
+            )
+        }
+    }
+
+    private fun clearImage() {
+        binding.imageView.visibility = View.GONE
+        binding.imageView.dispose()
+        binding.imageView.setImageDrawable(null)
+    }
+
+    private fun hideStatusScreen() {
+        binding.statusView.visibility = View.GONE
+    }
+
+    private fun showStatus(
+        busy: Boolean,
+        iconRes: Int,
+        primary: CharSequence,
+        secondary: CharSequence,
+        progressPercent: Int? = null
+    ) {
+        binding.playerView.visibility = View.GONE
+        clearImage()
+        binding.loadingIndicator.visibility = View.GONE
+
+        binding.statusSpinner.visibility = if (busy) View.VISIBLE else View.GONE
+        binding.statusIcon.visibility = if (busy) View.GONE else View.VISIBLE
+        if (!busy) binding.statusIcon.setImageResource(iconRes)
+
+        binding.tvStatusPrimary.text = primary
+        binding.tvStatusSecondary.text = secondary
+
+        if (progressPercent != null) {
+            binding.pbDownloadProgress.visibility = View.VISIBLE
+            binding.pbDownloadProgress.progress = progressPercent.coerceIn(0, 100)
+        } else {
+            binding.pbDownloadProgress.visibility = View.GONE
+        }
+
+        binding.statusView.visibility = View.VISIBLE
+    }
+
+    /** Fills the bottom identity bar from DeviceIdentityManager / RuntimeConfigStore. */
+    private fun bindIdentityBar() {
+        val metadata = try {
+            deviceIdentityManager.getDeviceMetadata()
+        } catch (e: Exception) {
+            android.util.Log.w("PlaybackActivity", "Device metadata unavailable", e)
+            null
+        }
+
+        binding.tvDeviceName.text = listOfNotNull(
+            android.os.Build.MANUFACTURER?.takeIf { it.isNotBlank() },
+            android.os.Build.MODEL?.takeIf { it.isNotBlank() }
+        ).joinToString(" ").ifBlank { getString(R.string.identity_device_name_unknown) }
+
+        binding.tvAppVersion.text = getString(
+            R.string.identity_version_format,
+            metadata?.appVersion ?: com.digitalsignage.player.BuildConfig.VERSION_NAME
+        )
+
+        binding.tvDeviceIp.text = localIpAddress()
+            ?.let { getString(R.string.identity_ip_format, it) }
+            ?: getString(R.string.identity_ip_unknown)
+
+        lifecycleScope.launch {
+            runtimeConfigStore.deviceId.collect { id ->
+                binding.tvDeviceIdChip.text = id?.takeIf { it.isNotBlank() }
+                    ?: getString(R.string.identity_device_id_placeholder)
             }
         }
+
+        lifecycleScope.launch {
+            networkMonitor.isOnline.collect { online ->
+                binding.viewOnlineDot.setBackgroundResource(
+                    if (online) R.drawable.dot_status_online else R.drawable.dot_status_offline
+                )
+                binding.tvOnlineLabel.setText(
+                    if (online) R.string.identity_online else R.string.identity_offline
+                )
+                binding.tvDeviceIp.text = localIpAddress()
+                    ?.let { getString(R.string.identity_ip_format, it) }
+                    ?: getString(R.string.identity_ip_unknown)
+            }
+        }
+    }
+
+    /** First non-loopback IPv4 address of an up interface, or null. */
+    private fun localIpAddress(): String? = try {
+        java.net.NetworkInterface.getNetworkInterfaces()
+            ?.toList()
+            ?.asSequence()
+            ?.filter { it.isUp && !it.isLoopback }
+            ?.flatMap { it.inetAddresses.toList().asSequence() }
+            ?.firstOrNull { !it.isLoopbackAddress && it is java.net.Inet4Address }
+            ?.hostAddress
+    } catch (e: Exception) {
+        android.util.Log.w("PlaybackActivity", "Unable to resolve local IP address", e)
+        null
     }
     private fun applyOrientation(orientation: String) {
         val rotationDegrees = when (orientation) {

@@ -1,5 +1,6 @@
 package com.digitalsignage.player.core.event
 
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -32,6 +33,8 @@ sealed class PlayerEvent {
     data class DownloadCompleted(val mediaId: String) : PlayerEvent()
     data class DownloadStarted(val mediaId: String) : PlayerEvent()
     data class DownloadProgress(val mediaId: String, val progress: Int) : PlayerEvent()
+    /** Aggregate progress of the pending playlist: how many of its items are on disk. */
+    data class DownloadQueueProgress(val completed: Int, val total: Int) : PlayerEvent()
     data class DownloadFailed(val mediaId: String, val error: Exception) : PlayerEvent()
     object PlaylistReady : PlayerEvent()
     object HeartbeatStarted : PlayerEvent()
@@ -64,11 +67,18 @@ sealed class PlayerEvent {
 
 @Singleton
 class PlayerEventBus @Inject constructor() {
-    private val _events = MutableSharedFlow<PlayerEvent>(extraBufferCapacity = 50)
+    // Large buffer + DROP_OLDEST so a burst of DebugStage events can never make tryEmit()
+    // silently discard a critical event such as PlaylistReady or RegistrationSucceeded.
+    private val _events = MutableSharedFlow<PlayerEvent>(
+        extraBufferCapacity = 256,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
     val events: SharedFlow<PlayerEvent> = _events.asSharedFlow()
 
     fun publish(event: PlayerEvent) {
-        _events.tryEmit(event)
+        if (!_events.tryEmit(event)) {
+            android.util.Log.w("PlayerEventBus", "Dropped event ${event::class.java.simpleName}: buffer full")
+        }
     }
 }
 

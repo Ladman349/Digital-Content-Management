@@ -1,5 +1,9 @@
 import os
+from dotenv import load_dotenv
 from pydantic import BaseModel, Field
+
+# Load backend/.env (if present) before any os.getenv() defaults are evaluated
+load_dotenv()
 
 def resolve_api_base_url() -> str:
     railway_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
@@ -24,11 +28,24 @@ class Settings(BaseModel):
     SUPABASE_URL: str | None = Field(default_factory=lambda: os.getenv("SUPABASE_URL"))
     SUPABASE_SERVICE_ROLE_KEY: str | None = Field(default_factory=lambda: os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
     SUPABASE_STORAGE_BUCKET: str = Field(default_factory=lambda: os.getenv("SUPABASE_STORAGE_BUCKET", "media"))
+    # Player APKs live in their own bucket so an OTA release survives a backend redeploy.
+    # The bucket and its public-read policy are created by migration_to_new_supabase.sql.
+    SUPABASE_APK_BUCKET: str = Field(default_factory=lambda: os.getenv("SUPABASE_APK_BUCKET", "apks"))
     
     # API base and CORS configs
     API_BASE_URL: str = Field(default_factory=resolve_api_base_url)
     CORS_ALLOWED_ORIGINS: str = Field(default_factory=lambda: os.getenv("CORS_ALLOWED_ORIGINS", ""))
     SECRET_KEY: str = Field(default_factory=lambda: os.getenv("SECRET_KEY", "super-secret-key-change-in-production"))
+
+    # ── Authentication (both opt-in; see app/core/auth.py) ────────────────────────────────
+    # Set ADMIN_API_KEY to require a key on CMS routes. Empty means no admin auth, which keeps
+    # existing deployments working unchanged after an upgrade.
+    ADMIN_API_KEY: str = Field(default_factory=lambda: os.getenv("ADMIN_API_KEY", ""))
+    # Only enable once every player in the field sends its real device token. A device that cannot
+    # authenticate also cannot fetch the OTA update that would fix it.
+    REQUIRE_DEVICE_AUTH: bool = Field(
+        default_factory=lambda: os.getenv("REQUIRE_DEVICE_AUTH", "false").strip().lower() in ("1", "true", "yes", "on")
+    )
     OTA_MAX_UPLOAD_MB: int = Field(default_factory=lambda: int(os.getenv("OTA_MAX_UPLOAD_MB", "150")))
 
     def validate_production(self):

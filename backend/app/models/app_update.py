@@ -16,6 +16,9 @@ class AppUpdate(Base):
     version_code = Column("version_code", Integer, nullable=False, unique=True)
     apk_filename = Column("apk_filename", Text, nullable=False)
     apk_url = Column("apk_url", Text, nullable=False)
+    # Object-storage URI (e.g. supabase://apks/player-v14-....apk). NULL means the APK only
+    # exists on this server's local disk, which does not survive a redeploy on Railway.
+    storage_uri = Column("storage_uri", Text, nullable=True)
     checksum_sha256 = Column("checksum_sha256", String, nullable=False)
     file_size = Column("file_size", BigInteger, nullable=False)
     release_notes = Column("release_notes", Text, nullable=True)
