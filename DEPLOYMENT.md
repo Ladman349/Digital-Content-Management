@@ -268,8 +268,9 @@ Section 6 covers what is implemented. What remains:
   edge, and consider a short-lived enrollment code entered during installation.
 * **Signing key rotation.** The release keystore and its passwords were committed to git and should
   be treated as compromised. Rotating the key means every screen in the field needs a manual
-  re-install, because Android rejects an update signed with a different key. Do it before the fleet
-  grows.
+  re-install, because Android rejects an update signed with a different key, and the OTA system
+  cannot work around it. Do it before the fleet grows — the cost is linear in screens. Step-by-step
+  procedure: [docs/KEY_ROTATION.md](docs/KEY_ROTATION.md).
 * **Secret rotation.** `SECRET_KEY` still defaults to its placeholder value. It is unused today, but
   set it before anything starts signing with it.
 
