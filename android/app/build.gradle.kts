@@ -131,6 +131,15 @@ android {
                 // Fails the build during packaging if not properly configured
                 storeFile = file("unconfigured_keystore")
             }
+
+            // v1 (JAR signing) is for Android 6 and below; minSdk is 24, so it only slows installs.
+            // v2 is what actually verifies the APK on every device we support.
+            // v3 carries the signing certificate's rotation lineage. Without it a future key change
+            // means physically revisiting every screen again, which is the situation we are in now
+            // precisely because the original build never enabled it.
+            enableV1Signing = false
+            enableV2Signing = true
+            enableV3Signing = true
         }
     }
 
