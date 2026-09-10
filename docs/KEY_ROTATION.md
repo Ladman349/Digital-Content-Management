@@ -70,15 +70,32 @@ never update again.
 Build a release APK and confirm it carries the new certificate:
 
 ```
-cd android && .\gradlew.bat assembleRelease
+cd android
+.\gradlew.bat assembleProdRelease
 ```
 
+Read the certificate with **apksigner**, not `keytool`. `keytool -printcert -jarfile` only
+understands v1 JAR signatures and answers "Not a signed jar file" for a v2/v3-signed APK, which
+looks alarming and means nothing at all. apksigner needs `JAVA_HOME` pointed at the Android Studio
+JBR:
+
 ```
-"C:\Program Files\Android\Android Studio\jbr\bin\keytool.exe" -printcert -jarfile android\app\build\outputs\apk\release\app-release.apk
+$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
+& "$env:LOCALAPPDATA\Android\Sdk\build-tools\36.1.0\apksigner.bat" verify --verbose --print-certs android\app\build\outputs\apk\prod\release\app-prod-release.apk
 ```
 
-The SHA-256 fingerprint must differ from the old key's. If it matches, the build is still picking up
-the old keystore and nothing has actually rotated.
+The SHA-256 digest must differ from the old key's. If it matches, the build is still picking up the
+old keystore and nothing has actually rotated.
+
+For the record, the rotation carried out on 11 September 2026:
+
+| | Certificate |
+| --- | --- |
+| Old, leaked | `CN=Test, OU=Test, O=Test, C=US` &middot; `ac3fb321...febc2dc2` |
+| New | `CN=Digital Signage Player, L=Kozhikode, C=IN` &middot; `2936ad18...1055c017` |
+
+The old certificate was a placeholder someone generated to get a build out, which is worth knowing:
+nothing of value was lost in replacing it.
 
 ## 5. Destroy the old key — but not yet
 
