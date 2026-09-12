@@ -23,8 +23,11 @@ android {
         applicationId = "com.digitalsignage.player"
         minSdk = 24
         targetSdk = 34
-        versionCode = 3
-        versionName = "1.0.0"
+        // 4 / 1.1.0 is the first build signed with the rotated key. It has to sit above the fleet's
+        // 1.0.0 (3), or the Updates page cannot tell rotated screens from unrotated ones and the OTA
+        // check never sees anything newer to offer.
+        versionCode = 4
+        versionName = "1.1.0"
     }
 
     flavorDimensions += "environment"
@@ -100,7 +103,7 @@ android {
         }
         create("prod") {
             dimension = "environment"
-            val prodHost = localProperties.getProperty("PROD_API_HOST") ?: System.getenv("PROD_API_HOST") ?: "digital-content-management-production-6fd4.up.railway.app"
+            val prodHost = localProperties.getProperty("PROD_API_HOST") ?: System.getenv("PROD_API_HOST") ?: "digital-content-management-production-9a88.up.railway.app"
             val prodPort = localProperties.getProperty("PROD_API_PORT") ?: System.getenv("PROD_API_PORT")
             
             val url = if (prodPort.isNullOrEmpty() || prodPort == "443") {
