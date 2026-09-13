@@ -1,17 +1,18 @@
 import { useMemo, useRef, useState } from "react";
-import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, InputAdornment, MenuItem, TextField, Tooltip, Typography } from "@mui/material";
+import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, InputAdornment, MenuItem, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ArrowUpwardRoundedIcon from "@mui/icons-material/ArrowUpwardRounded";
 import ArrowDownwardRoundedIcon from "@mui/icons-material/ArrowDownwardRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import DragIndicatorRoundedIcon from "@mui/icons-material/DragIndicatorRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
+import PermMediaRoundedIcon from "@mui/icons-material/PermMediaRounded";
 import { useSnackbar } from "notistack";
 import type { MediaItem } from "../../types/media";
 import type { Playlist, PlaylistItem, PlaylistStatus } from "../../types/playlist";
 import MediaThumb from "../../components/ui/MediaThumb";
 import EmptyState from "../../components/ui/EmptyState";
-import PermMediaRoundedIcon from "@mui/icons-material/PermMediaRounded";
+import { useIsCompact } from "../../hooks/useIsPhone";
 import { formatDuration, pluralize } from "../../utils/format";
 
 interface Props {
@@ -24,13 +25,20 @@ interface Props {
 
 const DEFAULT_IMAGE_SECONDS = 10;
 
+type Pane = "sequence" | "library";
+
 /**
  * Full-screen playlist editor: media library on the left, ordered sequence on the right.
  * Items can be reordered by drag or with the keyboard-accessible arrow buttons.
  * The parent mounts this only while open, so the draft always starts from the given playlist.
+ *
+ * Below `md` the two panes cannot sit side by side, so a toggle in the title swaps between them. The
+ * arrows carry reordering there too: HTML drag-and-drop never fires on a touch screen.
  */
 export default function PlaylistEditor({ playlist, mediaLibrary, saving, onClose, onSave }: Props) {
   const { enqueueSnackbar } = useSnackbar();
+  const compact = useIsCompact();
+  const [pane, setPane] = useState<Pane>("sequence");
   const [name, setName] = useState(playlist?.name ?? "");
   const [description, setDescription] = useState(playlist?.description ?? "");
   const [status, setStatus] = useState<PlaylistStatus>(playlist?.status ?? "Draft");
@@ -85,26 +93,61 @@ export default function PlaylistEditor({ playlist, mediaLibrary, saving, onClose
     onSave({ name: name.trim(), description: description.trim(), status, items, totalDuration: total });
   };
 
+  const showLibrary = !compact || pane === "library";
+  const showSequence = !compact || pane === "sequence";
+
   return (
-    <Dialog open onClose={saving ? undefined : onClose} fullWidth maxWidth="lg" slotProps={{ paper: { sx: { height: "min(88vh, 860px)" } } }}>
+    <Dialog
+      open
+      onClose={saving ? undefined : onClose}
+      fullWidth
+      maxWidth="lg"
+      fullScreen={compact}
+      slotProps={{ paper: { sx: { height: compact ? undefined : "min(88vh, 860px)" } } }}
+    >
       <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
         {playlist ? "Edit playlist" : "New playlist"}
         <Box sx={{ flex: 1 }} />
-        <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500, textTransform: "none", letterSpacing: 0 }}>
           {pluralize(items.length, "item")} · {formatDuration(total)} total
         </Typography>
+        {compact && (
+          <ToggleButtonGroup size="small" exclusive value={pane} onChange={(_, v) => v && setPane(v)} aria-label="Editor pane" sx={{ flexBasis: "100%", "& .MuiToggleButton-root": { flex: 1 } }}>
+            <ToggleButton value="sequence">Sequence · {items.length}</ToggleButton>
+            <ToggleButton value="library">Library · {mediaLibrary.length}</ToggleButton>
+          </ToggleButtonGroup>
+        )}
       </DialogTitle>
 
       <DialogContent dividers sx={{ p: 0, display: "flex", minHeight: 0 }}>
         {/* Library */}
-        <Box sx={{ width: 300, flexShrink: 0, borderRight: 1, borderColor: "surface.border", display: { xs: "none", md: "flex" }, flexDirection: "column", minHeight: 0 }}>
+        <Box
+          sx={{
+            width: { xs: "100%", md: 300 },
+            flexShrink: 0,
+            borderRight: { md: 1 },
+            borderColor: "surface.border",
+            display: showLibrary ? "flex" : "none",
+            flexDirection: "column",
+            minHeight: 0,
+          }}
+        >
           <Box sx={{ p: 1.25, borderBottom: 1, borderColor: "surface.border" }}>
             <TextField
               fullWidth
               placeholder="Search media…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRoundedIcon sx={{ fontSize: 18, color: "text.disabled" }} /></InputAdornment> } }}
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchRoundedIcon sx={{ fontSize: 18, color: "text.disabled" }} />
+                    </InputAdornment>
+                  ),
+                },
+                htmlInput: { inputMode: "search", "aria-label": "Search media" },
+              }}
             />
           </Box>
           <Box sx={{ flex: 1, overflowY: "auto", p: 1, display: "grid", gap: 0.5, alignContent: "start" }}>
@@ -141,9 +184,9 @@ export default function PlaylistEditor({ playlist, mediaLibrary, saving, onClose
         </Box>
 
         {/* Sequence */}
-        <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", minHeight: 0 }}>
+        <Box sx={{ flex: 1, minWidth: 0, display: showSequence ? "flex" : "none", flexDirection: "column", minHeight: 0 }}>
           <Box sx={{ p: 2, display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr", sm: "2fr 1fr" }, borderBottom: 1, borderColor: "surface.border" }}>
-            <TextField label="Playlist name" value={name} onChange={(e) => setName(e.target.value)} autoFocus required />
+            <TextField label="Playlist name" value={name} onChange={(e) => setName(e.target.value)} autoFocus={!compact} required />
             <TextField select label="Status" value={status} onChange={(e) => setStatus(e.target.value as PlaylistStatus)} helperText="Only Published playlists can be scheduled">
               <MenuItem value="Draft">Draft</MenuItem>
               <MenuItem value="Published">Published</MenuItem>
@@ -152,9 +195,16 @@ export default function PlaylistEditor({ playlist, mediaLibrary, saving, onClose
             <TextField label="Description" value={description} onChange={(e) => setDescription(e.target.value)} sx={{ gridColumn: { sm: "1 / -1" } }} />
           </Box>
 
-          <Box sx={{ flex: 1, overflowY: "auto", p: 2 }}>
+          <Box sx={{ flex: 1, overflowY: "auto", p: { xs: 1.5, md: 2 } }}>
             {items.length === 0 ? (
-              <EmptyState icon={PermMediaRoundedIcon} title="Empty sequence" description="Add media from the library on the left. Items play top to bottom, then loop." compact />
+              <EmptyState
+                icon={PermMediaRoundedIcon}
+                title="Empty sequence"
+                description={compact ? "Add media from the Library tab. Items play top to bottom, then loop." : "Add media from the library on the left. Items play top to bottom, then loop."}
+                actionLabel={compact ? "Open library" : undefined}
+                onAction={compact ? () => setPane("library") : undefined}
+                compact
+              />
             ) : (
               <Box sx={{ display: "grid", gap: 0.75 }}>
                 {items.map((item, index) => {
@@ -162,7 +212,7 @@ export default function PlaylistEditor({ playlist, mediaLibrary, saving, onClose
                   return (
                     <Box
                       key={item.id}
-                      draggable
+                      draggable={!compact}
                       onDragStart={() => (dragIndex.current = index)}
                       onDragOver={(e) => {
                         e.preventDefault();
@@ -182,6 +232,7 @@ export default function PlaylistEditor({ playlist, mediaLibrary, saving, onClose
                       sx={{
                         display: "flex",
                         alignItems: "center",
+                        flexWrap: "wrap",
                         gap: 1.25,
                         p: 1,
                         borderRadius: 1.5,
@@ -190,27 +241,31 @@ export default function PlaylistEditor({ playlist, mediaLibrary, saving, onClose
                         bgcolor: "background.paper",
                       }}
                     >
-                      <DragIndicatorRoundedIcon sx={{ fontSize: 18, color: "text.disabled", cursor: "grab" }} />
-                      <Typography variant="caption" color="text.secondary" sx={{ width: 18, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                        {index + 1}
-                      </Typography>
-                      <MediaThumb media={media} width={56} height={34} />
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography sx={{ fontSize: 13, fontWeight: 600 }} noWrap>
-                          {media?.name ?? `Missing media ${item.mediaId}`}
+                      {/* What the item is */}
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, flex: "1 1 220px", minWidth: 0 }}>
+                        <DragIndicatorRoundedIcon sx={{ fontSize: 18, color: "text.disabled", cursor: "grab", display: { xs: "none", md: "block" } }} />
+                        <Typography variant="caption" color="text.secondary" sx={{ width: 18, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                          {index + 1}
                         </Typography>
-                        <Typography variant="caption" color={media ? "text.secondary" : "error.main"}>
-                          {media ? `${media.type} · ${media.category}` : "This file no longer exists; remove it before saving"}
-                        </Typography>
+                        <MediaThumb media={media} width={56} height={34} />
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography sx={{ fontSize: 13, fontWeight: 600 }} noWrap>
+                            {media?.name ?? `Missing media ${item.mediaId}`}
+                          </Typography>
+                          <Typography variant="caption" color={media ? "text.secondary" : "error.main"}>
+                            {media ? `${media.type} · ${media.category}` : "This file no longer exists; remove it before saving"}
+                          </Typography>
+                        </Box>
                       </Box>
-                      <TextField
-                        type="number"
-                        value={item.duration}
-                        onChange={(e) => setDuration(index, Math.max(0, parseInt(e.target.value, 10) || 0))}
-                        sx={{ width: 104 }}
-                        slotProps={{ input: { endAdornment: <InputAdornment position="end">s</InputAdornment> }, htmlInput: { min: 1, "aria-label": "Duration in seconds" } }}
-                      />
-                      <Box sx={{ display: "flex" }}>
+                      {/* How long, and where it sits — wraps under the name on a phone */}
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, ml: "auto" }}>
+                        <TextField
+                          type="number"
+                          value={item.duration}
+                          onChange={(e) => setDuration(index, Math.max(0, parseInt(e.target.value, 10) || 0))}
+                          sx={{ width: 104 }}
+                          slotProps={{ input: { endAdornment: <InputAdornment position="end">s</InputAdornment> }, htmlInput: { min: 1, inputMode: "numeric", "aria-label": "Duration in seconds" } }}
+                        />
                         <IconButton onClick={() => move(index, index - 1)} disabled={index === 0} aria-label="Move up">
                           <ArrowUpwardRoundedIcon sx={{ fontSize: 16 }} />
                         </IconButton>

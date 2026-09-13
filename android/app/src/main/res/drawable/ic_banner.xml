@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android TV home-screen banner (320x180dp). The slat mark on the board ground. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+    <path
+        android:fillColor="#0B0B0C"
+        android:pathData="M0,0 L320,0 L320,180 L0,180 Z" />
+    <path
+        android:fillColor="#F2C230"
+        android:pathData="M96,54 L224,54 L224,74 L96,74 Z" />
+    <path
+        android:fillColor="#3E3E43"
+        android:pathData="M96,80 L224,80 L224,100 L96,100 Z" />
+    <path
+        android:fillColor="#3E3E43"
+        android:pathData="M96,106 L176,106 L176,126 L96,126 Z" />
+</vector>

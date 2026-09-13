@@ -4,11 +4,12 @@ import CloudUploadRoundedIcon from "@mui/icons-material/CloudUploadRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
-import { useDropzone } from "react-dropzone";
+import { useDropzone, type FileRejection } from "react-dropzone";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSnackbar } from "notistack";
 import { MediaService } from "../../services/MediaService";
 import { queryKeys } from "../../hooks/queries";
+import { useIsPhone } from "../../hooks/useIsPhone";
 import { MEDIA_CATEGORIES, type MediaCategory, type MediaItem } from "../../types/media";
 import { formatBytes } from "../../utils/format";
 import { probeFile } from "../../utils/media";
@@ -39,21 +40,39 @@ export default function UploadDialog({ onClose, onUploaded }: Props) {
   const [category, setCategory] = useState<MediaCategory>("Announcement");
   const [running, setRunning] = useState(false);
   const abortRef = useRef<Map<string, () => void>>(new Map());
+  const isPhone = useIsPhone();
 
-  const onDrop = useCallback((accepted: File[]) => {
+  const queueId = (file: File) => `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 7)}`;
+
+  // Files the dropzone refuses still get a row, so a .avi or a 400 MB export fails visibly rather than
+  // vanishing from the drop with no explanation.
+  const onDrop = useCallback((accepted: File[], rejections: FileRejection[]) => {
+    const rejectedRows: QueueItem[] = rejections.map(({ file, errors }) => {
+      const code = errors[0]?.code;
+      const reason =
+        code === "file-invalid-type"
+          ? `Unsupported type${file.type ? ` (${file.type})` : ""} — use PNG, JPG, WEBP, GIF, MP4, WEBM or MOV`
+          : code === "file-too-large"
+            ? `Larger than the ${formatBytes(MAX_BYTES, 0)} limit`
+            : (errors[0]?.message ?? "Rejected");
+      return { id: queueId(file), file, progress: 0, status: "error", error: reason };
+    });
     setQueue((q) => [
       ...q,
-      ...accepted.map((file) => ({
-        id: `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 7)}`,
-        file,
-        progress: 0,
-        status: file.size > MAX_BYTES ? ("error" as const) : ("queued" as const),
-        error: file.size > MAX_BYTES ? "Larger than the 100 MB limit" : undefined,
-      })),
+      ...accepted.map(
+        (file): QueueItem => ({
+          id: queueId(file),
+          file,
+          progress: 0,
+          status: file.size > MAX_BYTES ? "error" : "queued",
+          error: file.size > MAX_BYTES ? `Larger than the ${formatBytes(MAX_BYTES, 0)} limit` : undefined,
+        }),
+      ),
+      ...rejectedRows,
     ]);
   }, []);
 
-  const { getRootProps, getInputProps, isDragActive, open: openPicker } = useDropzone({ onDrop, accept: ACCEPT, multiple: true, noClick: true, disabled: running });
+  const { getRootProps, getInputProps, isDragActive, open: openPicker } = useDropzone({ onDrop, accept: ACCEPT, maxSize: MAX_BYTES, multiple: true, noClick: true, disabled: running });
 
   const patch = (id: string, changes: Partial<QueueItem>) => setQueue((q) => q.map((it) => (it.id === id ? { ...it, ...changes } : it)));
 
@@ -123,7 +142,7 @@ export default function UploadDialog({ onClose, onUploaded }: Props) {
   const allFinished = queue.length > 0 && queued === 0 && !running;
 
   return (
-    <Dialog open onClose={running ? undefined : handleClose} maxWidth="sm" fullWidth>
+    <Dialog open onClose={running ? undefined : handleClose} maxWidth="sm" fullWidth fullScreen={isPhone}>
       <DialogTitle>Upload media</DialogTitle>
       <DialogContent>
         <Box
@@ -143,13 +162,15 @@ export default function UploadDialog({ onClose, onUploaded }: Props) {
         >
           <input {...getInputProps()} />
           <CloudUploadRoundedIcon sx={{ fontSize: 30, color: "text.disabled" }} />
-          <Typography sx={{ fontWeight: 600, mt: 0.5 }}>{isDragActive ? "Drop to add files" : "Drop images or videos here, or click to browse"}</Typography>
+          <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
+            {isDragActive ? "Drop to add files" : isPhone ? "Tap to choose images or videos" : "Drop images or videos here, or click to browse"}
+          </Typography>
           <Typography variant="caption" color="text.secondary">
             PNG, JPG, WEBP, GIF, MP4, WEBM, MOV · up to 100 MB each
           </Typography>
         </Box>
 
-        <TextField select label="Category for these files" value={category} onChange={(e) => setCategory(e.target.value as MediaCategory)} sx={{ mt: 2, width: 240 }} disabled={running}>
+        <TextField select label="Category for these files" value={category} onChange={(e) => setCategory(e.target.value as MediaCategory)} sx={{ mt: 2, width: { xs: "100%", sm: 240 } }} disabled={running}>
           {MEDIA_CATEGORIES.map((c) => (
             <MenuItem key={c} value={c}>
               {c}
@@ -197,7 +218,7 @@ export default function UploadDialog({ onClose, onUploaded }: Props) {
         )}
       </DialogContent>
       <DialogActions>
-        <Typography variant="body2" color="text.secondary" sx={{ mr: "auto" }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mr: "auto", flexBasis: { xs: "100%", sm: "auto" } }}>
           {queue.length > 0 && `${done} of ${queue.length} uploaded`}
         </Typography>
         <Button variant="outlined" onClick={handleClose} disabled={running}>

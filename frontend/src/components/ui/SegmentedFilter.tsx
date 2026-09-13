@@ -13,10 +13,13 @@ interface Props<T extends string> {
   ariaLabel?: string;
 }
 
-/** Square filter chips carrying their own counts, so every bucket is legible without opening a menu. */
+/**
+ * Square filter chips carrying their own counts, so every bucket is legible without opening a menu.
+ * The group never wraps: PageHeader scrolls it sideways on phones, and on a desk it has room.
+ */
 export default function SegmentedFilter<T extends string>({ options, value, onChange, ariaLabel }: Props<T>) {
   return (
-    <Box role="tablist" aria-label={ariaLabel} sx={{ display: "inline-flex", gap: 0.5, flexWrap: "wrap" }}>
+    <Box role="tablist" aria-label={ariaLabel} sx={{ display: "inline-flex", gap: 0.5, flexWrap: { xs: "nowrap", md: "wrap" } }}>
       {options.map((o) => {
         const active = o.value === value;
         return (
@@ -34,6 +37,7 @@ export default function SegmentedFilter<T extends string>({ options, value, onCh
               fontWeight: 700,
               letterSpacing: "0.11em",
               textTransform: "uppercase",
+              whiteSpace: "nowrap",
               border: 1,
               borderColor: active ? t.palette.surface.borderStrong : "transparent",
               bgcolor: active ? t.palette.board.cell : "transparent",
@@ -41,6 +45,7 @@ export default function SegmentedFilter<T extends string>({ options, value, onCh
               display: "inline-flex",
               alignItems: "center",
               "&:hover": { color: "text.primary", borderColor: t.palette.surface.border },
+              "@media (pointer: coarse)": { minHeight: 36, px: 1.5 },
             })}
           >
             {o.label}

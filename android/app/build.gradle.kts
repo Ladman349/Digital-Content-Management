@@ -23,11 +23,11 @@ android {
         applicationId = "com.digitalsignage.player"
         minSdk = 24
         targetSdk = 34
-        // 4 / 1.1.0 is the first build signed with the rotated key. It has to sit above the fleet's
-        // 1.0.0 (3), or the Updates page cannot tell rotated screens from unrotated ones and the OTA
-        // check never sees anything newer to offer.
-        versionCode = 4
-        versionName = "1.1.0"
+        // The version code must rise with every build: the OTA check only offers a release whose code
+        // is strictly higher than what the screen runs. 4 / 1.1.0 was the first build on the rotated
+        // key; 5 / 1.2.0 restyles the player and scales its layout for phones and tablets.
+        versionCode = 5
+        versionName = "1.2.0"
     }
 
     flavorDimensions += "environment"

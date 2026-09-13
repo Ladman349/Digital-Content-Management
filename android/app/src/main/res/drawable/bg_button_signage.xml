@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- D-pad focus state: accent-filled, accent-bordered. Unfocused: flat card surface. -->
+<!-- D-pad focus state: amber-bordered. Pressed: amber-filled. Unfocused: flat slat with a hairline. -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_focused="true" android:state_pressed="true">
         <shape android:shape="rectangle">
@@ -31,7 +31,7 @@
             <corners android:radius="@dimen/signage_chip_radius" />
             <stroke
                 android:width="@dimen/signage_card_stroke"
-                android:color="@color/signage_card_border" />
+                android:color="@color/signage_card_border_strong" />
         </shape>
     </item>
 </selector>

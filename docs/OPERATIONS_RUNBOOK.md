@@ -3,7 +3,9 @@
 This runbook describes operational procedures for field technicians, installers, and support engineers managing the Android TV Signage Player in production.
 
 ## 1. Initial Provisioning & Installation
-1. Install the APK via ADB (`adb install app-prod-release.apk`) or via MDM deployment.
+1. Install the APK via ADB (`adb install app-prod-release.apk`) or via MDM deployment. The build
+   installs on TVs, signage boxes, tablets and phones alike; the status screen resizes itself to
+   the device, so a tablet in a shop window is provisioned exactly like a TV.
 2. If using ADB, set the application as Device Owner before launching it:
    ```bash
    adb shell dpm set-device-owner com.digitalsignage.player/.core.kiosk.SignageDeviceAdminReceiver

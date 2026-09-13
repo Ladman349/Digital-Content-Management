@@ -8,22 +8,29 @@
         <item name="android:includeFontPadding">false</item>
     </style>
 
+    <!-- Wordmark: the page-title register of the CMS — small, uppercase, widely tracked, amber. -->
     <style name="Text.Signage.Wordmark" parent="TextAppearance.Signage">
+        <item name="android:textColor">@color/signage_accent</item>
         <item name="android:textSize">@dimen/signage_text_wordmark_size</item>
         <item name="android:textStyle">bold</item>
-        <item name="android:letterSpacing">0.02</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.22</item>
     </style>
 
     <style name="Text.Signage.SplashWordmark" parent="TextAppearance.Signage">
+        <item name="android:textColor">@color/signage_accent</item>
         <item name="android:textSize">@dimen/signage_splash_wordmark_size</item>
         <item name="android:textStyle">bold</item>
-        <item name="android:letterSpacing">0.02</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.22</item>
     </style>
 
-    <!-- Primary status line: >= 40sp for 10-foot legibility. -->
+    <!-- Primary status line, set like a board row: bold, uppercase, tracked. 44sp on a TV, 24sp on a phone. -->
     <style name="Text.Signage.StatusPrimary" parent="TextAppearance.Signage">
         <item name="android:textSize">@dimen/signage_text_primary_size</item>
         <item name="android:textStyle">bold</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.02</item>
         <item name="android:gravity">center</item>
         <item name="android:maxLines">2</item>
     </style>
@@ -37,10 +44,15 @@
         <item name="android:maxLines">3</item>
     </style>
 
+    <!-- Identity bar: mono figures, the way the CMS sets every identifier. -->
     <style name="Text.Signage.Footer" parent="TextAppearance.Signage">
         <item name="android:textColor">@color/signage_text_muted</item>
         <item name="android:textSize">@dimen/signage_text_footer_size</item>
+        <item name="android:fontFamily">monospace</item>
+        <item name="android:typeface">monospace</item>
+        <item name="android:letterSpacing">0.04</item>
         <item name="android:singleLine">true</item>
+        <item name="android:ellipsize">end</item>
     </style>
 
     <style name="Text.Signage.DeviceIdChip" parent="TextAppearance.Signage">
@@ -48,18 +60,20 @@
         <item name="android:fontFamily">monospace</item>
         <item name="android:typeface">monospace</item>
         <item name="android:textStyle">bold</item>
-        <item name="android:letterSpacing">0.06</item>
+        <item name="android:letterSpacing">0.08</item>
         <item name="android:background">@drawable/bg_device_chip</item>
-        <item name="android:paddingLeft">14dp</item>
-        <item name="android:paddingRight">14dp</item>
-        <item name="android:paddingTop">6dp</item>
-        <item name="android:paddingBottom">6dp</item>
+        <item name="android:paddingLeft">@dimen/signage_gap</item>
+        <item name="android:paddingRight">@dimen/signage_gap</item>
+        <item name="android:paddingTop">@dimen/signage_gap_small</item>
+        <item name="android:paddingBottom">@dimen/signage_gap_small</item>
         <item name="android:singleLine">true</item>
     </style>
 
     <style name="Text.Signage.DialogTitle" parent="TextAppearance.Signage">
         <item name="android:textSize">@dimen/signage_text_dialog_title_size</item>
         <item name="android:textStyle">bold</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.02</item>
         <item name="android:gravity">center</item>
     </style>
 
@@ -110,13 +124,14 @@
         <item name="android:background">@drawable/bg_button_signage</item>
         <item name="android:textColor">@color/signage_text_primary</item>
         <item name="android:textSize">@dimen/signage_text_button_size</item>
-        <item name="android:textAllCaps">false</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.14</item>
         <item name="android:textStyle">bold</item>
         <item name="android:focusable">true</item>
         <item name="android:focusableInTouchMode">false</item>
         <item name="android:clickable">true</item>
-        <item name="android:minHeight">64dp</item>
-        <item name="android:paddingLeft">28dp</item>
-        <item name="android:paddingRight">28dp</item>
+        <item name="android:minHeight">@dimen/signage_button_min_height</item>
+        <item name="android:paddingLeft">@dimen/signage_gap_large</item>
+        <item name="android:paddingRight">@dimen/signage_gap_large</item>
     </style>
 </resources>

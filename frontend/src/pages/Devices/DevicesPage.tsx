@@ -40,7 +40,7 @@ export default function DevicesPage() {
   const { enqueueSnackbar } = useSnackbar();
   const now = useNow(15_000);
 
-  const { data: devices = [], isLoading } = useDevices();
+  const { data: devices = [], isLoading, error, refetch } = useDevices();
   const { data: playlists = [] } = usePlaylists();
   const { data: schedules = [] } = useSchedules();
   const createDevice = useCreateDevice();
@@ -344,35 +344,35 @@ export default function DevicesPage() {
             </>
           )
         }
+        count={rows.length !== devices.length ? `${rows.length} of ${devices.length}` : undefined}
         actions={
           <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={openAdd}>
             Add device
           </Button>
         }
-      >
-        <SearchField value={search} onChange={setSearch} placeholder="Search name, ID, location, IP…" />
-        <SegmentedFilter<StatusFilter>
-          ariaLabel="Filter by status"
-          value={statusFilter as StatusFilter}
-          onChange={setStatusFilter}
-          options={[
-            { value: "All", label: "All", count: counts.All },
-            { value: "Online", label: "Online", count: counts.Online },
-            { value: "Idle", label: "Idle", count: counts.Idle },
-            { value: "Offline", label: "Offline", count: counts.Offline },
-          ]}
-        />
-        {locations.length > 1 && <FilterSelect label="Location" value={locationFilter} onChange={setLocationFilter} options={[{ value: "All", label: "All locations" }, ...locations.map((l) => ({ value: l, label: l }))]} width={170} />}
-        {filtersActive && (
-          <Button size="small" onClick={clearFilters} startIcon={<FilterListOffRoundedIcon />}>
-            Clear
-          </Button>
-        )}
-        <Box sx={{ flex: 1 }} />
-        <Typography variant="body2" color="text.secondary">
-          {rows.length === devices.length ? `${rows.length} devices` : `${rows.length} of ${devices.length}`}
-        </Typography>
-      </PageHeader>
+        search={<SearchField value={search} onChange={setSearch} placeholder="Search name, ID, location, IP…" />}
+        filters={
+          <>
+            <SegmentedFilter<StatusFilter>
+              ariaLabel="Filter by status"
+              value={statusFilter as StatusFilter}
+              onChange={setStatusFilter}
+              options={[
+                { value: "All", label: "All", count: counts.All },
+                { value: "Online", label: "Online", count: counts.Online },
+                { value: "Idle", label: "Idle", count: counts.Idle },
+                { value: "Offline", label: "Offline", count: counts.Offline },
+              ]}
+            />
+            {locations.length > 1 && <FilterSelect label="Location" value={locationFilter} onChange={setLocationFilter} options={[{ value: "All", label: "All locations" }, ...locations.map((l) => ({ value: l, label: l }))]} width={170} />}
+            {filtersActive && (
+              <Button size="small" onClick={clearFilters} startIcon={<FilterListOffRoundedIcon />}>
+                Clear
+              </Button>
+            )}
+          </>
+        }
+      />
 
       <Box sx={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
         <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -381,6 +381,9 @@ export default function DevicesPage() {
             rows={rows}
             rowKey={(d) => d.id}
             loading={isLoading}
+            error={error ? (error as Error).message : null}
+            onRetry={() => refetch()}
+            noun="screens"
             selectable
             selected={selected}
             onSelectionChange={setSelected}

@@ -100,6 +100,12 @@ graph TD
    ```
 3. Copy the compiled release APK from `android/app/build/outputs/apk/prod/release/app-prod-release.apk` onto the TV device and install it.
 
+The same APK runs on any Android 7+ device, not only TVs: neither Leanback nor a touchscreen is
+required, and the status screen scales its type and spacing to the window (compact on phones and
+small boxes, medium on tablets, 10-foot on TVs and large tablets). Content itself always fills the
+screen. The CMS on Vercel is installable too — on a phone, open it in the browser and choose
+**Add to Home Screen**; it launches full screen with the board's own colours.
+
 ### Onboarding a New TV
 
 Registration is automatic — there is no pairing code to type in. The player calls

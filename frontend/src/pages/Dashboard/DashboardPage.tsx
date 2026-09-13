@@ -9,6 +9,7 @@ import CloudUploadRoundedIcon from "@mui/icons-material/CloudUploadRounded";
 import StatusChip from "../../components/ui/StatusChip";
 import RowLead from "../../components/ui/RowLead";
 import EmptyState from "../../components/ui/EmptyState";
+import ErrorState from "../../components/ui/ErrorState";
 import Field, { Section } from "../../components/ui/Field";
 import { deviceTone } from "../../components/ui/tone";
 import { MONO } from "../../app/theme";
@@ -35,7 +36,7 @@ function BoardRow({ children }: { children: React.ReactNode }) {
       sx={{
         display: "grid",
         gridTemplateColumns: { xs: "minmax(0, 1fr) auto", md: "minmax(0, 1.6fr) minmax(0, 1.2fr) 90px 118px 120px" },
-        alignItems: "center",
+        alignItems: { xs: "start", md: "center" },
         gap: { xs: 1, md: 2 },
         bgcolor: "board.cell",
         px: { xs: 1.5, md: 1.75 },
@@ -53,7 +54,7 @@ function BoardRow({ children }: { children: React.ReactNode }) {
 export default function DashboardPage() {
   const navigate = useNavigate();
   const now = useNow(15_000);
-  const { data: devices = [], isLoading: devicesLoading } = useDevices();
+  const { data: devices = [], isLoading: devicesLoading, error: devicesError, refetch: refetchDevices } = useDevices();
   const { data: media = [] } = useMedia();
   const { data: playlists = [] } = usePlaylists();
   const { data: schedules = [] } = useSchedules();
@@ -156,8 +157,6 @@ export default function DashboardPage() {
         .slice(0, 10),
     [devices],
   );
-
-  const errors = attention.filter((a) => a.severity === "error").length;
 
   return (
     <Box sx={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: "2px" }}>
@@ -269,13 +268,19 @@ export default function DashboardPage() {
         ))}
       </Box>
 
-      {devices.length === 0 && !devicesLoading ? (
-        <EmptyState
-          compact
-          icon={TvRoundedIcon}
-          title="No screens registered"
-          description="Install the player app on a TV. It registers itself and appears here within a minute."
-        />
+      {devices.length === 0 && devicesError ? (
+        <Box sx={{ order: 4 }}>
+          <ErrorState compact noun="screens" message={(devicesError as Error).message} onRetry={() => refetchDevices()} />
+        </Box>
+      ) : devices.length === 0 && !devicesLoading ? (
+        <Box sx={{ order: 4 }}>
+          <EmptyState
+            compact
+            icon={TvRoundedIcon}
+            title="No screens registered"
+            description="Install the player app on a TV. It registers itself and appears here within a minute."
+          />
+        </Box>
       ) : (
         <Box sx={{ order: 4, display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: "2px" }}>
           {deviceRows.map((d) => {
@@ -284,7 +289,37 @@ export default function DashboardPage() {
             return (
               <Box key={d.id} component={RouterLink} to={`/devices?select=${encodeURIComponent(d.id)}`} sx={{ textDecoration: "none", color: "inherit" }}>
                 <BoardRow>
-                  <RowLead name={d.name} sub={`${d.id}${d.location && d.location !== "Unassigned" ? ` · ${d.location}` : ""}`} title={d.name} />
+                  <Box sx={{ minWidth: 0 }}>
+                    <RowLead name={d.name} sub={`${d.id}${d.location && d.location !== "Unassigned" ? ` · ${d.location}` : ""}`} title={d.name} />
+                    {/* On a phone the "Showing" column is gone, and what a screen is playing is the whole point of this page. */}
+                    <Typography
+                      sx={{
+                        display: { xs: "block", md: "none" },
+                        mt: 0.75,
+                        fontSize: 13,
+                        fontWeight: 600,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.02em",
+                        color: p?.effective ? "primary.main" : "text.disabled",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {p?.effective ? (
+                        <>
+                          {p.effective.name}
+                          {idx >= 0 && (
+                            <Box component="span" sx={{ fontFamily: MONO, fontSize: 11, color: "text.secondary", ml: 1, textTransform: "none" }}>
+                              {idx + 1}/{p.effective.items.length}
+                            </Box>
+                          )}
+                        </>
+                      ) : (
+                        "— nothing to play —"
+                      )}
+                    </Typography>
+                  </Box>
                   <Typography
                     sx={{
                       display: { xs: "none", md: "block" },
@@ -372,7 +407,7 @@ export default function DashboardPage() {
           <Field label="Player release">{activeUpdate ? activeUpdate.version_name : "none active"}</Field>
         </Section>
 
-        <Section title={`Recent changes${errors ? "" : ""}`}>
+        <Section title="Recent changes">
           {activity.length === 0 ? (
             <Typography sx={{ fontSize: 12.5, color: "text.secondary" }}>Nothing yet.</Typography>
           ) : (

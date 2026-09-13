@@ -32,7 +32,7 @@ type StatusFilter = "All" | PlaylistStatus;
 export default function PlaylistsPage() {
   const { enqueueSnackbar } = useSnackbar();
   const [params, setParams] = useSearchParams();
-  const { data: playlists = [], isLoading } = usePlaylists();
+  const { data: playlists = [], isLoading, error, refetch } = usePlaylists();
   const { data: media = [] } = useMedia();
   const { data: devices = [] } = useDevices();
   const { data: schedules = [] } = useSchedules();
@@ -212,34 +212,34 @@ export default function PlaylistsPage() {
       <PageHeader
         title="Playlists"
         meta={!isLoading && <span>{counts.All} total · {counts.Published} published</span>}
+        count={rows.length !== playlists.length ? `${rows.length} of ${playlists.length}` : undefined}
         actions={
           <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => openEditor(null)}>
             New playlist
           </Button>
         }
-      >
-        <SearchField value={search} onChange={setSearch} placeholder="Search playlists…" />
-        <SegmentedFilter<StatusFilter>
-          ariaLabel="Filter by status"
-          value={statusFilter as StatusFilter}
-          onChange={setStatusFilter}
-          options={[
-            { value: "All", label: "All", count: counts.All },
-            { value: "Published", label: "Published", count: counts.Published },
-            { value: "Draft", label: "Draft", count: counts.Draft },
-            { value: "Archived", label: "Archived", count: counts.Archived },
-          ]}
-        />
-        {filtersActive && (
-          <Button size="small" onClick={clearFilters} startIcon={<FilterListOffRoundedIcon />}>
-            Clear
-          </Button>
-        )}
-        <Box sx={{ flex: 1 }} />
-        <Typography variant="body2" color="text.secondary">
-          {rows.length === playlists.length ? `${rows.length} playlists` : `${rows.length} of ${playlists.length}`}
-        </Typography>
-      </PageHeader>
+        search={<SearchField value={search} onChange={setSearch} placeholder="Search playlists…" />}
+        filters={
+          <>
+            <SegmentedFilter<StatusFilter>
+              ariaLabel="Filter by status"
+              value={statusFilter as StatusFilter}
+              onChange={setStatusFilter}
+              options={[
+                { value: "All", label: "All", count: counts.All },
+                { value: "Published", label: "Published", count: counts.Published },
+                { value: "Draft", label: "Draft", count: counts.Draft },
+                { value: "Archived", label: "Archived", count: counts.Archived },
+              ]}
+            />
+            {filtersActive && (
+              <Button size="small" onClick={clearFilters} startIcon={<FilterListOffRoundedIcon />}>
+                Clear
+              </Button>
+            )}
+          </>
+        }
+      />
 
       <Box sx={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
         <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -248,6 +248,9 @@ export default function PlaylistsPage() {
             rows={rows}
             rowKey={(p) => p.id}
             loading={isLoading}
+            error={error ? (error as Error).message : null}
+            onRetry={() => refetch()}
+            noun="playlists"
             selectable
             selected={selected}
             onSelectionChange={setSelected}

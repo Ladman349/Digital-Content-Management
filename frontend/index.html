@@ -3,9 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="light dark" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#0B0B0C" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Signage" />
+    <meta name="description" content="Digital signage CMS: what every screen is showing, and what it should be." />
     <title>Signage CMS</title>
+    <style>
+      /* Painted before any JavaScript runs so a cold load on a phone never flashes white. */
+      html { background: #0B0B0C; }
+      @media (prefers-color-scheme: light) { html { background: #E9E7E0; } }
+    </style>
   </head>
   <body>
     <div id="root"></div>

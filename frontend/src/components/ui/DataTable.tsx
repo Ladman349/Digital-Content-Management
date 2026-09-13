@@ -1,5 +1,7 @@
-import { Box, Button, Checkbox, Skeleton, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel, Typography, useMediaQuery, useTheme } from "@mui/material";
+import { Box, Button, Checkbox, Skeleton, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel, Typography } from "@mui/material";
 import { useMemo, useState, type ReactNode } from "react";
+import { useIsPhone } from "../../hooks/useIsPhone";
+import ErrorState from "./ErrorState";
 
 export interface Column<T> {
   key: string;
@@ -25,6 +27,11 @@ interface Props<T> {
   rows: T[];
   rowKey: (row: T) => string;
   loading?: boolean;
+  /** Message from a failed load. Shown in place of the rows so a broken API never looks like an empty board. */
+  error?: string | null;
+  onRetry?: () => void;
+  /** What the rows are, for the error slat: "screens", "files". */
+  noun?: string;
   emptyState?: ReactNode;
   selectable?: boolean;
   selected?: Set<string>;
@@ -52,6 +59,9 @@ export default function DataTable<T>({
   rows,
   rowKey,
   loading,
+  error,
+  onRetry,
+  noun = "rows",
   emptyState,
   selectable,
   selected,
@@ -66,13 +76,17 @@ export default function DataTable<T>({
   rowDim,
 }: Props<T>) {
   const [limit, setLimit] = useState(pageSize);
-  const theme = useTheme();
-  const isPhone = useMediaQuery(theme.breakpoints.down("sm"));
+  const isPhone = useIsPhone();
 
   const visible = useMemo(() => rows.slice(0, limit), [rows, limit]);
   const allKeys = useMemo(() => rows.map(rowKey), [rows, rowKey]);
   const allSelected = Boolean(selectable && selected && rows.length > 0 && allKeys.every((k) => selected.has(k)));
   const someSelected = Boolean(selectable && selected && selected.size > 0 && !allSelected);
+
+  // A load that failed before anything arrived: say so instead of shimmering or claiming "no rows".
+  const failedEmpty = Boolean(error) && rows.length === 0;
+  const showSkeleton = Boolean(loading) && rows.length === 0 && !error;
+  const showEmpty = !loading && rows.length === 0 && !error;
 
   const toggleAll = () => {
     if (!onSelectionChange) return;
@@ -89,8 +103,10 @@ export default function DataTable<T>({
 
   const hideSx = (c: Column<T>) => (c.hideBelow ? { display: { xs: "none", [c.hideBelow]: "table-cell" } } : undefined);
 
+  const errorSlat = failedEmpty && <ErrorState noun={noun} message={error} onRetry={onRetry} />;
+
   const showMore = rows.length > limit && (
-    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 2, py: 1.5 }}>
+    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 2, py: 1.5, flexWrap: "wrap" }}>
       <Typography sx={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.13em", textTransform: "uppercase", color: "text.secondary" }}>
         Showing {limit} of {rows.length}
       </Typography>
@@ -113,14 +129,15 @@ export default function DataTable<T>({
 
     return (
       <Box>
-        {loading && rows.length === 0 && (
+        {showSkeleton && (
           <Box sx={{ display: "grid", gap: "2px" }}>
             {Array.from({ length: 5 }).map((_, i) => (
               <Skeleton key={`sk-${i}`} variant="rectangular" height={78} />
             ))}
           </Box>
         )}
-        {!loading && rows.length === 0 && emptyState}
+        {errorSlat}
+        {showEmpty && emptyState}
         <Box sx={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: "2px" }}>
           {visible.map((row) => {
             const key = rowKey(row);
@@ -131,6 +148,18 @@ export default function DataTable<T>({
               <Box
                 key={key}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
+                role={onRowClick ? "button" : undefined}
+                tabIndex={onRowClick ? 0 : undefined}
+                onKeyDown={
+                  onRowClick
+                    ? (e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          onRowClick(row);
+                        }
+                      }
+                    : undefined
+                }
                 sx={(t) => ({
                   bgcolor: isActive ? t.palette.surface.hover : t.palette.board.cell,
                   p: 1.5,
@@ -204,8 +233,7 @@ export default function DataTable<T>({
             </TableRow>
           </TableHead>
           <TableBody>
-            {loading &&
-              rows.length === 0 &&
+            {showSkeleton &&
               Array.from({ length: 6 }).map((_, i) => (
                 <TableRow key={`sk-${i}`}>
                   {selectable && <TableCell padding="checkbox" />}
@@ -216,10 +244,10 @@ export default function DataTable<T>({
                   ))}
                 </TableRow>
               ))}
-            {!loading && rows.length === 0 && (
+            {(showEmpty || failedEmpty) && (
               <TableRow>
-                <TableCell colSpan={columns.length + (selectable ? 1 : 0)} sx={{ p: 0 }}>
-                  {emptyState}
+                <TableCell colSpan={columns.length + (selectable ? 1 : 0)} sx={{ p: 0, bgcolor: "transparent" }}>
+                  {failedEmpty ? errorSlat : emptyState}
                 </TableCell>
               </TableRow>
             )}

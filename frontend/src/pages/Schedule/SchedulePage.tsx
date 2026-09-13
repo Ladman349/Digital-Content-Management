@@ -41,7 +41,7 @@ export default function SchedulePage() {
   const { enqueueSnackbar } = useSnackbar();
   const now = useNow(30_000);
   const [params, setParams] = useSearchParams();
-  const { data: schedules = [], isLoading } = useSchedules();
+  const { data: schedules = [], isLoading, error, refetch } = useSchedules();
   const { data: playlists = [] } = usePlaylists();
   const { data: devices = [] } = useDevices();
   const createSchedule = useCreateSchedule();
@@ -244,44 +244,46 @@ export default function SchedulePage() {
       <PageHeader
         title="Schedule"
         meta={!isLoading && <span>{counts.Live} live now · {counts.Active} active · {counts.All} total</span>}
+        count={rows.length !== schedules.length ? `${rows.length} of ${schedules.length}` : undefined}
         actions={
           <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => openEditor(null)}>
             New schedule
           </Button>
         }
-      >
-        <SearchField value={search} onChange={setSearch} placeholder="Search schedules…" />
-        <SegmentedFilter<StatusFilter>
-          ariaLabel="Filter by status"
-          value={statusFilter as StatusFilter}
-          onChange={setStatusFilter}
-          options={[
-            { value: "All", label: "All", count: counts.All },
-            { value: "Live", label: "Live now", count: counts.Live },
-            { value: "Active", label: "Active", count: counts.Active },
-            { value: "Paused", label: "Paused", count: counts.Paused },
-            { value: "Draft", label: "Draft", count: counts.Draft },
-            { value: "Conflict", label: "Conflicts", count: counts.Conflict },
-          ]}
-        />
-        {filtersActive && (
-          <Button size="small" onClick={clearFilters} startIcon={<FilterListOffRoundedIcon />}>
-            Clear
-          </Button>
-        )}
-        <Box sx={{ flex: 1 }} />
-        <Typography variant="body2" color="text.secondary">
-          {rows.length === schedules.length ? `${rows.length} schedules` : `${rows.length} of ${schedules.length}`}
-        </Typography>
-        <ToggleButtonGroup size="small" exclusive value={view} onChange={(_, v) => v && setView(v)} aria-label="View mode">
-          <ToggleButton value="list" aria-label="List view">
-            <ViewListRoundedIcon sx={{ fontSize: 18 }} />
-          </ToggleButton>
-          <ToggleButton value="timeline" aria-label="Day timeline view">
-            <ViewTimelineRoundedIcon sx={{ fontSize: 18 }} />
-          </ToggleButton>
-        </ToggleButtonGroup>
-      </PageHeader>
+        search={<SearchField value={search} onChange={setSearch} placeholder="Search schedules…" />}
+        filters={
+          <>
+            <SegmentedFilter<StatusFilter>
+              ariaLabel="Filter by status"
+              value={statusFilter as StatusFilter}
+              onChange={setStatusFilter}
+              options={[
+                { value: "All", label: "All", count: counts.All },
+                { value: "Live", label: "Live now", count: counts.Live },
+                { value: "Active", label: "Active", count: counts.Active },
+                { value: "Paused", label: "Paused", count: counts.Paused },
+                { value: "Draft", label: "Draft", count: counts.Draft },
+                { value: "Conflict", label: "Conflicts", count: counts.Conflict },
+              ]}
+            />
+            {filtersActive && (
+              <Button size="small" onClick={clearFilters} startIcon={<FilterListOffRoundedIcon />}>
+                Clear
+              </Button>
+            )}
+          </>
+        }
+        tools={
+          <ToggleButtonGroup size="small" exclusive value={view} onChange={(_, v) => v && setView(v)} aria-label="View mode">
+            <ToggleButton value="list" aria-label="List view">
+              <ViewListRoundedIcon sx={{ fontSize: 18 }} />
+            </ToggleButton>
+            <ToggleButton value="timeline" aria-label="Day timeline view">
+              <ViewTimelineRoundedIcon sx={{ fontSize: 18 }} />
+            </ToggleButton>
+          </ToggleButtonGroup>
+        }
+      />
 
       <Box sx={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
         <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -293,6 +295,9 @@ export default function SchedulePage() {
               rows={rows}
               rowKey={(s) => s.id}
               loading={isLoading}
+              error={error ? (error as Error).message : null}
+              onRetry={() => refetch()}
+              noun="schedules"
               selectable
               selected={selected}
               onSelectionChange={setSelected}

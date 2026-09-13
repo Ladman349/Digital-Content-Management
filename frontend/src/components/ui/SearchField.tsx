@@ -17,7 +17,8 @@ export default function SearchField({ value, onChange, placeholder = "Search…"
       autoFocus={autoFocus}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      sx={{ width, minWidth: 160 }}
+      // Fills its row on phones; a fixed 260px column of a 375px screen leaves nothing for the action.
+      sx={{ width: { xs: "100%", md: width }, minWidth: { md: 160 } }}
       slotProps={{
         input: {
           startAdornment: (
@@ -33,6 +34,7 @@ export default function SearchField({ value, onChange, placeholder = "Search…"
             </InputAdornment>
           ) : undefined,
         },
+        htmlInput: { inputMode: "search", enterKeyHint: "search", autoComplete: "off", "aria-label": placeholder },
       }}
     />
   );

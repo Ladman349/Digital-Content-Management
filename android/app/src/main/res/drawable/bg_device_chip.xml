@@ -5,5 +5,5 @@
     <corners android:radius="@dimen/signage_chip_radius" />
     <stroke
         android:width="@dimen/signage_card_stroke"
-        android:color="@color/signage_card_border" />
+        android:color="@color/signage_card_border_strong" />
 </shape>

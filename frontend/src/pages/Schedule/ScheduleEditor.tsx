@@ -9,6 +9,7 @@ import StatusDot from "../../components/ui/StatusDot";
 import { deviceTone } from "../../components/ui/tone";
 import { findConflicts, PRIORITY_WEIGHT } from "../../utils/schedule";
 import { minutesOfDay, todayISO } from "../../utils/format";
+import { useIsPhone } from "../../hooks/useIsPhone";
 
 export interface ScheduleFormValues {
   name: string;
@@ -67,6 +68,7 @@ function initialForm(schedule?: Schedule | null, duplicateOf?: Schedule | null):
 
 export default function ScheduleEditor({ schedule, duplicateOf, playlists, devices, allSchedules, saving, onClose, onSave }: Props) {
   const { enqueueSnackbar } = useSnackbar();
+  const isPhone = useIsPhone();
   const [form, setForm] = useState<ScheduleFormValues>(() => initialForm(schedule, duplicateOf));
 
   const set = <K extends keyof ScheduleFormValues>(key: K, value: ScheduleFormValues[K]) => setForm((f) => ({ ...f, [key]: value }));
@@ -96,7 +98,7 @@ export default function ScheduleEditor({ schedule, duplicateOf, playlists, devic
   const allSelected = devices.length > 0 && form.deviceIds.length === devices.length;
 
   return (
-    <Dialog open onClose={saving ? undefined : onClose} maxWidth="md" fullWidth>
+    <Dialog open onClose={saving ? undefined : onClose} maxWidth="md" fullWidth fullScreen={isPhone}>
       <DialogTitle>{schedule ? "Edit schedule" : duplicateOf ? "Duplicate schedule" : "New schedule"}</DialogTitle>
       <DialogContent dividers>
         {publishable.length === 0 && (
@@ -207,7 +209,7 @@ export default function ScheduleEditor({ schedule, duplicateOf, playlists, devic
         </Box>
       </DialogContent>
       <DialogActions>
-        <Typography variant="caption" color="text.secondary" sx={{ mr: "auto" }}>
+        <Typography variant="caption" color="text.secondary" sx={{ mr: "auto", flexBasis: { xs: "100%", sm: "auto" } }}>
           Times are evaluated by the server in India Standard Time.
         </Typography>
         <Button variant="outlined" onClick={onClose} disabled={saving}>

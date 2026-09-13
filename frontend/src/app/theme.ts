@@ -19,7 +19,10 @@ export const MONO = "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Cons
 export const DISPLAY = "'Archivo', 'Helvetica Neue', Arial, sans-serif";
 
 /** Amber is the same fill in both themes — it is the identity, and it reads on either ground. */
-const AMBER = "#F2C230";
+export const AMBER = "#F2C230";
+
+/** Fingers need more than a mouse pointer does; every interactive control grows under this query. */
+const TOUCH = "@media (pointer: coarse)";
 
 const dark = {
   bg: "#0B0B0C",
@@ -52,6 +55,9 @@ const light = {
   // Fills keep the true amber via palette.board.amber.
   primary: "#7A5600",
 };
+
+/** The browser chrome colour for each mode, mirrored into <meta name="theme-color"> by the provider. */
+export const THEME_COLOR: Record<PaletteMode, string> = { dark: dark.bg, light: light.bg };
 
 declare module "@mui/material/styles" {
   interface Palette {
@@ -106,7 +112,14 @@ export function buildTheme(mode: PaletteMode) {
     components: {
       MuiCssBaseline: {
         styleOverrides: {
-          body: { backgroundColor: t.bg, color: t.text, WebkitFontSmoothing: "antialiased" },
+          html: {
+            // Safe areas on notched phones; keeps the board from sliding under the home indicator.
+            paddingLeft: "env(safe-area-inset-left)",
+            paddingRight: "env(safe-area-inset-right)",
+            // Editors are full-screen sheets on phones; the page behind them must not rubber-band.
+            overscrollBehaviorY: "none",
+          },
+          body: { backgroundColor: t.bg, color: t.text, WebkitFontSmoothing: "antialiased", WebkitTapHighlightColor: "transparent" },
           "*::-webkit-scrollbar": { width: 10, height: 10 },
           "*::-webkit-scrollbar-thumb": {
             backgroundColor: alpha(t.textSecondary, 0.35),
@@ -114,13 +127,24 @@ export function buildTheme(mode: PaletteMode) {
             backgroundClip: "padding-box",
           },
           "*::-webkit-scrollbar-track": { background: "transparent" },
+          // Keyboard focus is the one place amber is allowed to mean "here", not "playing": it is
+          // transient and never sits next to a playing marker for long.
+          ":focus-visible": { outline: `2px solid ${AMBER}`, outlineOffset: 2 },
+          "@media (prefers-reduced-motion: reduce)": {
+            "*, *::before, *::after": {
+              animationDuration: "0.01ms !important",
+              animationIterationCount: "1 !important",
+              transitionDuration: "0.01ms !important",
+              scrollBehavior: "auto !important",
+            },
+          },
         },
       },
 
       MuiButton: {
         defaultProps: { size: "small", disableElevation: true },
         styleOverrides: {
-          root: { borderRadius: 2, padding: "7px 14px", minHeight: 32, whiteSpace: "nowrap" },
+          root: { borderRadius: 2, padding: "7px 14px", minHeight: 32, whiteSpace: "nowrap", [TOUCH]: { minHeight: 40 } },
           contained: { backgroundColor: AMBER, color: t.amberInk, "&:hover": { backgroundColor: "#FFD24A" } },
           outlined: {
             backgroundColor: isDark ? "#26262A" : t.subtle,
@@ -133,7 +157,14 @@ export function buildTheme(mode: PaletteMode) {
       },
       MuiIconButton: {
         defaultProps: { size: "small" },
-        styleOverrides: { root: { borderRadius: 2, color: t.textSecondary, "&:hover": { color: t.text, backgroundColor: t.hover } } },
+        styleOverrides: {
+          root: {
+            borderRadius: 2,
+            color: t.textSecondary,
+            "&:hover": { color: t.text, backgroundColor: t.hover },
+            [TOUCH]: { padding: 10 },
+          },
+        },
       },
       MuiPaper: { defaultProps: { elevation: 0 }, styleOverrides: { root: { backgroundImage: "none" } } },
 
@@ -157,7 +188,8 @@ export function buildTheme(mode: PaletteMode) {
             "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: t.borderStrong },
             "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: AMBER, borderWidth: 1.5 },
           },
-          input: { padding: "8px 10px" },
+          // 16px on touch stops iOS Safari zooming the page every time a field is focused.
+          input: { padding: "8px 10px", [TOUCH]: { fontSize: 16, padding: "10px 10px" } },
         },
       },
       MuiInputLabel: {
@@ -198,7 +230,7 @@ export function buildTheme(mode: PaletteMode) {
         },
       },
 
-      MuiCheckbox: { styleOverrides: { root: { color: t.textDisabled, "&.Mui-checked": { color: AMBER } } } },
+      MuiCheckbox: { styleOverrides: { root: { color: t.textDisabled, "&.Mui-checked": { color: AMBER }, [TOUCH]: { padding: 11 } } } },
       MuiSwitch: { styleOverrides: { track: { backgroundColor: t.textDisabled } } },
 
       MuiTooltip: {
@@ -208,13 +240,18 @@ export function buildTheme(mode: PaletteMode) {
 
       MuiDialog: {
         styleOverrides: {
-          paper: {
+          paper: ({ theme }) => ({
             borderRadius: 3,
             border: `1px solid ${t.borderStrong}`,
             backgroundColor: t.bench,
             boxShadow: "0 28px 70px -12px rgba(0,0,0,0.6)",
             backgroundImage: "none",
-          },
+            // MUI's default 32px margin on each side leaves a 311px dialog on a 375px phone.
+            [theme.breakpoints.down("sm")]: {
+              "&:not(.MuiDialog-paperFullScreen)": { margin: 12, width: "calc(100% - 24px)", maxHeight: "calc(100% - 24px)" },
+              "&.MuiDialog-paperFullScreen": { border: 0, borderRadius: 0, paddingBottom: "env(safe-area-inset-bottom)" },
+            },
+          }),
         },
       },
       MuiDialogTitle: {
@@ -223,10 +260,10 @@ export function buildTheme(mode: PaletteMode) {
         },
       },
       MuiDialogContent: { styleOverrides: { root: { padding: "8px 22px 16px" } } },
-      MuiDialogActions: { styleOverrides: { root: { padding: "10px 22px 18px" } } },
+      MuiDialogActions: { styleOverrides: { root: { padding: "10px 22px 18px", flexWrap: "wrap", gap: 4 } } },
 
       MuiMenu: { styleOverrides: { paper: { border: `1px solid ${t.borderStrong}`, backgroundColor: t.bench, borderRadius: 2 } } },
-      MuiMenuItem: { styleOverrides: { root: { fontSize: 12.5, minHeight: 34, borderRadius: 0 } } },
+      MuiMenuItem: { styleOverrides: { root: { fontSize: 12.5, minHeight: 34, borderRadius: 0, [TOUCH]: { minHeight: 44 } } } },
       MuiListItemIcon: { styleOverrides: { root: { minWidth: 30, color: t.textSecondary } } },
 
       MuiLinearProgress: {
@@ -249,6 +286,7 @@ export function buildTheme(mode: PaletteMode) {
             borderColor: t.border,
             color: t.textSecondary,
             "&.Mui-selected": { backgroundColor: t.paper, color: t.text },
+            [TOUCH]: { minHeight: 40 },
           },
         },
       },

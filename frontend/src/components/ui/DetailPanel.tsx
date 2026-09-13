@@ -1,8 +1,9 @@
-import { Box, Drawer, IconButton, Tooltip, Typography, useMediaQuery, useTheme } from "@mui/material";
+import { Box, Drawer, IconButton, Tooltip, Typography } from "@mui/material";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import KeyboardArrowUpRoundedIcon from "@mui/icons-material/KeyboardArrowUpRounded";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import { useEffect, type ReactNode } from "react";
+import { useIsCompact } from "../../hooks/useIsPhone";
 
 interface Props {
   open: boolean;
@@ -23,11 +24,13 @@ interface Props {
  *
  * A board this loud cannot also do dense work, so detail and editing sit on a lifted panel below the
  * rows: smaller type, mono figures, columns that flow. The board keeps its full width, and moving
- * between records with ↑/↓ never closes anything. On a phone it becomes a bottom sheet.
+ * between records with ↑/↓ never closes anything.
+ *
+ * Below `md` it becomes a bottom sheet: a grab bar, a header that stays put while the body scrolls,
+ * and actions that fill the width so the primary one is under the thumb.
  */
 export default function DetailPanel({ open, onClose, title, subtitle, actions, children, onPrev, onNext, position }: Props) {
-  const theme = useTheme();
-  const isPhone = useMediaQuery(theme.breakpoints.down("md"));
+  const isSheet = useIsCompact();
 
   useEffect(() => {
     if (!open) return;
@@ -35,7 +38,7 @@ export default function DetailPanel({ open, onClose, title, subtitle, actions, c
       const target = e.target as HTMLElement | null;
       if (target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
       if (target?.getAttribute("contenteditable") === "true") return;
-      if (document.querySelector('[role="dialog"]')) return; // a modal is open; leave keys to it
+      if (document.querySelector('[role="dialog"]:not(.sig-sheet)')) return; // a modal is open; leave keys to it
       if (e.key === "Escape") onClose();
       if (e.key === "ArrowDown" && onNext) {
         e.preventDefault();
@@ -51,7 +54,7 @@ export default function DetailPanel({ open, onClose, title, subtitle, actions, c
   }, [open, onClose, onNext, onPrev]);
 
   const header = (
-    <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1, px: { xs: 2, md: 2.5 }, pt: 2, pb: 1.5 }}>
+    <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1, px: { xs: 2, md: 2.5 }, pt: { xs: 1.25, md: 2 }, pb: 1.5 }}>
       <Box sx={{ minWidth: 0, flex: 1 }}>
         <Typography
           component="div"
@@ -82,7 +85,7 @@ export default function DetailPanel({ open, onClose, title, subtitle, actions, c
             </span>
           </Tooltip>
           {position && (
-            <Typography variant="caption" color="text.secondary" sx={{ mx: 0.5, whiteSpace: "nowrap" }}>
+            <Typography variant="caption" color="text.secondary" sx={{ mx: 0.5, whiteSpace: "nowrap", display: { xs: "none", sm: "inline" } }}>
               {position}
             </Typography>
           )}
@@ -101,7 +104,7 @@ export default function DetailPanel({ open, onClose, title, subtitle, actions, c
         px: { xs: 2, md: 2.5 },
         pb: 2.5,
         display: "grid",
-        gridTemplateColumns: { xs: "1fr", md: "repeat(auto-fit, minmax(260px, 1fr))" },
+        gridTemplateColumns: { xs: "1fr", sm: "repeat(auto-fit, minmax(260px, 1fr))" },
         gap: { xs: 2, md: 3.5 },
         alignItems: "start",
       }}
@@ -115,27 +118,38 @@ export default function DetailPanel({ open, onClose, title, subtitle, actions, c
       sx={{
         px: { xs: 2, md: 2.5 },
         py: 1.5,
-        display: "flex",
+        pb: { xs: "calc(12px + env(safe-area-inset-bottom))", md: 1.5 },
+        display: { xs: "grid", md: "flex" },
+        gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
         gap: 1,
         flexWrap: "wrap",
         borderTop: 1,
         borderColor: "surface.border",
+        bgcolor: "board.bench",
       }}
     >
       {actions}
     </Box>
   );
 
-  if (isPhone) {
+  if (isSheet) {
     return (
       <Drawer
         anchor="bottom"
         open={open}
         onClose={onClose}
-        slotProps={{ paper: { sx: { maxHeight: "88vh", borderTop: 2, borderColor: "board.amber" } } }}
+        slotProps={{
+          paper: {
+            className: "sig-sheet",
+            sx: { maxHeight: "92dvh", borderTop: 2, borderColor: "board.amber", display: "flex", flexDirection: "column" },
+          },
+        }}
       >
-        <Box sx={{ overflowY: "auto" }}>
-          {header}
+        <Box sx={{ display: "flex", justifyContent: "center", pt: 1, flexShrink: 0 }} aria-hidden>
+          <Box sx={{ width: 40, height: 4, borderRadius: 2, bgcolor: "surface.borderStrong" }} />
+        </Box>
+        <Box sx={{ overflowY: "auto", flex: 1, minHeight: 0, overscrollBehavior: "contain" }}>
+          <Box sx={{ position: "sticky", top: 0, zIndex: 1, bgcolor: "board.bench" }}>{header}</Box>
           {content}
         </Box>
         {footer}

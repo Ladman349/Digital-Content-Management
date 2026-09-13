@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { CssBaseline, ThemeProvider, type PaletteMode } from "@mui/material";
-import { buildTheme } from "./theme";
+import { buildTheme, THEME_COLOR } from "./theme";
 
 const STORAGE_KEY = "signage.theme";
 
@@ -33,6 +33,8 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
       /* storage unavailable */
     }
     document.documentElement.style.colorScheme = mode;
+    // Phone browsers paint their own chrome in this colour; keep it on the same ground as the board.
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", THEME_COLOR[mode]);
   }, [mode]);
 
   const theme = useMemo(() => buildTheme(mode), [mode]);

@@ -17,6 +17,9 @@ interface Props {
 /**
  * The left-hand cell of every board row. Names are set large and uppercase so a list can be read at a
  * distance; the identifier sits under it in mono at a size that only matters once you are close.
+ *
+ * On a phone card the name may run to two lines: a registered screen is called something like
+ * "SKYWORTH SWTV-24AE-FHD (0C4B8C2A…)" and clipping it to one line hides the only part that differs.
  */
 export default function RowLead({ name, sub, before, size = "board", muted, title }: Props) {
   const big = size === "board";
@@ -36,7 +39,11 @@ export default function RowLead({ name, sub, before, size = "board", muted, titl
             color: muted ? "text.disabled" : "text.primary",
             overflow: "hidden",
             textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
+            overflowWrap: "anywhere",
+            whiteSpace: { xs: "normal", sm: "nowrap" },
+            display: { xs: "-webkit-box", sm: "block" },
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
           }}
         >
           {name}

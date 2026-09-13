@@ -61,12 +61,15 @@
                     style="@style/Text.Signage.Wordmark" />
             </LinearLayout>
 
-            <!-- Centred status card -->
+            <!-- Centred status card. The side margins keep it inside a phone-sized window; the
+                 minimum width keeps it from looking lost on a TV. -->
             <LinearLayout
                 android:id="@+id/statusCard"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
+                android:layout_marginStart="@dimen/signage_screen_padding"
+                android:layout_marginEnd="@dimen/signage_screen_padding"
                 android:minWidth="@dimen/signage_status_card_min_width"
                 style="@style/Widget.Signage.Card">
 
@@ -105,7 +108,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/signage_gap"
-                    android:maxWidth="800dp"
+                    android:maxWidth="@dimen/signage_status_text_max_width"
                     android:text="@string/status_booting_subtitle"
                     style="@style/Text.Signage.StatusSecondary" />
 
@@ -120,17 +123,18 @@
                     style="@style/Widget.Signage.ProgressBar.Determinate" />
             </LinearLayout>
 
-            <!-- Identity bar, bottom -->
+            <!-- Identity bar, bottom: a board slat running the full width, the ground showing above it. -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_gravity="bottom"
+                android:background="@color/signage_card"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:paddingStart="@dimen/signage_screen_padding"
                 android:paddingEnd="@dimen/signage_screen_padding"
                 android:paddingTop="@dimen/signage_gap"
-                android:paddingBottom="@dimen/signage_screen_padding">
+                android:paddingBottom="@dimen/signage_gap">
 
                 <TextView
                     android:id="@+id/tvDeviceName"

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, LinearProgress, Paper, Switch, TextField, Tooltip, Typography } from "@mui/material";
+import { Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, LinearProgress, Paper, Switch, TextField, Tooltip, Typography } from "@mui/material";
 import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import SystemUpdateAltRoundedIcon from "@mui/icons-material/SystemUpdateAltRounded";
@@ -18,7 +18,7 @@ import { formatBytes, formatDateTime } from "../../utils/format";
 
 export default function UpdatesPage() {
   const { enqueueSnackbar } = useSnackbar();
-  const { data: updates = [], isLoading, error } = useAppUpdates();
+  const { data: updates = [], isLoading, error, refetch } = useAppUpdates();
   const { data: devices = [] } = useDevices();
   const toggle = useToggleAppUpdate();
   const remove = useDeleteAppUpdate();
@@ -103,8 +103,9 @@ export default function UpdatesPage() {
       label: "",
       width: 200,
       align: "right",
+      onCard: true,
       render: (u) => (
-        <Box sx={{ display: "flex", gap: 0.75, justifyContent: "flex-end" }} onClick={(e) => e.stopPropagation()}>
+        <Box sx={{ display: "flex", gap: 0.75, justifyContent: "flex-end", flexWrap: "wrap" }} onClick={(e) => e.stopPropagation()}>
           <Button size="small" variant={u.is_active ? "outlined" : "contained"} onClick={() => onToggle(u)} disabled={toggle.isPending}>
             {u.is_active ? "Deactivate" : "Activate"}
           </Button>
@@ -132,18 +133,15 @@ export default function UpdatesPage() {
         }
       />
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          Could not load releases: {(error as Error).message}
-        </Alert>
-      )}
-
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "minmax(0, 3fr) minmax(0, 1fr)" }, gap: 2, alignItems: "start" }}>
         <DataTable<AppUpdate>
           columns={columns}
           rows={updates}
           rowKey={(u) => u.id}
           loading={isLoading}
+          error={error ? (error as Error).message : null}
+          onRetry={() => refetch()}
+          noun="releases"
           emptyState={
             <EmptyState
               icon={SystemUpdateAltRoundedIcon}
@@ -206,7 +204,7 @@ export default function UpdatesPage() {
               {file ? `${file.name} (${formatBytes(file.size)})` : "Choose APK file"}
               <input type="file" hidden accept=".apk,application/vnd.android.package-archive" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
             </Button>
-            <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2 }}>
               <TextField label="Version name" placeholder="1.4.0" value={versionName} onChange={(e) => setVersionName(e.target.value)} />
               <TextField label="Version code" type="number" placeholder="14" value={versionCode} onChange={(e) => setVersionCode(e.target.value)} helperText="Must be higher than what devices run" />
             </Box>

@@ -11,10 +11,13 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
-    <!-- Declare Leanback / TV requirements -->
+    <!--
+      Runs on Android TV first, but the same build has to install on tablets, phones and
+      signage boxes that do not ship Leanback, so neither feature is required.
+    -->
     <uses-feature
         android:name="android.software.leanback"
-        android:required="true" />
+        android:required="false" />
     <uses-feature
         android:name="android.hardware.touchscreen"
         android:required="false" />
@@ -22,6 +25,7 @@
     <application
         android:name=".DigitalSignageApplication"
         android:allowBackup="false"
+        android:banner="@drawable/ic_banner"
         android:networkSecurityConfig="@xml/network_security_config"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"

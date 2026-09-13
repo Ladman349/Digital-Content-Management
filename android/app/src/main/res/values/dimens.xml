@@ -1,35 +1,45 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Compact scale: phones and small boxes (anything narrower than 600dp).
+  Two further buckets scale the same tokens up:
+    values-w600dp-h480dp  – tablets
+    values-w720dp-h500dp  – TVs (1080p renders at 960x540dp) and large tablets, sized for 10-foot reading
+  Every layout refers to these names only, so nothing is hard-coded to one screen class.
+-->
 <resources>
-    <!-- Radii & strokes -->
-    <dimen name="signage_card_radius">16dp</dimen>
+    <!-- Radii & strokes. The board is square; radius only softens edges by a hair. -->
+    <dimen name="signage_card_radius">2dp</dimen>
     <dimen name="signage_card_stroke">1dp</dimen>
-    <dimen name="signage_chip_radius">10dp</dimen>
-    <dimen name="signage_focus_stroke">3dp</dimen>
+    <dimen name="signage_card_accent">3dp</dimen>
+    <dimen name="signage_chip_radius">2dp</dimen>
+    <dimen name="signage_focus_stroke">2dp</dimen>
 
     <!-- Spacing -->
-    <dimen name="signage_screen_padding">48dp</dimen>
-    <dimen name="signage_card_padding">40dp</dimen>
-    <dimen name="signage_gap_small">8dp</dimen>
-    <dimen name="signage_gap">16dp</dimen>
-    <dimen name="signage_gap_large">28dp</dimen>
+    <dimen name="signage_screen_padding">20dp</dimen>
+    <dimen name="signage_card_padding">22dp</dimen>
+    <dimen name="signage_gap_small">6dp</dimen>
+    <dimen name="signage_gap">12dp</dimen>
+    <dimen name="signage_gap_large">18dp</dimen>
 
-    <!-- Type scale (10-foot legibility) -->
-    <dimen name="signage_text_primary_size">44sp</dimen>
-    <dimen name="signage_text_secondary_size">24sp</dimen>
-    <dimen name="signage_text_footer_size">22sp</dimen>
-    <dimen name="signage_text_wordmark_size">28sp</dimen>
-    <dimen name="signage_text_chip_size">30sp</dimen>
-    <dimen name="signage_text_button_size">24sp</dimen>
-    <dimen name="signage_text_pin_size">48sp</dimen>
-    <dimen name="signage_text_dialog_title_size">32sp</dimen>
+    <!-- Type scale -->
+    <dimen name="signage_text_primary_size">24sp</dimen>
+    <dimen name="signage_text_secondary_size">14sp</dimen>
+    <dimen name="signage_text_footer_size">12sp</dimen>
+    <dimen name="signage_text_wordmark_size">14sp</dimen>
+    <dimen name="signage_text_chip_size">14sp</dimen>
+    <dimen name="signage_text_button_size">14sp</dimen>
+    <dimen name="signage_text_pin_size">28sp</dimen>
+    <dimen name="signage_text_dialog_title_size">18sp</dimen>
+    <dimen name="signage_splash_wordmark_size">22sp</dimen>
 
     <!-- Components -->
-    <dimen name="signage_brand_mark_size">44dp</dimen>
-    <dimen name="signage_status_indicator_size">72dp</dimen>
-    <dimen name="signage_status_card_min_width">720dp</dimen>
-    <dimen name="signage_progress_height">8dp</dimen>
-    <dimen name="signage_progress_width">560dp</dimen>
-    <dimen name="signage_status_dot_size">16dp</dimen>
-    <dimen name="signage_splash_wordmark_size">40sp</dimen>
-    <dimen name="signage_dialog_width">560dp</dimen>
+    <dimen name="signage_brand_mark_size">26dp</dimen>
+    <dimen name="signage_status_indicator_size">40dp</dimen>
+    <dimen name="signage_status_card_min_width">260dp</dimen>
+    <dimen name="signage_status_text_max_width">320dp</dimen>
+    <dimen name="signage_progress_height">6dp</dimen>
+    <dimen name="signage_progress_width">240dp</dimen>
+    <dimen name="signage_status_dot_size">10dp</dimen>
+    <dimen name="signage_dialog_width">320dp</dimen>
+    <dimen name="signage_button_min_height">44dp</dimen>
 </resources>

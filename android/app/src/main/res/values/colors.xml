@@ -3,18 +3,24 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
 
-    <!-- Signage design tokens -->
-    <color name="signage_background">#FF0B0E13</color>
-    <color name="signage_card">#FF161A22</color>
-    <color name="signage_card_border">#FF262C38</color>
-    <color name="signage_accent">#FF818CF8</color>
-    <color name="signage_text_primary">#FFF2F4F7</color>
-    <color name="signage_text_muted">#FF98A2B3</color>
-    <color name="signage_error">#FFF87171</color>
+    <!--
+      Departure-board tokens, shared with the CMS (frontend/src/app/theme.ts).
+      Near-black ground, slats a shade lighter, one amber accent. Amber is the identity of the whole
+      product, so the screen a technician sees on the wall matches the board they manage it from.
+    -->
+    <color name="signage_background">#FF0B0B0C</color>
+    <color name="signage_card">#FF141416</color>
+    <color name="signage_card_border">#FF232326</color>
+    <color name="signage_card_border_strong">#FF3E3E43</color>
+    <color name="signage_accent">#FFF2C230</color>
+    <color name="signage_accent_ink">#FF0B0B0C</color>
+    <color name="signage_text_primary">#FFF3F1EC</color>
+    <color name="signage_text_muted">#FF8C8A84</color>
+    <color name="signage_error">#FFF05A5A</color>
     <color name="signage_success">#FF4ADE80</color>
 
     <!-- Derived tints -->
-    <color name="signage_chip_background">#FF1E2430</color>
-    <color name="signage_track">#FF262C38</color>
-    <color name="signage_scrim">#DD0B0E13</color>
+    <color name="signage_chip_background">#FF1A1A1D</color>
+    <color name="signage_track">#FF232326</color>
+    <color name="signage_scrim">#E60B0B0C</color>
 </resources>

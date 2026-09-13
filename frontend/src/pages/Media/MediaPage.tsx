@@ -17,6 +17,7 @@ import SegmentedFilter from "../../components/ui/SegmentedFilter";
 import FilterSelect from "../../components/ui/FilterSelect";
 import DataTable, { type Column, type SortState } from "../../components/ui/DataTable";
 import EmptyState from "../../components/ui/EmptyState";
+import ErrorState from "../../components/ui/ErrorState";
 import ConfirmDialog from "../../components/ui/ConfirmDialog";
 import BulkBar from "../../components/ui/BulkBar";
 import MediaThumb from "../../components/ui/MediaThumb";
@@ -37,7 +38,7 @@ type SortKey = "newest" | "oldest" | "name" | "size";
 export default function MediaPage() {
   const { enqueueSnackbar } = useSnackbar();
   const [params, setParams] = useSearchParams();
-  const { data: items = [], isLoading } = useMedia();
+  const { data: items = [], isLoading, error, refetch } = useMedia();
   const { data: playlists = [] } = usePlaylists();
   const deleteMedia = useDeleteMedia();
   const updateMedia = useUpdateMedia();
@@ -216,54 +217,56 @@ export default function MediaPage() {
             </>
           )
         }
+        count={rows.length !== items.length ? `${rows.length} of ${items.length}` : undefined}
         actions={
           <Button variant="contained" startIcon={<CloudUploadRoundedIcon />} onClick={() => setUploadOpen(true)}>
             Upload
           </Button>
         }
-      >
-        <SearchField value={search} onChange={setSearch} placeholder="Search by name or ID…" />
-        <SegmentedFilter<TypeFilter>
-          ariaLabel="Filter by type"
-          value={typeFilter as TypeFilter}
-          onChange={setTypeFilter}
-          options={[
-            { value: "All", label: "All", count: counts.All },
-            { value: "Image", label: "Images", count: counts.Image },
-            { value: "Video", label: "Videos", count: counts.Video },
-          ]}
-        />
-        <FilterSelect label="Category" value={categoryFilter} onChange={setCategoryFilter} options={[{ value: "All", label: "All categories" }, ...MEDIA_CATEGORIES.map((c) => ({ value: c, label: c }))]} width={160} />
-        <FilterSelect
-          label="Sort"
-          value={sortKey}
-          onChange={(v) => setSortKey(v as SortKey)}
-          options={[
-            { value: "newest", label: "Newest first" },
-            { value: "oldest", label: "Oldest first" },
-            { value: "name", label: "Name A–Z" },
-            { value: "size", label: "Largest first" },
-          ]}
-          width={140}
-        />
-        {filtersActive && (
-          <Button size="small" onClick={clearFilters} startIcon={<FilterListOffRoundedIcon />}>
-            Clear
-          </Button>
-        )}
-        <Box sx={{ flex: 1 }} />
-        <Typography variant="body2" color="text.secondary">
-          {rows.length === items.length ? `${rows.length} files` : `${rows.length} of ${items.length}`}
-        </Typography>
-        <ToggleButtonGroup size="small" exclusive value={view} onChange={(_, v) => v && setView(v)} aria-label="View mode">
-          <ToggleButton value="grid" aria-label="Grid view">
-            <GridViewRoundedIcon sx={{ fontSize: 18 }} />
-          </ToggleButton>
-          <ToggleButton value="list" aria-label="List view">
-            <ViewListRoundedIcon sx={{ fontSize: 18 }} />
-          </ToggleButton>
-        </ToggleButtonGroup>
-      </PageHeader>
+        search={<SearchField value={search} onChange={setSearch} placeholder="Search by name or ID…" />}
+        filters={
+          <>
+            <SegmentedFilter<TypeFilter>
+              ariaLabel="Filter by type"
+              value={typeFilter as TypeFilter}
+              onChange={setTypeFilter}
+              options={[
+                { value: "All", label: "All", count: counts.All },
+                { value: "Image", label: "Images", count: counts.Image },
+                { value: "Video", label: "Videos", count: counts.Video },
+              ]}
+            />
+            <FilterSelect label="Category" value={categoryFilter} onChange={setCategoryFilter} options={[{ value: "All", label: "All categories" }, ...MEDIA_CATEGORIES.map((c) => ({ value: c, label: c }))]} width={160} />
+            <FilterSelect
+              label="Sort"
+              value={sortKey}
+              onChange={(v) => setSortKey(v as SortKey)}
+              options={[
+                { value: "newest", label: "Newest first" },
+                { value: "oldest", label: "Oldest first" },
+                { value: "name", label: "Name A–Z" },
+                { value: "size", label: "Largest first" },
+              ]}
+              width={140}
+            />
+            {filtersActive && (
+              <Button size="small" onClick={clearFilters} startIcon={<FilterListOffRoundedIcon />}>
+                Clear
+              </Button>
+            )}
+          </>
+        }
+        tools={
+          <ToggleButtonGroup size="small" exclusive value={view} onChange={(_, v) => v && setView(v)} aria-label="View mode">
+            <ToggleButton value="grid" aria-label="Grid view">
+              <GridViewRoundedIcon sx={{ fontSize: 18 }} />
+            </ToggleButton>
+            <ToggleButton value="list" aria-label="List view">
+              <ViewListRoundedIcon sx={{ fontSize: 18 }} />
+            </ToggleButton>
+          </ToggleButtonGroup>
+        }
+      />
 
       <Box sx={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
         <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -273,6 +276,9 @@ export default function MediaPage() {
               rows={rows}
               rowKey={(m) => m.id}
               loading={isLoading}
+              error={error ? (error as Error).message : null}
+              onRetry={() => refetch()}
+              noun="media"
               selectable
               selected={selected}
               onSelectionChange={setSelected}
@@ -282,8 +288,10 @@ export default function MediaPage() {
               emptyState={empty}
               sort={undefined as SortState | undefined}
             />
+          ) : error && items.length === 0 ? (
+            <ErrorState noun="media" message={(error as Error).message} onRetry={() => refetch()} />
           ) : rows.length === 0 && !isLoading ? (
-            <Box sx={{ border: 1, borderColor: "surface.border", borderRadius: 2, bgcolor: "background.paper" }}>{empty}</Box>
+            empty
           ) : (
             <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(168px, 1fr))", gap: 1.25 }}>
               {rows.map((m) => {

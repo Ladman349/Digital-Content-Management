@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tablet scale (see values/dimens.xml for the buckets). -->
+<resources>
+    <dimen name="signage_screen_padding">32dp</dimen>
+    <dimen name="signage_card_padding">32dp</dimen>
+    <dimen name="signage_gap_small">8dp</dimen>
+    <dimen name="signage_gap">14dp</dimen>
+    <dimen name="signage_gap_large">22dp</dimen>
+
+    <dimen name="signage_text_primary_size">34sp</dimen>
+    <dimen name="signage_text_secondary_size">19sp</dimen>
+    <dimen name="signage_text_footer_size">16sp</dimen>
+    <dimen name="signage_text_wordmark_size">20sp</dimen>
+    <dimen name="signage_text_chip_size">22sp</dimen>
+    <dimen name="signage_text_button_size">19sp</dimen>
+    <dimen name="signage_text_pin_size">40sp</dimen>
+    <dimen name="signage_text_dialog_title_size">26sp</dimen>
+    <dimen name="signage_splash_wordmark_size">32sp</dimen>
+
+    <dimen name="signage_brand_mark_size">36dp</dimen>
+    <dimen name="signage_status_indicator_size">56dp</dimen>
+    <dimen name="signage_status_card_min_width">480dp</dimen>
+    <dimen name="signage_status_text_max_width">520dp</dimen>
+    <dimen name="signage_progress_height">8dp</dimen>
+    <dimen name="signage_progress_width">400dp</dimen>
+    <dimen name="signage_status_dot_size">12dp</dimen>
+    <dimen name="signage_dialog_width">440dp</dimen>
+    <dimen name="signage_button_min_height">52dp</dimen>
+</resources>
