@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <!-- Departure-board tokens, shared with frontend/src/app/theme.ts and the TV player. -->
+    <color name="colorPrimary">#F2C230</color>
+    <color name="colorPrimaryDark">#0B0B0C</color>
+    <color name="colorAccent">#F2C230</color>
+</resources>

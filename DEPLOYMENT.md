@@ -104,7 +104,8 @@ The same APK runs on any Android 7+ device, not only TVs: neither Leanback nor a
 required, and the status screen scales its type and spacing to the window (compact on phones and
 small boxes, medium on tablets, 10-foot on TVs and large tablets). Content itself always fills the
 screen. The CMS on Vercel is installable too — on a phone, open it in the browser and choose
-**Add to Home Screen**; it launches full screen with the board's own colours.
+**Add to Home Screen**; it launches full screen with the board's own colours. For a real
+native controller app on phones (Android APK, iOS via TestFlight) see `docs/MOBILE_APPS.md`.
 
 ### Onboarding a New TV
 

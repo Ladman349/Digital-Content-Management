@@ -102,6 +102,11 @@ origins = [
     "https://ladman349-digital-content-managemen.vercel.app",
     "https://digital-content-management-two.vercel.app",
     "https://dcm.grovitai.com",
+    # The native CMS shells (frontend/android, frontend/ios) serve the bundle from these fixed
+    # origins. They are listed explicitly so the apps survive APP_ENV=production, which drops the
+    # development-only localhost regex below.
+    "https://localhost",
+    "capacitor://localhost",
 ]
 allowed_origins_env = settings.CORS_ALLOWED_ORIGINS
 if allowed_origins_env:

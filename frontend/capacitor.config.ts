@@ -17,6 +17,12 @@ const config: CapacitorConfig = {
     allowsLinkPreview: false,
     scrollEnabled: true,
   },
+  // Both shells serve the bundle from a fixed origin — https://localhost on Android,
+  // capacitor://localhost on iOS — which the API allow-lists in backend/main.py.
+  android: {
+    backgroundColor: "#0B0B0C",
+    allowMixedContent: false,
+  },
   plugins: {
     StatusBar: {
       // Light glyphs over the near-black ground; ThemeModeProvider flips this when the theme does.

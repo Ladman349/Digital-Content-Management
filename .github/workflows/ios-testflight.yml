@@ -3,7 +3,7 @@
 # Runs on GitHub's macOS runners, so no Mac is needed locally. Signing uses an Apple Distribution
 # certificate (.p12) plus an App Store Connect API key; with those, xcodebuild manages the
 # provisioning profile itself (-allowProvisioningUpdates). Setup is documented in
-# docs/IOS_TESTFLIGHT.md.
+# docs/MOBILE_APPS.md.
 #
 # Required repository secrets:
 #   APPLE_TEAM_ID            10-character Team ID from developer.apple.com/account
