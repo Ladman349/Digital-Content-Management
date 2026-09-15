@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { CssBaseline, ThemeProvider, type PaletteMode } from "@mui/material";
+import { Capacitor } from "@capacitor/core";
+import { StatusBar, Style } from "@capacitor/status-bar";
 import { buildTheme, THEME_COLOR } from "./theme";
 
 const STORAGE_KEY = "signage.theme";
@@ -35,6 +37,12 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
     document.documentElement.style.colorScheme = mode;
     // Phone browsers paint their own chrome in this colour; keep it on the same ground as the board.
     document.querySelector('meta[name="theme-color"]')?.setAttribute("content", THEME_COLOR[mode]);
+    // Inside the native iOS shell the status bar glyphs are ours to set: light on dark, dark on light.
+    if (Capacitor.isNativePlatform()) {
+      StatusBar.setStyle({ style: mode === "dark" ? Style.Dark : Style.Light }).catch(() => {
+        /* plugin missing on this platform */
+      });
+    }
   }, [mode]);
 
   const theme = useMemo(() => buildTheme(mode), [mode]);

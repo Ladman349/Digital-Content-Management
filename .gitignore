@@ -31,6 +31,12 @@ Thumbs.db
 *.keystore
 *.p12
 *.pfx
+# Apple signing material: distribution certs, App Store Connect API keys, provisioning profiles
+*.p8
+*.cer
+*.certSigningRequest
+*.mobileprovision
+private_keys/
 **/keystore.properties
 **/signing.properties
 .env

@@ -1,0 +1,124 @@
+# Builds the Signage CMS iPhone/iPad shell and uploads it to TestFlight.
+#
+# Runs on GitHub's macOS runners, so no Mac is needed locally. Signing uses an Apple Distribution
+# certificate (.p12) plus an App Store Connect API key; with those, xcodebuild manages the
+# provisioning profile itself (-allowProvisioningUpdates). Setup is documented in
+# docs/IOS_TESTFLIGHT.md.
+#
+# Required repository secrets:
+#   APPLE_TEAM_ID            10-character Team ID from developer.apple.com/account
+#   APPSTORE_ISSUER_ID       App Store Connect → Users and Access → Integrations → Issuer ID
+#   APPSTORE_KEY_ID          Key ID of the App Store Connect API key
+#   APPSTORE_PRIVATE_KEY     Contents of the AuthKey_<KEY_ID>.p8 file
+#   IOS_DIST_P12_BASE64      Apple Distribution certificate + private key, .p12, base64-encoded
+#   IOS_DIST_P12_PASSWORD    Password that .p12 was exported with
+
+name: iOS · TestFlight
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["ios-v*"]
+
+concurrency:
+  group: ios-testflight
+  cancel-in-progress: false
+
+jobs:
+  testflight:
+    name: Archive, sign and upload
+    runs-on: macos-15
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      KEY_PATH: ${{ github.workspace }}/private_keys/AuthKey_${{ secrets.APPSTORE_KEY_ID }}.p8
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build the web bundle
+        # VITE_API_URL comes from the committed frontend/.env (public production URL).
+        run: |
+          npm ci
+          npm run build
+
+      - name: Copy the bundle into the iOS project
+        run: npx cap sync ios
+
+      - name: Show Xcode
+        run: xcodebuild -version
+
+      - name: Import the distribution certificate
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.IOS_DIST_P12_BASE64 }}
+          p12-password: ${{ secrets.IOS_DIST_P12_PASSWORD }}
+
+      - name: Install the App Store Connect API key
+        run: |
+          mkdir -p "$(dirname "$KEY_PATH")"
+          printf '%s' "$APPSTORE_PRIVATE_KEY" > "$KEY_PATH"
+          chmod 600 "$KEY_PATH"
+        env:
+          APPSTORE_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+
+      - name: Stamp the build number
+        # TestFlight rejects a build number it has already seen; the run number only ever grows.
+        run: xcrun agvtool new-version -all ${{ github.run_number }}
+        working-directory: frontend/ios/App
+
+      - name: Archive
+        run: |
+          xcodebuild archive \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$KEY_PATH" \
+            -authenticationKeyID "${{ secrets.APPSTORE_KEY_ID }}" \
+            -authenticationKeyIssuerID "${{ secrets.APPSTORE_ISSUER_ID }}" \
+            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
+            CODE_SIGN_STYLE=Automatic
+          test -d "$RUNNER_TEMP/App.xcarchive"
+
+      - name: Export the IPA
+        run: |
+          sed "s/__TEAM_ID__/${{ secrets.APPLE_TEAM_ID }}/" ios/App/ExportOptions.plist > "$RUNNER_TEMP/ExportOptions.plist"
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$KEY_PATH" \
+            -authenticationKeyID "${{ secrets.APPSTORE_KEY_ID }}" \
+            -authenticationKeyIssuerID "${{ secrets.APPSTORE_ISSUER_ID }}"
+          ls -la "$RUNNER_TEMP/export"
+
+      - name: Upload to TestFlight
+        run: |
+          xcrun altool --upload-app --type ios \
+            --file "$RUNNER_TEMP/export/App.ipa" \
+            --apiKey "${{ secrets.APPSTORE_KEY_ID }}" \
+            --apiIssuer "${{ secrets.APPSTORE_ISSUER_ID }}"
+        env:
+          # altool looks for the .p8 in ./private_keys, ~/private_keys, ~/.private_keys or ~/.appstoreconnect/private_keys
+          API_PRIVATE_KEYS_DIR: ${{ github.workspace }}/private_keys
+
+      - name: Keep the IPA as a run artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: signage-cms-ios-${{ github.run_number }}
+          path: ${{ runner.temp }}/export/*.ipa
+          if-no-files-found: ignore
+          retention-days: 14
