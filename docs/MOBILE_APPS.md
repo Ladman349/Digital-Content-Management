@@ -76,7 +76,7 @@ openssl req -new -key ios-dist.key -out ios-dist.certSigningRequest -subj "/emai
 ```powershell
 # 3. Bundle certificate and key into a .p12. Choose a password; it becomes IOS_DIST_P12_PASSWORD.
 openssl x509 -inform der -in distribution.cer -out distribution.pem
-openssl pkcs12 -export -inkey ios-dist.key -in distribution.pem -out ios-dist.p12 -legacy
+openssl pkcs12 -export -inkey ios-dist.key -in distribution.pem -out ios-dist.p12 -keypbe PBE-SHA1-3DES -certpbe PBE-SHA1-3DES -macalg sha1
 
 # 4. Base64 for the secret. Paste the whole output as IOS_DIST_P12_BASE64.
 [Convert]::ToBase64String([IO.File]::ReadAllBytes("ios-dist.p12"))
@@ -86,8 +86,18 @@ Keep `ios-dist.key` and `ios-dist.p12` somewhere safe. The certificate lasts a y
 section and replace the two secrets when it expires. Apple allows two distribution certificates
 at a time.
 
-> `-legacy` matters with OpenSSL 3: without it macOS cannot import the `.p12`. Drop the flag on
-> OpenSSL 1.1.
+> The three `-keypbe/-certpbe/-macalg` flags make OpenSSL 3 write a `.p12` that macOS can import
+> without needing the `legacy` provider module, which Git's bundled OpenSSL does not ship.
+
+5. **App Store provisioning profile.** The build signs manually, so the profile must exist:
+   developer.apple.com → Certificates, Identifiers & Profiles → **Profiles** → **+** →
+   **App Store Connect** (under Distribution) → App ID `com.grovitai.signage` → tick the
+   distribution certificate from step 2 → name it exactly **`Signage CMS App Store`** → Generate.
+   Nothing to download: the workflow fetches it with the API key. The profile is tied to the
+   certificate, so regenerate it (same name) whenever the certificate is renewed.
+
+   Automatic signing is not used because an archive under it always signs with a *development*
+   identity, which needs a registered device and a development certificate the runner never has.
 
 ### 3. GitHub secrets
 

@@ -1,9 +1,9 @@
 # Builds the Signage CMS iPhone/iPad shell and uploads it to TestFlight.
 #
-# Runs on GitHub's macOS runners, so no Mac is needed locally. Signing uses an Apple Distribution
-# certificate (.p12) plus an App Store Connect API key; with those, xcodebuild manages the
-# provisioning profile itself (-allowProvisioningUpdates). Setup is documented in
-# docs/MOBILE_APPS.md.
+# Runs on GitHub's macOS runners, so no Mac is needed locally. Signing is manual: an Apple
+# Distribution certificate (.p12) plus the App Store provisioning profile "Signage CMS App Store",
+# which xcodebuild downloads with the App Store Connect API key (-allowProvisioningUpdates).
+# Setup is documented in docs/MOBILE_APPS.md.
 #
 # Required repository secrets:
 #   APPLE_TEAM_ID            10-character Team ID from developer.apple.com/account
@@ -76,9 +76,10 @@ jobs:
         working-directory: frontend/ios/App
 
       - name: Archive
-        # Only an Apple Distribution certificate is in the keychain, so the archive must sign
-        # with it. At the default developer identity Xcode tries to mint a development profile,
-        # which fails on a team with no registered devices.
+        # Manual signing: automatic signing always archives with a development identity, which
+        # needs a registered device and a development certificate the runner does not have.
+        # The App Store profile named here is created once on developer.apple.com and
+        # -allowProvisioningUpdates downloads it (docs/MOBILE_APPS.md, section 2).
         run: |
           xcodebuild archive \
             -project ios/App/App.xcodeproj \
@@ -91,8 +92,9 @@ jobs:
             -authenticationKeyID "${{ secrets.APPSTORE_KEY_ID }}" \
             -authenticationKeyIssuerID "${{ secrets.APPSTORE_ISSUER_ID }}" \
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
-            CODE_SIGN_STYLE=Automatic \
-            CODE_SIGN_IDENTITY="Apple Distribution"
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="Signage CMS App Store"
           test -d "$RUNNER_TEMP/App.xcarchive"
 
       - name: Export the IPA
