@@ -27,7 +27,9 @@ concurrency:
 jobs:
   testflight:
     name: Archive, sign and upload
-    runs-on: macos-15
+    # macos-26 ships Xcode 26 by default. App Store Connect rejects anything built with an older
+    # SDK ("All iOS and iPadOS apps must be built with the iOS 26 SDK or later").
+    runs-on: macos-26
     timeout-minutes: 60
     defaults:
       run:
