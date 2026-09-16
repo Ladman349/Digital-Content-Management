@@ -39,7 +39,7 @@ package is `com.grovitai.signage`, it never collides with the TV player.
 ## iOS — TestFlight from GitHub Actions
 
 Building for iOS needs macOS, so `.github/workflows/ios-testflight.yml` does it on GitHub's
-runners: archive with automatic signing driven by an App Store Connect API key, export, upload.
+runners: archive with manual signing (distribution certificate + App Store profile, fetched with an App Store Connect API key), export, upload.
 No Mac is needed at any point. The setup below is done once.
 
 ### 1. Apple side
