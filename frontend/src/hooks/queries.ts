@@ -4,6 +4,8 @@ import { MediaService } from "../services/MediaService";
 import { PlaylistService } from "../services/PlaylistService";
 import { ScheduleService } from "../services/ScheduleService";
 import { AppUpdateService } from "../services/AppUpdateService";
+import { ClientService, UserService } from "../services/AccountService";
+import type { UserCreatePayload, UserUpdatePayload } from "../types/account";
 import type { DeviceCreatePayload, DeviceUpdatePayload } from "../types/device";
 import type { MediaUpdatePayload } from "../types/media";
 import type { PlaylistCreatePayload, PlaylistUpdatePayload } from "../types/playlist";
@@ -16,6 +18,8 @@ export const queryKeys = {
   playlists: ["playlists"] as const,
   schedules: ["schedules"] as const,
   appUpdates: ["app-updates"] as const,
+  users: ["users"] as const,
+  clients: ["clients"] as const,
 };
 
 // Devices report heartbeats every minute, so poll their list a little faster than the rest.
@@ -34,8 +38,9 @@ export function usePlaylists() {
 export function useSchedules() {
   return useQuery({ queryKey: queryKeys.schedules, queryFn: ScheduleService.list, refetchInterval: LIST_POLL_MS });
 }
-export function useAppUpdates() {
-  return useQuery({ queryKey: queryKeys.appUpdates, queryFn: AppUpdateService.list });
+/** Player releases are the operator's business; pass `false` for client users, who would only get a 403. */
+export function useAppUpdates(enabled = true) {
+  return useQuery({ queryKey: queryKeys.appUpdates, queryFn: AppUpdateService.list, enabled });
 }
 
 function useInvalidator(...keys: readonly (readonly string[])[]) {
@@ -49,7 +54,8 @@ export function useCreateDevice() {
   return useMutation({ mutationFn: (d: DeviceCreatePayload) => DeviceService.create(d), onSuccess: invalidate });
 }
 export function useUpdateDevice() {
-  const invalidate = useInvalidator(queryKeys.devices);
+  // Handing a screen to a client changes that client's counts too.
+  const invalidate = useInvalidator(queryKeys.devices, queryKeys.clients);
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: DeviceUpdatePayload }) => DeviceService.update(id, data),
     onSuccess: invalidate,
@@ -153,6 +159,38 @@ export function useToggleAppUpdate() {
 export function useDeleteAppUpdate() {
   const invalidate = useInvalidator(queryKeys.appUpdates);
   return useMutation({ mutationFn: (id: string) => AppUpdateService.remove(id), onSuccess: invalidate });
+}
+
+// ── Accounts (administrators only) ─────────────────────────────────────────
+export function useClients(enabled = true) {
+  return useQuery({ queryKey: queryKeys.clients, queryFn: ClientService.list, enabled, staleTime: 60_000 });
+}
+export function useUsers() {
+  return useQuery({ queryKey: queryKeys.users, queryFn: UserService.list });
+}
+export function useCreateUser() {
+  const invalidate = useInvalidator(queryKeys.users, queryKeys.clients);
+  return useMutation({ mutationFn: (d: UserCreatePayload) => UserService.create(d), onSuccess: invalidate });
+}
+export function useUpdateUser() {
+  const invalidate = useInvalidator(queryKeys.users, queryKeys.clients);
+  return useMutation({ mutationFn: ({ id, data }: { id: string; data: UserUpdatePayload }) => UserService.update(id, data), onSuccess: invalidate });
+}
+export function useDeleteUser() {
+  const invalidate = useInvalidator(queryKeys.users, queryKeys.clients);
+  return useMutation({ mutationFn: (id: string) => UserService.remove(id), onSuccess: invalidate });
+}
+export function useCreateClient() {
+  const invalidate = useInvalidator(queryKeys.clients);
+  return useMutation({ mutationFn: (name: string) => ClientService.create(name), onSuccess: invalidate });
+}
+export function useRenameClient() {
+  const invalidate = useInvalidator(queryKeys.clients, queryKeys.users);
+  return useMutation({ mutationFn: ({ id, name }: { id: string; name: string }) => ClientService.update(id, name), onSuccess: invalidate });
+}
+export function useDeleteClient() {
+  const invalidate = useInvalidator(queryKeys.clients);
+  return useMutation({ mutationFn: (id: string) => ClientService.remove(id), onSuccess: invalidate });
 }
 
 // ── helpers ────────────────────────────────────────────────────────────────

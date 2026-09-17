@@ -10,6 +10,7 @@ import type { Schedule } from "../../types/schedule";
 import DetailPanel from "../../components/ui/DetailPanel";
 import Field, { FieldGrid, Section } from "../../components/ui/Field";
 import StatusChip from "../../components/ui/StatusChip";
+import OwnerSection from "../../components/ui/OwnerSection";
 import MediaThumb from "../../components/ui/MediaThumb";
 import { useUpdatePlaylist } from "../../hooks/queries";
 import { formatDateTime, formatDuration, pluralize } from "../../utils/format";
@@ -207,6 +208,8 @@ export default function PlaylistDetailPanel({ playlist, media, devices, schedule
           </Box>
         )}
       </Section>
+
+      <OwnerSection kind="playlist" id={playlist.id} clientId={playlist.clientId} />
     </DetailPanel>
   );
 }

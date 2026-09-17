@@ -10,6 +10,7 @@ import type { Playlist } from "../../types/playlist";
 import DetailPanel from "../../components/ui/DetailPanel";
 import Field, { FieldGrid, Section } from "../../components/ui/Field";
 import StatusChip from "../../components/ui/StatusChip";
+import OwnerSection from "../../components/ui/OwnerSection";
 import { useUpdateMedia } from "../../hooks/queries";
 import { formatBytes, formatDateTime, formatDuration } from "../../utils/format";
 import { thumbnailUrl } from "../../utils/media";
@@ -132,6 +133,8 @@ export default function MediaDetailPanel({ media, playlists, onClose, onPrev, on
           </Box>
         )}
       </Section>
+
+      <OwnerSection kind="media" id={media.id} clientId={media.clientId} />
     </DetailPanel>
   );
 }

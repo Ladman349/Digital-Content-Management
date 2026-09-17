@@ -6,7 +6,10 @@ import LightModeRoundedIcon from "@mui/icons-material/LightModeRounded";
 import { useIsFetching, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { navigationItems, pageTitleFor } from "../../constants/navigation";
+import { navigationFor, pageTitleFor } from "../../constants/navigation";
+import { useAuth } from "../../auth/AuthProvider";
+import AccountMenu from "./AccountMenu";
+import ClientSwitcher from "./ClientSwitcher";
 import { useThemeMode } from "../../app/ThemeModeProvider";
 import { API_ROOT, checkApiReady } from "../../api/client";
 import { useNow } from "../../hooks/useNow";
@@ -50,6 +53,7 @@ function Clock() {
  */
 function Tabs({ fade }: { fade?: boolean }) {
   const location = useLocation();
+  const { isAdmin } = useAuth();
   const navRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -76,7 +80,7 @@ function Tabs({ fade }: { fade?: boolean }) {
         }),
       }}
     >
-      {navigationItems.map((item) => (
+      {navigationFor(isAdmin).map((item) => (
         <Box
           key={item.path}
           component={NavLink}
@@ -154,6 +158,8 @@ export default function TopBar({ onOpenSearch }: Props) {
 
         <Clock />
 
+        <ClientSwitcher />
+
         <Box sx={{ display: "flex", alignItems: "center", gap: { xs: 0, md: 0.25 } }}>
           <Tooltip title={`Search everything · ${isMac ? "⌘K" : "Ctrl K"}`}>
             <IconButton onClick={onOpenSearch} aria-label="Search everything">
@@ -193,6 +199,8 @@ export default function TopBar({ onOpenSearch }: Props) {
               </Typography>
             </Box>
           </Tooltip>
+
+          <AccountMenu />
         </Box>
       </Box>
 

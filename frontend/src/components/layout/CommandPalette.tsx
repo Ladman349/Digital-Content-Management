@@ -7,7 +7,8 @@ import EventRoundedIcon from "@mui/icons-material/EventRounded";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import { useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { navigationItems } from "../../constants/navigation";
+import { navigationFor } from "../../constants/navigation";
+import { useAuth } from "../../auth/AuthProvider";
 import { useDevices, useMedia, usePlaylists, useSchedules } from "../../hooks/queries";
 import StatusDot from "../ui/StatusDot";
 import { deviceTone } from "../ui/tone";
@@ -37,6 +38,7 @@ function matches(q: string, ...fields: (string | null | undefined)[]) {
  */
 export default function CommandPalette({ onClose }: Props) {
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
   const [query, setQuery] = useState("");
   const [cursor, setCursor] = useState(0);
   const { data: devices = [] } = useDevices();
@@ -47,6 +49,7 @@ export default function CommandPalette({ onClose }: Props) {
   const results = useMemo<Result[]>(() => {
     const q = query.trim().toLowerCase();
     const out: Result[] = [];
+    const navigationItems = navigationFor(isAdmin);
     if (!q) {
       navigationItems.forEach((n) => out.push({ id: `nav-${n.path}`, group: "Go to", title: n.title, icon: <n.icon fontSize="small" />, to: n.path }));
       return out;
@@ -87,7 +90,7 @@ export default function CommandPalette({ onClose }: Props) {
       .slice(0, MAX_PER_GROUP)
       .forEach((s) => out.push({ id: `sch-${s.id}`, group: "Schedules", title: s.name, subtitle: `${s.status} · ${s.startDate} → ${s.endDate}`, icon: <EventRoundedIcon fontSize="small" />, to: `/schedule?select=${encodeURIComponent(s.id)}` }));
     return out;
-  }, [query, devices, media, playlists, schedules]);
+  }, [query, devices, media, playlists, schedules, isAdmin]);
 
   // Clamp during render instead of resetting from an effect: the result list shrinks as you type.
   const activeIndex = results.length === 0 ? -1 : Math.min(cursor, results.length - 1);

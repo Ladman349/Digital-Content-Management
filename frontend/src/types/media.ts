@@ -16,6 +16,8 @@ export interface MediaItem {
   uploadedAt: number;
   uploadedBy: string;
   checksum?: string | null;
+  /** Owning client; null or absent means it belongs to the operator. Only administrators can change it. */
+  clientId?: string | null;
 }
 
 export interface MediaUpdatePayload {
@@ -23,4 +25,5 @@ export interface MediaUpdatePayload {
   category?: MediaCategory;
   duration?: number;
   dimensions?: string;
+  clientId?: string | null;
 }

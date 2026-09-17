@@ -15,6 +15,8 @@ export interface Playlist {
   totalDuration: number;
   status: PlaylistStatus;
   updatedAt: number;
+  /** Owning client; null or absent means it belongs to the operator. Only administrators can change it. */
+  clientId?: string | null;
 }
 
 export type PlaylistCreatePayload = Omit<Playlist, "id">;

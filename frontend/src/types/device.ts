@@ -20,6 +20,8 @@ export interface Device {
   uptimeSeconds?: number | null;
   firmwareVersion?: string | null;
   orientation?: DeviceOrientation | null;
+  /** Owning client; null or absent means the screen belongs to the operator. */
+  clientId?: string | null;
 }
 
 export interface DeviceCreatePayload {
@@ -38,6 +40,8 @@ export interface DeviceUpdatePayload {
   location?: string;
   resolution?: string;
   orientation?: DeviceOrientation;
+  /** Administrators only. null hands the screen back to the operator. */
+  clientId?: string | null;
 }
 
 export const ORIENTATION_LABELS: Record<DeviceOrientation, string> = {

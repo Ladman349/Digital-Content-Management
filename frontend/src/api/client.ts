@@ -3,7 +3,10 @@
  * - Normalises VITE_API_URL so it always ends in /api/v1
  * - Parses FastAPI error bodies ({detail: string | ValidationError[]}) into readable messages
  * - Handles 204 No Content
+ * - Sends the signed-in session on every request and reports a refused one to the auth provider
  */
+
+import { notifyUnauthorized, session } from "../auth/session";
 
 function normaliseBase(raw: string | undefined): string {
   let base = (raw || "http://localhost:8000/api/v1").trim();
@@ -20,16 +23,29 @@ export const API_BASE = normaliseBase(import.meta.env.VITE_API_URL);
 export const API_ROOT = API_BASE.replace(/\/api\/v1$/, "");
 
 /**
- * Shared admin key, sent on every request when the backend has ADMIN_API_KEY configured.
- *
- * Note this is a deployment-level guard, not user authentication: anything in a Vite bundle is
- * readable by anyone who can load the CMS. It stops anonymous access to the API from the open
- * internet, so pair it with SSO or a VPN in front of the CMS itself.
+ * Optional shared admin key from before user accounts existed. Anything in a Vite bundle is readable
+ * by anyone who can load the CMS, so this was only ever a guard against anonymous traffic. With
+ * accounts in use it should be left unset: a key baked into the bundle would make every visitor a
+ * platform administrator, sign-in screen or not.
  */
 const ADMIN_KEY = (import.meta.env.VITE_ADMIN_API_KEY || "").trim();
 
-function authHeaders(): Record<string, string> {
-  return ADMIN_KEY ? { "X-Admin-Key": ADMIN_KEY } : {};
+/**
+ * Account-level routes are never narrowed to a client. Leaving the scope off them also means a
+ * scope pointing at a client that has since been deleted cannot block the very request (the client
+ * list) that lets the switcher notice and reset itself.
+ */
+const UNSCOPED = /^\/(auth|users|clients|app-updates)(\/|$|\?)/;
+
+function authHeaders(url: string): Record<string, string> {
+  const headers: Record<string, string> = {};
+  const token = session.getToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  else if (ADMIN_KEY) headers["X-Admin-Key"] = ADMIN_KEY;
+  // Administrators can work "as" one client; the server ignores this for everyone else.
+  const scope = session.getScope();
+  if (scope && !UNSCOPED.test(url)) headers["X-Client-Scope"] = scope;
+  return headers;
 }
 
 export class ApiError extends Error {
@@ -64,9 +80,14 @@ async function errorFromResponse(res: Response, fallback: string): Promise<ApiEr
   return new ApiError(message || fallback, res.status);
 }
 
-async function request<T>(method: string, url: string, body?: unknown): Promise<T> {
+interface RequestOptions {
+  /** The sign-in call itself: a 401 there means "wrong password", not "your session ended". */
+  expect401?: boolean;
+}
+
+async function request<T>(method: string, url: string, body?: unknown, options: RequestOptions = {}): Promise<T> {
   const isForm = body instanceof FormData;
-  const headers: Record<string, string> = { ...authHeaders() };
+  const headers: Record<string, string> = { ...authHeaders(url) };
   if (body !== undefined && !isForm) headers["Content-Type"] = "application/json";
   let res: Response;
   try {
@@ -78,13 +99,11 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
   } catch {
     throw new ApiError("Cannot reach the API server", 0);
   }
-  if (res.status === 401) {
-    throw new ApiError(
-      ADMIN_KEY
-        ? "The API rejected this admin key. Check VITE_ADMIN_API_KEY matches ADMIN_API_KEY on the backend."
-        : "This API requires an admin key. Set VITE_ADMIN_API_KEY for the CMS.",
-      401,
-    );
+  if (res.status === 401 && !options.expect401) {
+    // The session ended, was revoked, or sign-in has just been switched on. Either way the answer
+    // is the sign-in screen, which the auth provider shows when told.
+    notifyUnauthorized();
+    throw new ApiError("Your session has ended. Sign in again.", 401);
   }
   if (!res.ok) throw await errorFromResponse(res, `${method} ${url} failed (${res.status})`);
   if (res.status === 204 || res.headers.get("content-length") === "0") return undefined as T;
@@ -93,7 +112,7 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
 
 export const api = {
   get: <T>(url: string) => request<T>("GET", url),
-  post: <T>(url: string, body?: unknown) => request<T>("POST", url, body),
+  post: <T>(url: string, body?: unknown, options?: RequestOptions) => request<T>("POST", url, body, options),
   put: <T>(url: string, body?: unknown) => request<T>("PUT", url, body),
   delete: (url: string) => request<void>("DELETE", url),
 };
@@ -108,7 +127,7 @@ export function uploadWithProgress<T>(url: string, form: FormData, onProgress?: 
   const xhr = new XMLHttpRequest();
   const promise = new Promise<T>((resolve, reject) => {
     xhr.open("POST", `${API_BASE}${url}`);
-    Object.entries(authHeaders()).forEach(([k, v]) => xhr.setRequestHeader(k, v));
+    Object.entries(authHeaders(url)).forEach(([k, v]) => xhr.setRequestHeader(k, v));
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total);
     };
@@ -121,7 +140,8 @@ export function uploadWithProgress<T>(url: string, form: FormData, onProgress?: 
         }
         return;
       }
-      let message = `Upload failed (${xhr.status})`;
+      if (xhr.status === 401) notifyUnauthorized();
+      let message = xhr.status === 401 ? "Your session has ended. Sign in again." : `Upload failed (${xhr.status})`;
       try {
         const data = JSON.parse(xhr.responseText);
         if (typeof data?.detail === "string") message = data.detail;

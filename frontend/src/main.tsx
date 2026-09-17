@@ -13,6 +13,7 @@ import "@fontsource/jetbrains-mono/500.css";
 import "@fontsource/jetbrains-mono/700.css";
 
 import { ThemeModeProvider } from "./app/ThemeModeProvider";
+import { AuthProvider } from "./auth/AuthProvider";
 import App from "./App";
 
 const queryClient = new QueryClient({
@@ -31,7 +32,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={queryClient}>
       <ThemeModeProvider>
         <SnackbarProvider maxSnack={3} dense anchorOrigin={{ vertical: "bottom", horizontal: "right" }} autoHideDuration={3500}>
-          <App />
+          <AuthProvider>
+            <App />
+          </AuthProvider>
         </SnackbarProvider>
       </ThemeModeProvider>
     </QueryClientProvider>

@@ -14,6 +14,7 @@ import { useAssignPlaylistToDevices } from "../../hooks/queries";
 import DetailPanel from "../../components/ui/DetailPanel";
 import Field, { FieldGrid, Section } from "../../components/ui/Field";
 import StatusChip from "../../components/ui/StatusChip";
+import OwnerSection from "../../components/ui/OwnerSection";
 import { formatDateTime, formatMegabytes, formatUptime, relativeTime } from "../../utils/format";
 
 interface Props {
@@ -219,6 +220,8 @@ export default function DeviceDetailPanel({ device, playback, playlists, schedul
           </Box>
         )}
       </Section>
+
+      <OwnerSection kind="screen" id={device.id} clientId={device.clientId} />
     </DetailPanel>
   );
 }

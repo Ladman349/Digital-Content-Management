@@ -15,6 +15,7 @@ import { deviceTone } from "../../components/ui/tone";
 import { MONO } from "../../app/theme";
 import { useAppUpdates, useDevices, useMedia, usePlaylists, useSchedules } from "../../hooks/queries";
 import { useNow } from "../../hooks/useNow";
+import { useAuth } from "../../auth/AuthProvider";
 import { usePlaybackMap } from "../../hooks/usePlayback";
 import { findConflicts, isScheduleExpired, isScheduleLiveNow } from "../../utils/schedule";
 import { formatBytes, formatDuration, relativeTime } from "../../utils/format";
@@ -58,7 +59,8 @@ export default function DashboardPage() {
   const { data: media = [] } = useMedia();
   const { data: playlists = [] } = usePlaylists();
   const { data: schedules = [] } = useSchedules();
-  const { data: updates = [] } = useAppUpdates();
+  const { isAdmin } = useAuth();
+  const { data: updates = [] } = useAppUpdates(isAdmin);
   const playback = usePlaybackMap(devices, playlists, schedules, now);
 
   const online = devices.filter((d) => d.status === "Online").length;
@@ -404,7 +406,7 @@ export default function DashboardPage() {
           <Field label="Total size">{formatBytes(totalBytes)}</Field>
           <Field label="Playlists">{`${published} published`}</Field>
           <Field label="Longest run">{longest ? formatDuration(longest) : "—"}</Field>
-          <Field label="Player release">{activeUpdate ? activeUpdate.version_name : "none active"}</Field>
+          {isAdmin && <Field label="Player release">{activeUpdate ? activeUpdate.version_name : "none active"}</Field>}
         </Section>
 
         <Section title="Recent changes">

@@ -11,6 +11,7 @@ import type { Device } from "../../types/device";
 import DetailPanel from "../../components/ui/DetailPanel";
 import Field, { FieldGrid, Section } from "../../components/ui/Field";
 import StatusChip from "../../components/ui/StatusChip";
+import OwnerSection from "../../components/ui/OwnerSection";
 import { useUpdateSchedule } from "../../hooks/queries";
 import { findConflicts, isScheduleExpired, isScheduleLiveNow } from "../../utils/schedule";
 import { formatDate } from "../../utils/format";
@@ -149,6 +150,8 @@ export default function ScheduleDetailPanel({ schedule, playlists, devices, allS
           </Box>
         )}
       </Section>
+
+      <OwnerSection kind="schedule" id={schedule.id} clientId={schedule.clientId} />
     </DetailPanel>
   );
 }

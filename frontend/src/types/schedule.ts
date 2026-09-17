@@ -19,6 +19,8 @@ export interface Schedule {
   status: ScheduleStatus;
   createdAt?: number;
   updatedAt?: number;
+  /** Owning client; null or absent means it belongs to the operator. Only administrators can change it. */
+  clientId?: string | null;
 }
 
 export type ScheduleCreatePayload = Omit<Schedule, "id" | "createdAt" | "updatedAt">;
