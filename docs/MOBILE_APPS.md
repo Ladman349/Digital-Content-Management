@@ -135,10 +135,15 @@ App Review the first time.
 - The bundle is served from `https://localhost` (Android) and `capacitor://localhost` (iOS);
   `backend/main.py` allow-lists both origins, so the apps keep working when `APP_ENV` moves to
   `production` and the development-only localhost regex goes away.
-- No push notifications, no offline mode, and no login beyond what the web CMS has. Anyone with
-  the app reaches the API exactly as anyone with the Vercel URL does — set `ADMIN_API_KEY` on the
-  backend and `VITE_ADMIN_API_KEY` at build time before handing the apps to anyone outside the
-  team.
+- They sign in exactly as the web CMS does: the same sign-in screen, the same accounts. Once the
+  first administrator exists (DEPLOYMENT.md, Section 6) installing the app gives a stranger nothing
+  but that screen, and a client user sees only their own client's screens and content. The session
+  is kept on the phone for 30 days of inactivity, so people are not asked to sign in every morning.
+  Do not build the apps with `VITE_ADMIN_API_KEY` set; it would bypass sign-in for everyone.
+- For TestFlight **external** testers, Apple's Beta App Review needs a working sign-in. Create a
+  demo client with one screen and a demo client user, and enter those details under Test
+  Information → Sign-in required.
+- No push notifications and no offline mode.
 - A backend move (new API host) means rebuilding both apps; the URL is compiled in.
 
 ## Local development

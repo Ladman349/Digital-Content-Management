@@ -34,12 +34,14 @@ graph TD
 | `SECRET_KEY` | Cryptographic signature salt | `[a-secure-random-hash]` |
 | `ADMIN_API_KEY` | Requires a key on all CMS routes. Empty leaves the API open (see Section 6) | `[a-long-random-string]` |
 | `REQUIRE_DEVICE_AUTH` | Requires players to send their device token. Enable only after the fleet is updated (see Section 6) | `false` initially |
+| `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD` | Optional. Creates the first administrator at startup while no user exists, which turns sign-in on (see Section 6) | unset; remove the password after first sign-in |
+| `SESSION_TTL_DAYS` | How long a CMS sign-in lasts without being used | `30` |
 
 ### React CMS (Vercel)
 | Variable | Description | Recommended Production Value |
 | :--- | :--- | :--- |
 | `VITE_API_URL` | Target FastAPI gateway (include `/api/v1` prefix) | `https://api.grovitai.com/api/v1` |
-| `VITE_ADMIN_API_KEY` | Must match the backend's `ADMIN_API_KEY`. Only needed once that is set | `[same-as-backend]` |
+| `VITE_ADMIN_API_KEY` | Legacy. Leave **unset** once user accounts are in use (see Section 6) | unset |
 
 ---
 
@@ -65,6 +67,7 @@ graph TD
    ```bash
    python migrate_ota_storage.py    # adds app_updates.storage_uri (OTA durability)
    python migrate_fk_rules.py       # aligns foreign-key delete rules with the API's 409 guards
+   python migrate_accounts.py       # adds users, clients, sessions and per-client ownership
    ```
    `migrate_fk_rules.py --check` reports without changing anything, so it is safe to run in CI.
 
@@ -212,26 +215,64 @@ release with a higher version code containing the older code, and activate that.
 ## 6. Securing the API
 
 The API ships **open by default** so an existing deployment keeps working after upgrading. Both
-guards below are opt-in, and the order you enable them in matters.
+guards below are opt-in, and the order you enable them in matters. Until Step 1 is done, anyone who
+can reach the CMS address controls every screen.
 
-### Step 1: Lock the CMS routes (safe to do immediately)
+### Step 1: Turn on sign-in (safe to do immediately)
 
-Set `ADMIN_API_KEY` on the backend to any long random string, and the matching
-`VITE_ADMIN_API_KEY` on the CMS. Every management route then requires the key, sent as
-`X-Admin-Key` or `Authorization: Bearer <key>`.
+People sign in to the CMS and the phone apps with an email and a password. There are two kinds of
+account:
 
-```bash
-# generate one
-python -c "import secrets; print(secrets.token_urlsafe(48))"
-```
+| Role | Sees | Can also |
+| :--- | :--- | :--- |
+| **Administrator** | Everything, across every client | Manage users and clients, publish player updates, hand screens to clients |
+| **Client user** | Only the screens, media, playlists and schedules of their own client | Nothing outside it. Another client's rows answer *404 Not Found*, never *403* |
 
-This closes the most serious hole: without it, anyone who can reach the API can upload and activate
-a player APK, which installs on every screen. Player routes are unaffected, so screens keep running
-throughout.
+Sign-in is **switched on by creating the first administrator**. Until that account exists the API
+behaves exactly as it did before accounts, which is what makes the upgrade safe. There are three
+ways to create it; pick one:
 
-> The CMS key travels in the browser bundle, so it is a deployment guard rather than user
-> authentication. Anyone who can load the CMS can read it. Keep the CMS behind SSO or a VPN, and
-> treat per-user login as the follow-up work.
+1. **In the CMS (simplest).** Open **Accounts**, which shows a "Sign-in is off" notice, and create
+   your own administrator there. It takes effect at once: the CMS returns to the sign-in screen and
+   you sign in with the account you just made. The password is typed into the CMS over HTTPS and
+   goes nowhere else.
+2. **From the hosting dashboard.** Set `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` on
+   the backend and restart it. The account is created only while the users table is empty, so the
+   variables can never reset or resurrect an account later. Delete `BOOTSTRAP_ADMIN_PASSWORD` once
+   you have signed in and changed the password.
+3. **From a terminal with database access:** `python manage_users.py create-admin you@example.com "Your Name"`.
+   The same tool recovers a locked-out operator: `python manage_users.py reset-password you@example.com`.
+
+Screens are untouched throughout: players authenticate with their device token, never a user
+account, so turning sign-in on cannot take a screen dark.
+
+**Then, for each client:** Accounts → Clients → **New client**; on the Screens page open each of
+their screens and set **Client → Belongs to**; do the same for the media, playlists and schedules
+that are theirs (the same control is in each inspector); finally Accounts → Users → **New user**
+with the role *Client user*. New screens always register belonging to nobody, so handing a screen
+over is a deliberate step by an administrator. The **Client** control in the top bar lets an
+administrator work *as* one client: every board narrows to that client and anything created
+belongs to them.
+
+How it is built, for whoever maintains it:
+
+* Passwords are hashed with scrypt. Sessions are opaque random tokens and the database stores only
+  their SHA-256, so neither a database leak nor the default `SECRET_KEY` lets anyone forge a session.
+  They last `SESSION_TTL_DAYS` (default 30) and slide forward while in use.
+* Five wrong passwords for one email, or thirty from one address, block further attempts for fifteen
+  minutes. Every failure returns the same message, so the form cannot be used to discover who has an
+  account.
+* The last active administrator cannot be deleted, disabled or demoted, and nobody can remove their
+  own access.
+* A user's sessions end immediately when they are disabled, deleted, or given a new password.
+* `migrate_accounts.py` adds the schema (also applied at startup). It enables row-level security on
+  `users`, `user_sessions` and `clients`: without that, Supabase's auto-generated REST API would
+  serve password hashes to anyone holding the project's public anon key.
+
+`ADMIN_API_KEY` still works as a platform-administrator credential for scripts and support tooling
+(`X-Admin-Key` or `Authorization: Bearer <key>`). **Do not set `VITE_ADMIN_API_KEY` once accounts
+are in use:** it is baked into the browser bundle, so it would make every visitor an administrator,
+sign-in screen or not.
 
 ### Step 2: Require device tokens (only when the fleet is ready)
 
@@ -255,7 +296,9 @@ worth rate-limiting at the edge.
 
 | Route group | Guard |
 | :--- | :--- |
-| Devices list/create/update/delete, playlists, schedules, media management, OTA upload and activation | Admin key |
+| Devices, media, playlists and schedules (list/create/update/delete) | A signed-in user, narrowed to their client; or the admin key |
+| OTA upload and activation, `/users`, `/clients` | A signed-in **administrator**, or the admin key |
+| `POST /auth/login`, `GET /auth/status` | Open by design (sign-in is rate-limited) |
 | `GET /devices/{id}/current-playlist`, `GET /devices/{id}/status`, `POST /devices/heartbeat` | That device's token |
 | `GET /media/{id}/download`, `GET /app-updates/check`, `GET /app-updates/download/...` | Any valid device token, or the admin key |
 | `POST /devices/register`, `GET /app-updates/ping`, `/health`, `/ready` | Open by design |
@@ -266,10 +309,11 @@ worth rate-limiting at the edge.
 
 Section 6 covers what is implemented. What remains:
 
-* **Per-user login for the CMS.** The admin key is a single shared secret embedded in the browser
-  bundle. It cannot identify who made a change, cannot be revoked for one person, and is readable by
-  anyone who can load the CMS. Real accounts with sessions, roles and an audit trail are the natural
-  next step. `SECRET_KEY` is already provisioned for signing sessions or JWTs.
+* **Audit trail and self-service for accounts.** Accounts, roles and per-client separation are in
+  place (Section 6), but nothing records who changed what, and a forgotten password is reset by an
+  administrator rather than by email. Both need an outbound mail service first.
+* **Screen enrolment per client.** A new screen registers belonging to nobody and an administrator
+  hands it over. A pairing code a client could enter themselves would remove that step.
 * **Enrollment control.** `POST /devices/register` must stay open so a new screen can obtain its
   token, which means anyone who can reach the API can create device records. Rate-limit it at the
   edge, and consider a short-lived enrollment code entered during installation.
@@ -278,8 +322,8 @@ Section 6 covers what is implemented. What remains:
   re-install, because Android rejects an update signed with a different key, and the OTA system
   cannot work around it. Do it before the fleet grows — the cost is linear in screens. Step-by-step
   procedure: [docs/KEY_ROTATION.md](docs/KEY_ROTATION.md).
-* **Secret rotation.** `SECRET_KEY` still defaults to its placeholder value. It is unused today, but
-  set it before anything starts signing with it.
+* **Secret rotation.** `SECRET_KEY` still defaults to its placeholder value. It is unused today
+  (sessions deliberately do not depend on it), but set it before anything starts signing with it.
 
 ---
 
