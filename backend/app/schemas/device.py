@@ -21,6 +21,8 @@ class DeviceBase(BaseModel):
     uptimeSeconds: Optional[int] = None
     firmwareVersion: Optional[str] = None
     orientation: Optional[str] = "LANDSCAPE"
+    # Owning client; None is operator-owned. Only an administrator can change it.
+    clientId: Optional[str] = None
 
 class DeviceCreate(DeviceBase):
     id: str
@@ -38,6 +40,8 @@ class DeviceUpdate(BaseModel):
     location: Optional[str] = None
     resolution: Optional[str] = None
     orientation: Optional[str] = None
+    # Administrators only: hands the screen to a client, or back to the operator with null.
+    clientId: Optional[str] = None
 
 class DeviceResponse(DeviceBase):
     id: str

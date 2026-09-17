@@ -27,9 +27,12 @@ class ScheduleUpdate(BaseModel):
     priority: Optional[str] = None
     status: Optional[str] = None
     deviceIds: Optional[List[str]] = None
+    # Administrators only.
+    clientId: Optional[str] = None
 
 class ScheduleResponse(ScheduleBase):
     id: str
+    clientId: Optional[str] = None
     deviceIds: List[str] = []
     createdAt: int
     updatedAt: int

@@ -32,9 +32,12 @@ class PlaylistUpdate(BaseModel):
     updatedAt: Optional[int] = None
     items: Optional[List[PlaylistItemCreate]] = None
     assignedDeviceIds: Optional[List[str]] = None
+    # Administrators only.
+    clientId: Optional[str] = None
 
 class PlaylistResponse(PlaylistBase):
     id: str
+    clientId: Optional[str] = None
     items: List[PlaylistItemResponse] = []
     assignedDeviceIds: List[str] = []
 

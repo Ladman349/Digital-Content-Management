@@ -16,6 +16,7 @@ from app.models.media import Media
 from app.models.playlist_item import PlaylistItem
 from app.schemas.media import MediaUpdate, MediaResponse
 from app.core.storage import get_storage_provider
+from app.core.tenancy import apply_owner_change, owner_for_new, scope_query, visible
 
 logger = logging.getLogger("api")
 
@@ -33,7 +34,9 @@ class MediaService:
     @staticmethod
     def upload_media(
         file: UploadFile,
-        db: Session
+        db: Session,
+        principal=None,
+        uploaded_by: str = "Admin",
     ) -> Media:
 
         # Keep only the leaf name of whatever the client sent; it is used for display only
@@ -110,8 +113,9 @@ class MediaService:
             dimensions=dimensions,
             duration=duration,
             uploadedAt=int(time.time() * 1000),
-            uploadedBy="Admin",
-            checksum=checksum
+            uploadedBy=uploaded_by,
+            checksum=checksum,
+            clientId=owner_for_new(principal),
         )
 
         db.add(new_media)
@@ -122,20 +126,21 @@ class MediaService:
         return new_media
 
     @staticmethod
-    def get_all_media(db: Session) -> List[Media]:
-        return db.query(Media).all()
+    def get_all_media(db: Session, principal=None) -> List[Media]:
+        return scope_query(db.query(Media), Media, principal).all()
 
     @staticmethod
-    def get_media(db: Session, media_id: str) -> Media:
-        return db.query(Media).filter(Media.id == media_id).first()
+    def get_media(db: Session, media_id: str, principal=None) -> Media:
+        return visible(db.query(Media).filter(Media.id == media_id).first(), principal)
 
     @staticmethod
-    def update_media(db: Session, media_id: str, payload: MediaUpdate) -> Media:
-        media = db.query(Media).filter(Media.id == media_id).first()
+    def update_media(db: Session, media_id: str, payload: MediaUpdate, principal=None) -> Media:
+        media = visible(db.query(Media).filter(Media.id == media_id).first(), principal)
         if not media:
             return None
 
         update_data = payload.model_dump(exclude_unset=True)
+        apply_owner_change(media, update_data, principal, db)
         for key, value in update_data.items():
             setattr(media, key, value)
 
@@ -146,9 +151,9 @@ class MediaService:
         return media
 
     @staticmethod
-    def delete_media(db: Session, media_id: str) -> bool:
+    def delete_media(db: Session, media_id: str, principal=None) -> bool:
         from sqlalchemy.exc import IntegrityError
-        media = db.query(Media).filter(Media.id == media_id).first()
+        media = visible(db.query(Media).filter(Media.id == media_id).first(), principal)
         if not media:
             return False
 
@@ -228,5 +233,6 @@ class MediaService:
             duration=media.duration,
             uploadedAt=media.uploadedAt,
             uploadedBy=media.uploadedBy,
-            checksum=media.checksum
+            checksum=media.checksum,
+            clientId=media.clientId,
         )

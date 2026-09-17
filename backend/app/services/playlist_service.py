@@ -10,11 +10,12 @@ from app.models.device_playlist import DevicePlaylist
 from app.models.media import Media
 from app.models.device import Device
 from app.schemas.playlist import PlaylistCreate, PlaylistUpdate
+from app.core.tenancy import apply_owner_change, ensure_referable, owner_for_new, scope_query, visible
 
 class PlaylistService:
 
     @staticmethod
-    def _validate_playlist_data(db: Session, items, assignedDeviceIds):
+    def _validate_playlist_data(db: Session, items, assignedDeviceIds, principal=None, check_item_owner=True, check_device_owner=True):
         if not items:
             raise HTTPException(status_code=400, detail="At least one PlaylistItem is required.")
             
@@ -26,28 +27,44 @@ class PlaylistService:
                 raise HTTPException(status_code=400, detail="Duplicate media within the same playlist is not allowed.")
             media_ids_seen.add(item.mediaId)
             
-            # Validate media exists
-            if not db.query(Media).filter(Media.id == item.mediaId).first():
-                raise HTTPException(status_code=400, detail=f"Referenced Media ID {item.mediaId} does not exist.")
+            # Validate media exists, and that a client user is only using their own files. Rows
+            # already on the playlist are not re-checked for ownership, so an administrator's
+            # earlier choices never make the playlist uneditable for its client.
+            media = db.query(Media).filter(Media.id == item.mediaId).first()
+            ensure_referable(media, principal if check_item_owner else None, f"Referenced Media ID {item.mediaId} does not exist.")
 
         for device_id in assignedDeviceIds:
-            if not db.query(Device).filter(Device.id == device_id).first():
-                raise HTTPException(status_code=400, detail=f"Referenced Device ID {device_id} does not exist.")
+            device = db.query(Device).filter(Device.id == device_id).first()
+            ensure_referable(device, principal if check_device_owner else None, f"Referenced Device ID {device_id} does not exist.")
 
     @staticmethod
-    def get_playlists(db: Session) -> List[Playlist]:
-        return db.query(Playlist).all()
+    def _claim_devices(db: Session, playlist_id: str, device_ids) -> None:
+        """
+        A screen has one directly-assigned playlist. The player takes whichever row it finds first,
+        so assigning here removes the screen from every other playlist. Done server-side because a
+        client user cannot see, and so cannot tidy up, an assignment made by someone else.
+        """
+        if not device_ids:
+            return
+        db.query(DevicePlaylist).filter(
+            DevicePlaylist.deviceId.in_(list(device_ids)),
+            DevicePlaylist.playlistId != playlist_id,
+        ).delete(synchronize_session=False)
 
     @staticmethod
-    def get_playlist(db: Session, playlist_id: str) -> Playlist:
-        return db.query(Playlist).filter(Playlist.id == playlist_id).first()
+    def get_playlists(db: Session, principal=None) -> List[Playlist]:
+        return scope_query(db.query(Playlist), Playlist, principal).all()
 
     @staticmethod
-    def create_playlist(db: Session, payload: PlaylistCreate) -> Playlist:
+    def get_playlist(db: Session, playlist_id: str, principal=None) -> Playlist:
+        return visible(db.query(Playlist).filter(Playlist.id == playlist_id).first(), principal)
+
+    @staticmethod
+    def create_playlist(db: Session, payload: PlaylistCreate, principal=None) -> Playlist:
         if not payload.name:
             raise HTTPException(status_code=400, detail="Playlist name is required.")
             
-        PlaylistService._validate_playlist_data(db, payload.items, payload.assignedDeviceIds)
+        PlaylistService._validate_playlist_data(db, payload.items, payload.assignedDeviceIds, principal)
 
         new_id = f"PL-NEW-{int(time.time() * 1000)}"
         
@@ -58,10 +75,13 @@ class PlaylistService:
             status=payload.status,
             totalDuration=payload.totalDuration,
             createdAt=int(time.time() * 1000),
-            updatedAt=int(time.time() * 1000)
+            updatedAt=int(time.time() * 1000),
+            clientId=owner_for_new(principal),
         )
         db.add(playlist)
         db.commit()
+
+        PlaylistService._claim_devices(db, new_id, payload.assignedDeviceIds)
 
         for idx, item in enumerate(payload.items):
             pl_item = PlaylistItem(
@@ -88,8 +108,8 @@ class PlaylistService:
         return playlist
 
     @staticmethod
-    def update_playlist(db: Session, playlist_id: str, payload: PlaylistUpdate) -> Playlist:
-        playlist = db.query(Playlist).filter(Playlist.id == playlist_id).first()
+    def update_playlist(db: Session, playlist_id: str, payload: PlaylistUpdate, principal=None) -> Playlist:
+        playlist = visible(db.query(Playlist).filter(Playlist.id == playlist_id).first(), principal)
         if not playlist:
             return None
 
@@ -112,9 +132,17 @@ class PlaylistService:
         if payload.items is not None or payload.assignedDeviceIds is not None:
             items_to_check = payload.items if payload.items is not None else [i for i in playlist.items]
             devices_to_check = payload.assignedDeviceIds if payload.assignedDeviceIds is not None else [d.deviceId for d in playlist.devices]
-            PlaylistService._validate_playlist_data(db, items_to_check, devices_to_check)
+            PlaylistService._validate_playlist_data(
+                db,
+                items_to_check,
+                devices_to_check,
+                principal,
+                check_item_owner=payload.items is not None,
+                check_device_owner=payload.assignedDeviceIds is not None,
+            )
 
         update_data = payload.model_dump(exclude_unset=True, exclude={"items", "assignedDeviceIds"})
+        apply_owner_change(playlist, update_data, principal, db)
         for key, value in update_data.items():
             setattr(playlist, key, value)
             
@@ -134,6 +162,7 @@ class PlaylistService:
                 db.add(pl_item)
 
         if payload.assignedDeviceIds is not None:
+            PlaylistService._claim_devices(db, playlist_id, payload.assignedDeviceIds)
             db.query(DevicePlaylist).filter(DevicePlaylist.playlistId == playlist_id).delete()
             for device_id in payload.assignedDeviceIds:
                 dp = DevicePlaylist(
@@ -149,11 +178,11 @@ class PlaylistService:
         return playlist
 
     @staticmethod
-    def delete_playlist(db: Session, playlist_id: str) -> bool:
+    def delete_playlist(db: Session, playlist_id: str, principal=None) -> bool:
         from fastapi import HTTPException
         from sqlalchemy.exc import IntegrityError
         
-        playlist = db.query(Playlist).filter(Playlist.id == playlist_id).first()
+        playlist = visible(db.query(Playlist).filter(Playlist.id == playlist_id).first(), principal)
         if not playlist:
             return False
 

@@ -13,7 +13,8 @@ from app.database.database import get_db
 from app.schemas.media import MediaUpdate, MediaResponse
 from app.services.media_service import MediaService, MEDIA_CACHE_DIR
 from app.core.config import settings
-from app.core.auth import require_admin, require_any_device
+from app.core.auth import Principal, get_principal, require_any_device
+from app.models.user import User
 from app.core.storage import get_storage_provider
 
 import threading
@@ -61,9 +62,9 @@ router = APIRouter(
     tags=["Media"]
 )
 
-@router.get("", response_model=List[MediaResponse], dependencies=[Depends(require_admin)])
-def get_all_media(db: Session = Depends(get_db)):
-    media_list = MediaService.get_all_media(db)
+@router.get("", response_model=List[MediaResponse])
+def get_all_media(db: Session = Depends(get_db), principal: Principal = Depends(get_principal)):
+    media_list = MediaService.get_all_media(db, principal)
     return [MediaService.to_response(m) for m in media_list]
 
 # Players fetch media here, so this is guarded by device auth rather than the admin key.
@@ -139,28 +140,31 @@ def download_media(media_id: str, request: Request, db: Session = Depends(get_db
         }
     )
 
-@router.get("/{media_id}", response_model=MediaResponse, dependencies=[Depends(require_admin)])
-def get_media(media_id: str, db: Session = Depends(get_db)):
-    media = MediaService.get_media(db, media_id)
+@router.get("/{media_id}", response_model=MediaResponse)
+def get_media(media_id: str, db: Session = Depends(get_db), principal: Principal = Depends(get_principal)):
+    media = MediaService.get_media(db, media_id, principal)
     if not media:
         raise HTTPException(status_code=404, detail="Media not found")
     return MediaService.to_response(media)
 
-@router.post("/upload", response_model=MediaResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_admin)])
-def upload_media(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    media = MediaService.upload_media(file, db)
+@router.post("/upload", response_model=MediaResponse, status_code=status.HTTP_201_CREATED)
+def upload_media(file: UploadFile = File(...), db: Session = Depends(get_db), principal: Principal = Depends(get_principal)):
+    # Record who uploaded it. Callers without an account (the admin key, or a deployment with no
+    # accounts yet) keep the historical "Admin" label.
+    uploader = db.query(User).filter(User.id == principal.user_id).first() if principal.user_id else None
+    media = MediaService.upload_media(file, db, principal, uploaded_by=uploader.name if uploader else "Admin")
     return MediaService.to_response(media)
 
-@router.put("/{media_id}", response_model=MediaResponse, dependencies=[Depends(require_admin)])
-def update_media(media_id: str, payload: MediaUpdate, db: Session = Depends(get_db)):
-    media = MediaService.update_media(db, media_id, payload)
+@router.put("/{media_id}", response_model=MediaResponse)
+def update_media(media_id: str, payload: MediaUpdate, db: Session = Depends(get_db), principal: Principal = Depends(get_principal)):
+    media = MediaService.update_media(db, media_id, payload, principal)
     if not media:
         raise HTTPException(status_code=404, detail="Media not found")
     return MediaService.to_response(media)
 
-@router.delete("/{media_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_admin)])
-def delete_media(media_id: str, db: Session = Depends(get_db)):
-    success = MediaService.delete_media(db, media_id)
+@router.delete("/{media_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_media(media_id: str, db: Session = Depends(get_db), principal: Principal = Depends(get_principal)):
+    success = MediaService.delete_media(db, media_id, principal)
     if not success:
         raise HTTPException(status_code=404, detail="Media not found")
     return None

@@ -1,5 +1,5 @@
 from enum import Enum
-from sqlalchemy import Column, String, BigInteger, Integer, Float
+from sqlalchemy import Column, String, BigInteger, Integer, Float, ForeignKey
 from app.database.base import Base
 
 class DeviceOrientation(str, Enum):
@@ -37,3 +37,7 @@ class Device(Base):
     androidId = Column(String, nullable=True)
 
     orientation = Column(String, nullable=False, default=DeviceOrientation.LANDSCAPE.value)
+
+    # Owning client. NULL means the screen belongs to the operator: a player registers itself
+    # unowned, and an administrator hands it to a client from the Screens page.
+    clientId = Column(String, ForeignKey("clients.id"), nullable=True, index=True)

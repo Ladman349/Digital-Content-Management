@@ -6,24 +6,26 @@ from app.models.device import Device
 from app.schemas.device import DeviceCreate, DeviceUpdate, HeartbeatRequest, DeviceStatusResponse, DeviceRegisterRequest, DeviceRegisterResponse
 from datetime import datetime, timezone
 
+from app.core.tenancy import apply_owner_change, owner_for_new, scope_query, visible
+
 class DeviceService:
 
     @staticmethod
-    def get_devices(db: Session) -> List[Device]:
-        devices = db.query(Device).all()
+    def get_devices(db: Session, principal=None) -> List[Device]:
+        devices = scope_query(db.query(Device), Device, principal).all()
         for device in devices:
             device.status = DeviceService.calculate_status(device.heartbeatAt)
         return devices
 
     @staticmethod
-    def get_device(db: Session, device_id: str) -> Device:
-        device = db.query(Device).filter(Device.id == device_id).first()
+    def get_device(db: Session, device_id: str, principal=None) -> Device:
+        device = visible(db.query(Device).filter(Device.id == device_id).first(), principal)
         if device:
             device.status = DeviceService.calculate_status(device.heartbeatAt)
         return device
 
     @staticmethod
-    def create_device(db: Session, payload: DeviceCreate) -> Device:
+    def create_device(db: Session, payload: DeviceCreate, principal=None) -> Device:
         from fastapi import HTTPException
         
         # Verify Device ID uniqueness
@@ -33,21 +35,24 @@ class DeviceService:
                 detail="A device with this Device ID already exists."
             )
             
-        device = Device(
-            **payload.model_dump()
-        )
+        data = payload.model_dump()
+        # Ownership comes from who is asking, never from the payload: a client user's screens are
+        # always their own, and an administrator's follow the client switcher.
+        data["clientId"] = owner_for_new(principal)
+        device = Device(**data)
         db.add(device)
         db.commit()
         db.refresh(device)
         return device
 
     @staticmethod
-    def update_device(db: Session, device_id: str, payload: DeviceUpdate) -> Device:
-        device = db.query(Device).filter(Device.id == device_id).first()
+    def update_device(db: Session, device_id: str, payload: DeviceUpdate, principal=None) -> Device:
+        device = visible(db.query(Device).filter(Device.id == device_id).first(), principal)
         if not device:
             return None
         
         update_data = payload.model_dump(exclude_unset=True)
+        apply_owner_change(device, update_data, principal, db)
         for key, value in update_data.items():
             setattr(device, key, value)
             
@@ -61,11 +66,11 @@ class DeviceService:
         return device
 
     @staticmethod
-    def delete_device(db: Session, device_id: str) -> bool:
+    def delete_device(db: Session, device_id: str, principal=None) -> bool:
         from fastapi import HTTPException
         from sqlalchemy.exc import IntegrityError
         
-        device = db.query(Device).filter(Device.id == device_id).first()
+        device = visible(db.query(Device).filter(Device.id == device_id).first(), principal)
         if not device:
             return False
             

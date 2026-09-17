@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, BigInteger, Integer
+from sqlalchemy import Column, String, BigInteger, Integer, ForeignKey
 from app.database.base import Base
 
 class Media(Base):
@@ -16,3 +16,5 @@ class Media(Base):
     uploadedAt = Column(BigInteger, nullable=False)
     uploadedBy = Column(String, nullable=False)
     checksum = Column(String, nullable=True)
+    # Owning client; NULL is operator-owned. See app/core/tenancy.py.
+    clientId = Column(String, ForeignKey("clients.id"), nullable=True, index=True)

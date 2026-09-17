@@ -3,6 +3,11 @@
 -- Target Supabase Project: hthjagrhwoxwionduhmi (ap-southeast-1)
 -- Description: Creates all 7 tables, relations, and performance indexes.
 --              Starts completely clean (0 rows).
+--
+-- User accounts (clients, users, user_sessions, and the "clientId" ownership column on devices,
+-- media, playlists and schedules) are NOT created here. The backend adds them itself on first
+-- start, and `python migrate_accounts.py` does the same on demand; both are idempotent. Keeping
+-- that schema in one place (backend/app/database/account_schema.py) stops the two drifting apart.
 -- ==============================================================================
 
 -- Drop existing tables if restarting completely fresh (safe for new project)

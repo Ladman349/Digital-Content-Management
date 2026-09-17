@@ -9,7 +9,7 @@ from app.database.database import get_db
 from app.core.config import settings
 from app.core.cache import PlayerCache
 from app.schemas.device import DeviceCreate, DeviceUpdate, DeviceResponse, HeartbeatRequest, DeviceStatusResponse, DeviceRegisterRequest, DeviceRegisterResponse
-from app.core.auth import require_admin, require_device, require_device_body
+from app.core.auth import Principal, get_principal, require_device, require_device_body
 from app.services.device_service import DeviceService
 from app.services.player_service import PlayerService
 
@@ -18,13 +18,13 @@ router = APIRouter(
     tags=["Devices"]
 )
 
-@router.get("", response_model=List[DeviceResponse], dependencies=[Depends(require_admin)])
-def get_devices(db: Session = Depends(get_db)):
-    return DeviceService.get_devices(db)
+@router.get("", response_model=List[DeviceResponse])
+def get_devices(db: Session = Depends(get_db), principal: Principal = Depends(get_principal)):
+    return DeviceService.get_devices(db, principal)
 
-@router.post("", response_model=DeviceResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_admin)])
-def create_device(payload: DeviceCreate, db: Session = Depends(get_db)):
-    return DeviceService.create_device(db, payload)
+@router.post("", response_model=DeviceResponse, status_code=status.HTTP_201_CREATED)
+def create_device(payload: DeviceCreate, db: Session = Depends(get_db), principal: Principal = Depends(get_principal)):
+    return DeviceService.create_device(db, payload, principal)
 
 # Deliberately unauthenticated: this is how a player obtains its token in the first place.
 @router.post("/register", response_model=DeviceRegisterResponse, status_code=status.HTTP_201_CREATED)
@@ -130,23 +130,23 @@ def get_current_playlist(request: Request, device_id: str, db: Session = Depends
         headers={"ETag": etag}
     )
 
-@router.get("/{device_id}", response_model=DeviceResponse, dependencies=[Depends(require_admin)])
-def get_device(device_id: str, db: Session = Depends(get_db)):
-    device = DeviceService.get_device(db, device_id)
+@router.get("/{device_id}", response_model=DeviceResponse)
+def get_device(device_id: str, db: Session = Depends(get_db), principal: Principal = Depends(get_principal)):
+    device = DeviceService.get_device(db, device_id, principal)
     if not device:
         raise HTTPException(status_code=404, detail="Device not found")
     return device
 
-@router.put("/{device_id}", response_model=DeviceResponse, dependencies=[Depends(require_admin)])
-def update_device(device_id: str, payload: DeviceUpdate, db: Session = Depends(get_db)):
-    device = DeviceService.update_device(db, device_id, payload)
+@router.put("/{device_id}", response_model=DeviceResponse)
+def update_device(device_id: str, payload: DeviceUpdate, db: Session = Depends(get_db), principal: Principal = Depends(get_principal)):
+    device = DeviceService.update_device(db, device_id, payload, principal)
     if not device:
         raise HTTPException(status_code=404, detail="Device not found")
     return device
 
-@router.delete("/{device_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_admin)])
-def delete_device(device_id: str, db: Session = Depends(get_db)):
-    success = DeviceService.delete_device(db, device_id)
+@router.delete("/{device_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_device(device_id: str, db: Session = Depends(get_db), principal: Principal = Depends(get_principal)):
+    success = DeviceService.delete_device(db, device_id, principal)
     if not success:
         raise HTTPException(status_code=404, detail="Device not found")
     _forget_last_seen(device_id)

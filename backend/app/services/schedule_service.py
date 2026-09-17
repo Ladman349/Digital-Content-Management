@@ -9,6 +9,7 @@ from app.models.schedule_device import ScheduleDevice
 from app.models.playlist import Playlist
 from app.models.device import Device
 from app.schemas.schedule import ScheduleCreate, ScheduleUpdate
+from app.core.tenancy import apply_owner_change, ensure_referable, owner_for_new, scope_query, visible
 
 PRIORITY_LEVELS = {
     "Emergency": 4,
@@ -59,18 +60,17 @@ class ScheduleService:
                         )
 
     @staticmethod
-    def _validate_schedule(db: Session, data: dict, exclude_schedule_id: str = None):
+    def _validate_schedule(db: Session, data: dict, exclude_schedule_id: str = None, principal=None):
         if "playlistId" in data:
             playlist = db.query(Playlist).filter(Playlist.id == data["playlistId"]).first()
-            if not playlist:
-                raise HTTPException(status_code=400, detail="Referenced Playlist does not exist.")
+            ensure_referable(playlist, principal, "Referenced Playlist does not exist.")
             if playlist.status != "Published":
                 raise HTTPException(status_code=400, detail="Only Published playlists can be scheduled.")
         
         if "deviceIds" in data:
             for d_id in data["deviceIds"]:
-                if not db.query(Device).filter(Device.id == d_id).first():
-                    raise HTTPException(status_code=400, detail=f"Referenced Device ID {d_id} does not exist.")
+                device = db.query(Device).filter(Device.id == d_id).first()
+                ensure_referable(device, principal, f"Referenced Device ID {d_id} does not exist.")
         
         if "priority" in data and data["priority"] not in VALID_PRIORITIES:
             raise HTTPException(status_code=400, detail=f"Invalid priority: {data['priority']}")
@@ -82,16 +82,16 @@ class ScheduleService:
         # This function handles the conflict check separately in create/update.
 
     @staticmethod
-    def get_schedules(db: Session) -> List[Schedule]:
-        return db.query(Schedule).all()
+    def get_schedules(db: Session, principal=None) -> List[Schedule]:
+        return scope_query(db.query(Schedule), Schedule, principal).all()
 
     @staticmethod
-    def get_schedule(db: Session, schedule_id: str) -> Schedule:
-        return db.query(Schedule).filter(Schedule.id == schedule_id).first()
+    def get_schedule(db: Session, schedule_id: str, principal=None) -> Schedule:
+        return visible(db.query(Schedule).filter(Schedule.id == schedule_id).first(), principal)
 
     @staticmethod
-    def create_schedule(db: Session, payload: ScheduleCreate) -> Schedule:
-        ScheduleService._validate_schedule(db, payload.model_dump())
+    def create_schedule(db: Session, payload: ScheduleCreate, principal=None) -> Schedule:
+        ScheduleService._validate_schedule(db, payload.model_dump(), principal=principal)
         ScheduleService._validate_dates_and_times(payload.startDate, payload.endDate, payload.startTime, payload.endTime)
         ScheduleService._check_conflicts(db, payload.deviceIds, payload.startDate, payload.endDate, payload.startTime, payload.endTime, payload.priority)
 
@@ -108,7 +108,8 @@ class ScheduleService:
             priority=payload.priority,
             status=payload.status,
             createdAt=int(time.time() * 1000),
-            updatedAt=int(time.time() * 1000)
+            updatedAt=int(time.time() * 1000),
+            clientId=owner_for_new(principal),
         )
         db.add(schedule)
         db.commit()
@@ -123,13 +124,14 @@ class ScheduleService:
         return schedule
 
     @staticmethod
-    def update_schedule(db: Session, schedule_id: str, payload: ScheduleUpdate) -> Schedule:
-        schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
+    def update_schedule(db: Session, schedule_id: str, payload: ScheduleUpdate, principal=None) -> Schedule:
+        schedule = visible(db.query(Schedule).filter(Schedule.id == schedule_id).first(), principal)
         if not schedule:
             return None
 
         update_data = payload.model_dump(exclude_unset=True)
-        ScheduleService._validate_schedule(db, update_data, exclude_schedule_id=schedule_id)
+        apply_owner_change(schedule, update_data, principal, db)
+        ScheduleService._validate_schedule(db, update_data, exclude_schedule_id=schedule_id, principal=principal)
         
         # Merge data for validation
         new_start_date = update_data.get("startDate", schedule.startDate)
@@ -160,11 +162,11 @@ class ScheduleService:
         return schedule
 
     @staticmethod
-    def delete_schedule(db: Session, schedule_id: str) -> bool:
+    def delete_schedule(db: Session, schedule_id: str, principal=None) -> bool:
         from fastapi import HTTPException
         from sqlalchemy.exc import IntegrityError
         
-        schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
+        schedule = visible(db.query(Schedule).filter(Schedule.id == schedule_id).first(), principal)
         if not schedule:
             return False
             

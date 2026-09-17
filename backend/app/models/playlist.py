@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, BigInteger, Integer
+from sqlalchemy import Column, String, BigInteger, Integer, ForeignKey
 from sqlalchemy.orm import relationship
 from app.database.base import Base
 import time
@@ -13,6 +13,8 @@ class Playlist(Base):
     totalDuration = Column(Integer, nullable=False, default=0)
     createdAt = Column(BigInteger, default=lambda: int(time.time() * 1000))
     updatedAt = Column(BigInteger, default=lambda: int(time.time() * 1000))
+    # Owning client; NULL is operator-owned. See app/core/tenancy.py.
+    clientId = Column(String, ForeignKey("clients.id"), nullable=True, index=True)
 
     items = relationship("PlaylistItem", back_populates="playlist", cascade="all, delete-orphan", order_by="PlaylistItem.order")
     devices = relationship("DevicePlaylist", back_populates="playlist", cascade="all, delete-orphan")

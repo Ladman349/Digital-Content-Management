@@ -48,6 +48,14 @@ class Settings(BaseModel):
     )
     OTA_MAX_UPLOAD_MB: int = Field(default_factory=lambda: int(os.getenv("OTA_MAX_UPLOAD_MB", "150")))
 
+    # ── User accounts (see app/core/auth.py) ─────────────────────────────────────────────
+    # How long a CMS sign-in lasts without being used. Active sessions slide forward.
+    SESSION_TTL_DAYS: int = Field(default_factory=lambda: int(os.getenv("SESSION_TTL_DAYS", "30")))
+    # Creates the first administrator at startup, only while no user exists at all. Creating that
+    # account is what makes sign-in mandatory. Remove BOOTSTRAP_ADMIN_PASSWORD once signed in.
+    BOOTSTRAP_ADMIN_EMAIL: str = Field(default_factory=lambda: os.getenv("BOOTSTRAP_ADMIN_EMAIL", "").strip())
+    BOOTSTRAP_ADMIN_PASSWORD: str = Field(default_factory=lambda: os.getenv("BOOTSTRAP_ADMIN_PASSWORD", ""))
+
     def validate_production(self):
         if self.APP_ENV == "production":
             # Check for placeholder credentials

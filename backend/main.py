@@ -12,12 +12,14 @@ from sqlalchemy.sql import text
 
 from app.core.logging_util import setup_logging, request_id_ctx
 from app.core.config import settings
-from app.database.database import get_db, SessionLocal
+from app.database.database import get_db, SessionLocal, engine
+from app.database.account_schema import ensure_account_schema, missing_account_schema
 from app.routers.device_router import router as device_router
 from app.routers.media_router import router as media_router
 from app.routers.playlist_router import router as playlist_router
 from app.routers.schedule_router import router as schedule_router
 from app.routers.app_update_router import router as app_update_router
+from app.routers.account_router import auth_router, user_router, client_router
 
 # Setup logging immediately
 setup_logging()
@@ -49,11 +51,39 @@ def verify_startup(db_session: Session):
         
     logger.info("Startup readiness checks completed.")
 
+
+def prepare_accounts(db_session: Session):
+    """
+    Brings the accounts schema up to date and creates the first administrator when asked to.
+
+    The schema step is additive and idempotent, so it is a no-op on every start after the first.
+    A failure is logged loudly rather than raised: the content tables now carry a clientId column,
+    and an API that refuses to start takes every screen dark, which is worse than one that starts
+    and reports exactly what is missing.
+    """
+    try:
+        ensure_account_schema(engine)
+        missing = missing_account_schema(engine)
+        if missing:
+            logger.error(f"Accounts schema is incomplete, run `python migrate_accounts.py`. Missing: {', '.join(missing)}")
+            return
+        logger.info("Startup check: accounts schema verified.")
+    except Exception as e:
+        logger.error(f"Accounts schema could not be verified, run `python migrate_accounts.py`: {str(e)}")
+        return
+
+    try:
+        from app.services.account_service import AccountService
+        AccountService.bootstrap_admin(db_session)
+    except Exception as e:
+        logger.error(f"Could not create the first administrator: {str(e)}")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         verify_startup(db)
+        prepare_accounts(db)
     except Exception as e:
         logger.error(f"Non-fatal error during startup lifespan: {str(e)}")
     finally:
@@ -139,6 +169,9 @@ api_v1_router.include_router(media_router)
 api_v1_router.include_router(playlist_router)
 api_v1_router.include_router(schedule_router)
 api_v1_router.include_router(app_update_router)
+api_v1_router.include_router(auth_router)
+api_v1_router.include_router(user_router)
+api_v1_router.include_router(client_router)
 app.include_router(api_v1_router)
 
 # Root mounts for direct REST APIs
@@ -147,6 +180,9 @@ app.include_router(media_router)
 app.include_router(playlist_router)
 app.include_router(schedule_router)
 app.include_router(app_update_router)
+app.include_router(auth_router)
+app.include_router(user_router)
+app.include_router(client_router)
 
 MEDIA_FOLDER = "media"
 os.makedirs(MEDIA_FOLDER, exist_ok=True)

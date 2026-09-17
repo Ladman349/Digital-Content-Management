@@ -13,6 +13,7 @@ class MediaBase(BaseModel):
     uploadedAt: int
     uploadedBy: str
     checksum: Optional[str] = None
+    clientId: Optional[str] = None
 
 class MediaCreate(MediaBase):
     pass
@@ -25,6 +26,8 @@ class MediaUpdate(BaseModel):
     category: Optional[str] = None
     dimensions: Optional[str] = None
     duration: Optional[int] = None
+    # Administrators only: moves the file to another client, or back to the operator with null.
+    clientId: Optional[str] = None
 
 class MediaResponse(MediaBase):
     id: str

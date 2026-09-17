@@ -19,6 +19,8 @@ class Schedule(Base):
     status = Column(String, nullable=False, default="Draft")
     createdAt = Column(BigInteger, default=lambda: int(time.time() * 1000))
     updatedAt = Column(BigInteger, default=lambda: int(time.time() * 1000))
+    # Owning client; NULL is operator-owned. See app/core/tenancy.py.
+    clientId = Column(String, ForeignKey("clients.id"), nullable=True, index=True)
 
     playlist = relationship("Playlist")
     devices = relationship("ScheduleDevice", back_populates="schedule", cascade="all, delete-orphan")

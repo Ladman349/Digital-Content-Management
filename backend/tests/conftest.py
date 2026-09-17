@@ -46,6 +46,22 @@ def clean_upload_artefacts():
                 pass
 
 
+@pytest.fixture(autouse=True)
+def reset_account_state():
+    """
+    "Does any user exist?" and the sign-in throttle are cached per process. Each test gets a
+    rolled-back database, so both caches have to be forgotten along with it.
+    """
+    from app.core.auth import reset_login_state
+    from app.services.account_service import LoginThrottle
+
+    reset_login_state()
+    LoginThrottle.reset()
+    yield
+    reset_login_state()
+    LoginThrottle.reset()
+
+
 @pytest.fixture(scope="session")
 def db_engine():
     Base.metadata.create_all(bind=engine)

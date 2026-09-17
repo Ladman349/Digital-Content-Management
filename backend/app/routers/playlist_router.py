@@ -4,40 +4,40 @@ from sqlalchemy.orm import Session
 
 from app.database.database import get_db
 from app.schemas.playlist import PlaylistCreate, PlaylistUpdate, PlaylistResponse
-from app.core.auth import require_admin
+from app.core.auth import Principal, get_principal
 from app.services.playlist_service import PlaylistService
 
 router = APIRouter(
     prefix="/playlists",
     tags=["Playlists"],
-    dependencies=[Depends(require_admin)]
+    dependencies=[Depends(get_principal)]
 )
 
 @router.get("", response_model=List[PlaylistResponse])
-def get_playlists(db: Session = Depends(get_db)):
-    return PlaylistService.get_playlists(db)
+def get_playlists(db: Session = Depends(get_db), principal: Principal = Depends(get_principal)):
+    return PlaylistService.get_playlists(db, principal)
 
 @router.get("/{playlist_id}", response_model=PlaylistResponse)
-def get_playlist(playlist_id: str, db: Session = Depends(get_db)):
-    playlist = PlaylistService.get_playlist(db, playlist_id)
+def get_playlist(playlist_id: str, db: Session = Depends(get_db), principal: Principal = Depends(get_principal)):
+    playlist = PlaylistService.get_playlist(db, playlist_id, principal)
     if not playlist:
         raise HTTPException(status_code=404, detail="Playlist not found")
     return playlist
 
 @router.post("", response_model=PlaylistResponse, status_code=status.HTTP_201_CREATED)
-def create_playlist(payload: PlaylistCreate, db: Session = Depends(get_db)):
-    return PlaylistService.create_playlist(db, payload)
+def create_playlist(payload: PlaylistCreate, db: Session = Depends(get_db), principal: Principal = Depends(get_principal)):
+    return PlaylistService.create_playlist(db, payload, principal)
 
 @router.put("/{playlist_id}", response_model=PlaylistResponse)
-def update_playlist(playlist_id: str, payload: PlaylistUpdate, db: Session = Depends(get_db)):
-    playlist = PlaylistService.update_playlist(db, playlist_id, payload)
+def update_playlist(playlist_id: str, payload: PlaylistUpdate, db: Session = Depends(get_db), principal: Principal = Depends(get_principal)):
+    playlist = PlaylistService.update_playlist(db, playlist_id, payload, principal)
     if not playlist:
         raise HTTPException(status_code=404, detail="Playlist not found")
     return playlist
 
 @router.delete("/{playlist_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_playlist(playlist_id: str, db: Session = Depends(get_db)):
-    success = PlaylistService.delete_playlist(db, playlist_id)
+def delete_playlist(playlist_id: str, db: Session = Depends(get_db), principal: Principal = Depends(get_principal)):
+    success = PlaylistService.delete_playlist(db, playlist_id, principal)
     if not success:
         raise HTTPException(status_code=404, detail="Playlist not found")
     return None
