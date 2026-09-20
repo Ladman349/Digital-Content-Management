@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional
 
 class DeviceBase(BaseModel):
@@ -45,8 +45,19 @@ class DeviceUpdate(BaseModel):
 
 class DeviceResponse(DeviceBase):
     id: str
+    # Health. Null until the screen runs a player that reports it.
+    lastError: Optional[str] = None
+    lastErrorAt: Optional[int] = None
+    pendingPlays: Optional[int] = None
+    screenshotRequestedAt: Optional[int] = None
+    screenshotAt: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class HeartbeatResponse(DeviceResponse):
+    # True while the CMS is waiting for a screenshot from this screen.
+    screenshotRequested: bool = False
 
 class HeartbeatRequest(BaseModel):
     deviceId: str
@@ -58,6 +69,10 @@ class HeartbeatRequest(BaseModel):
     uptimeSeconds: Optional[int] = None
     ipAddress: Optional[str] = None
     firmwareVersion: Optional[str] = None
+    # The most recent error the player logged, and when (device clock, epoch ms).
+    lastError: Optional[str] = Field(default=None, max_length=2000)
+    lastErrorAt: Optional[int] = None
+    pendingPlays: Optional[int] = Field(default=None, ge=0)
 
 class DeviceStatusResponse(BaseModel):
     status: str

@@ -1,5 +1,6 @@
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status, Response, Request
+from fastapi.responses import FileResponse
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 import threading
@@ -8,12 +9,13 @@ import time
 from app.database.database import get_db
 from app.core.config import settings
 from app.core.cache import PlayerCache
-from app.schemas.device import DeviceCreate, DeviceUpdate, DeviceResponse, HeartbeatRequest, DeviceStatusResponse, DeviceRegisterRequest, DeviceRegisterResponse
+from app.schemas.device import DeviceCreate, DeviceUpdate, DeviceResponse, HeartbeatRequest, HeartbeatResponse, DeviceStatusResponse, DeviceRegisterRequest, DeviceRegisterResponse
 from app.core.auth import Principal, get_principal, require_device, require_device_body
 from app.services.device_service import DeviceService
 from app.services.player_service import PlayerService
 from app.services.audit_service import AuditService, describe_changes
 from app.services.report_service import ReportService
+from app.services.screenshot_service import ScreenshotService
 from app.schemas.report import PlayBatchRequest, PlayBatchResponse
 from app.models.device import Device
 
@@ -37,14 +39,16 @@ def create_device(payload: DeviceCreate, db: Session = Depends(get_db), principa
 def register_device(payload: DeviceRegisterRequest, db: Session = Depends(get_db)):
     return DeviceService.register_device(db, payload)
 
-@router.post("/heartbeat", response_model=DeviceResponse)
+@router.post("/heartbeat", response_model=HeartbeatResponse)
 def process_heartbeat(request: Request, payload: HeartbeatRequest, db: Session = Depends(get_db)):
     # The device id is in the body rather than the path, so this cannot be a path dependency.
     require_device_body(device_id=payload.deviceId, request=request, db=db)
     device = DeviceService.process_heartbeat(db, payload)
     if not device:
         raise HTTPException(status_code=404, detail="Device not found")
-    return device
+    reply = HeartbeatResponse.model_validate(device)
+    reply.screenshotRequested = ScreenshotService.wanted(device)
+    return reply
 
 @router.get("/{device_id}/status", response_model=DeviceStatusResponse, dependencies=[Depends(require_device)])
 def get_device_status(device_id: str, db: Session = Depends(get_db)):
@@ -136,6 +140,33 @@ def get_current_playlist(request: Request, device_id: str, db: Session = Depends
         headers={"ETag": etag}
     )
 
+# ── Screenshots ──
+# The CMS asks; the screen sees `screenshotRequested` in its next heartbeat reply and uploads one.
+@router.post("/{device_id}/screenshot/request", response_model=DeviceResponse)
+def request_screenshot(device_id: str, db: Session = Depends(get_db), principal: Principal = Depends(get_principal)):
+    device = DeviceService.get_device(db, device_id, principal)
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+    device = ScreenshotService.request(db, device)
+    device.status = DeviceService.calculate_status(device.heartbeatAt)
+    return device
+
+@router.post("/{device_id}/screenshot", status_code=status.HTTP_204_NO_CONTENT)
+def upload_screenshot(file: UploadFile = File(...), device: Device = Depends(require_device), db: Session = Depends(get_db)):
+    # Only an answer to a question: a screen cannot push pictures nobody asked for.
+    if not ScreenshotService.wanted(device):
+        raise HTTPException(status_code=409, detail="No screenshot has been requested for this screen.")
+    ScreenshotService.store(db, device, file)
+    return None
+
+@router.get("/{device_id}/screenshot")
+def get_screenshot(device_id: str, db: Session = Depends(get_db), principal: Principal = Depends(get_principal)):
+    device = DeviceService.get_device(db, device_id, principal)
+    path = ScreenshotService.path_for(device) if device else None
+    if not path:
+        raise HTTPException(status_code=404, detail="No screenshot yet")
+    return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
+
 # Proof of play. The player queues what it showed and delivers it here in batches, offline or not.
 @router.post("/{device_id}/plays", response_model=PlayBatchResponse)
 def record_plays(payload: PlayBatchRequest, device: Device = Depends(require_device), db: Session = Depends(get_db)):
@@ -164,5 +195,6 @@ def delete_device(device_id: str, db: Session = Depends(get_db), principal: Prin
     if not success:
         raise HTTPException(status_code=404, detail="Device not found")
     _forget_last_seen(device_id)
+    ScreenshotService.forget(device_id)
     AuditService.record(db, principal, "deleted", "screen", device_id, label[0], label[1])
     return None

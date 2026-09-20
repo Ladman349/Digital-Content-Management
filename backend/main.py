@@ -16,6 +16,7 @@ from app.database.database import get_db, SessionLocal, engine
 from app.database.account_schema import ensure_account_schema, missing_account_schema
 from app.database.report_schema import ensure_report_schema, missing_report_schema
 from app.database.audit_schema import ensure_audit_schema, missing_audit_schema
+from app.database.health_schema import ensure_health_schema, missing_health_schema
 from app.routers.device_router import router as device_router
 from app.routers.media_router import router as media_router
 from app.routers.playlist_router import router as playlist_router
@@ -95,6 +96,19 @@ def prepare_reports():
         logger.error(f"Reports schema could not be verified, run `python migrate_reports.py`: {str(e)}")
 
 
+def prepare_health():
+    """Adds the screen-health columns. The pre-deploy step has normally done this already."""
+    try:
+        ensure_health_schema(engine)
+        missing = missing_health_schema(engine)
+        if missing:
+            logger.error(f"Screen-health columns are missing, run `python migrate_health.py`: {', '.join(missing)}")
+            return
+        logger.info("Startup check: screen-health schema verified.")
+    except Exception as e:
+        logger.error(f"Screen-health schema could not be verified, run `python migrate_health.py`: {str(e)}")
+
+
 def prepare_audit():
     """Adds the activity-log table. Additive and idempotent; a failure is logged, never fatal."""
     try:
@@ -115,6 +129,7 @@ async def lifespan(app: FastAPI):
         prepare_accounts(db)
         prepare_reports()
         prepare_audit()
+        prepare_health()
     except Exception as e:
         logger.error(f"Non-fatal error during startup lifespan: {str(e)}")
     finally:

@@ -155,7 +155,16 @@ class DeviceService:
             device.ipAddress = payload.ipAddress
         if payload.firmwareVersion is not None:
             device.firmwareVersion = payload.firmwareVersion
-            
+        if payload.pendingPlays is not None:
+            device.pendingPlays = payload.pendingPlays
+        if payload.lastError:
+            # The time is taken from the server when the message changes: a TV's own clock is
+            # not to be trusted, and "when did we first hear of this" is what the CMS shows.
+            message = payload.lastError[:500]
+            if message != device.lastError or device.lastErrorAt is None:
+                device.lastError = message
+                device.lastErrorAt = current_time
+
         device.status = "Online"
         
         db.commit()

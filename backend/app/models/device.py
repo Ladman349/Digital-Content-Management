@@ -1,5 +1,5 @@
 from enum import Enum
-from sqlalchemy import Column, String, BigInteger, Integer, Float, ForeignKey
+from sqlalchemy import Column, String, BigInteger, Integer, Float, ForeignKey, Text
 from app.database.base import Base
 
 class DeviceOrientation(str, Enum):
@@ -37,6 +37,15 @@ class Device(Base):
     androidId = Column(String, nullable=True)
 
     orientation = Column(String, nullable=False, default=DeviceOrientation.LANDSCAPE.value)
+
+    # Health, reported with the heartbeat by player 1.4.0 and later. See app/database/health_schema.py.
+    lastError = Column(Text, nullable=True)
+    lastErrorAt = Column(BigInteger, nullable=True)
+    # Plays recorded on the screen and not yet delivered for the reports.
+    pendingPlays = Column(Integer, nullable=True)
+    # A screenshot is asked for here and the player answers on its next heartbeat.
+    screenshotRequestedAt = Column(BigInteger, nullable=True)
+    screenshotAt = Column(BigInteger, nullable=True)
 
     # Owning client. NULL means the screen belongs to the operator: a player registers itself
     # unowned, and an administrator hands it to a client from the Screens page.
