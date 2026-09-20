@@ -12,6 +12,9 @@ from app.schemas.device import DeviceCreate, DeviceUpdate, DeviceResponse, Heart
 from app.core.auth import Principal, get_principal, require_device, require_device_body
 from app.services.device_service import DeviceService
 from app.services.player_service import PlayerService
+from app.services.report_service import ReportService
+from app.schemas.report import PlayBatchRequest, PlayBatchResponse
+from app.models.device import Device
 
 router = APIRouter(
     prefix="/devices",
@@ -129,6 +132,11 @@ def get_current_playlist(request: Request, device_id: str, db: Session = Depends
         content=result.model_dump(),
         headers={"ETag": etag}
     )
+
+# Proof of play. The player queues what it showed and delivers it here in batches, offline or not.
+@router.post("/{device_id}/plays", response_model=PlayBatchResponse)
+def record_plays(payload: PlayBatchRequest, device: Device = Depends(require_device), db: Session = Depends(get_db)):
+    return ReportService.record_batch(db, device, payload)
 
 @router.get("/{device_id}", response_model=DeviceResponse)
 def get_device(device_id: str, db: Session = Depends(get_db), principal: Principal = Depends(get_principal)):

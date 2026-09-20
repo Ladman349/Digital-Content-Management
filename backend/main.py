@@ -14,12 +14,14 @@ from app.core.logging_util import setup_logging, request_id_ctx
 from app.core.config import settings
 from app.database.database import get_db, SessionLocal, engine
 from app.database.account_schema import ensure_account_schema, missing_account_schema
+from app.database.report_schema import ensure_report_schema, missing_report_schema
 from app.routers.device_router import router as device_router
 from app.routers.media_router import router as media_router
 from app.routers.playlist_router import router as playlist_router
 from app.routers.schedule_router import router as schedule_router
 from app.routers.app_update_router import router as app_update_router
 from app.routers.account_router import auth_router, user_router, client_router, handover_router
+from app.routers.report_router import router as report_router
 
 # Setup logging immediately
 setup_logging()
@@ -78,12 +80,26 @@ def prepare_accounts(db_session: Session):
     except Exception as e:
         logger.error(f"Could not create the first administrator: {str(e)}")
 
+def prepare_reports():
+    """Adds the proof-of-play tables. Additive and idempotent; a failure is logged, never fatal."""
+    try:
+        ensure_report_schema(engine)
+        missing = missing_report_schema(engine)
+        if missing:
+            logger.error(f"Reports schema is incomplete, run `python migrate_reports.py`. Missing: {', '.join(missing)}")
+            return
+        logger.info("Startup check: reports schema verified.")
+    except Exception as e:
+        logger.error(f"Reports schema could not be verified, run `python migrate_reports.py`: {str(e)}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         verify_startup(db)
         prepare_accounts(db)
+        prepare_reports()
     except Exception as e:
         logger.error(f"Non-fatal error during startup lifespan: {str(e)}")
     finally:
@@ -173,6 +189,7 @@ api_v1_router.include_router(auth_router)
 api_v1_router.include_router(user_router)
 api_v1_router.include_router(client_router)
 api_v1_router.include_router(handover_router)
+api_v1_router.include_router(report_router)
 app.include_router(api_v1_router)
 
 # Root mounts for direct REST APIs
@@ -185,6 +202,7 @@ app.include_router(auth_router)
 app.include_router(user_router)
 app.include_router(client_router)
 app.include_router(handover_router)
+app.include_router(report_router)
 
 MEDIA_FOLDER = "media"
 os.makedirs(MEDIA_FOLDER, exist_ok=True)
