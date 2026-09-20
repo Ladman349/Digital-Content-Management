@@ -19,7 +19,7 @@ from app.routers.media_router import router as media_router
 from app.routers.playlist_router import router as playlist_router
 from app.routers.schedule_router import router as schedule_router
 from app.routers.app_update_router import router as app_update_router
-from app.routers.account_router import auth_router, user_router, client_router
+from app.routers.account_router import auth_router, user_router, client_router, handover_router
 
 # Setup logging immediately
 setup_logging()
@@ -172,6 +172,7 @@ api_v1_router.include_router(app_update_router)
 api_v1_router.include_router(auth_router)
 api_v1_router.include_router(user_router)
 api_v1_router.include_router(client_router)
+api_v1_router.include_router(handover_router)
 app.include_router(api_v1_router)
 
 # Root mounts for direct REST APIs
@@ -183,6 +184,7 @@ app.include_router(app_update_router)
 app.include_router(auth_router)
 app.include_router(user_router)
 app.include_router(client_router)
+app.include_router(handover_router)
 
 MEDIA_FOLDER = "media"
 os.makedirs(MEDIA_FOLDER, exist_ok=True)

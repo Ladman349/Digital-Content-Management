@@ -13,6 +13,7 @@ import type { Playlist, PlaylistItem, PlaylistStatus } from "../../types/playlis
 import MediaThumb from "../../components/ui/MediaThumb";
 import EmptyState from "../../components/ui/EmptyState";
 import { useIsCompact } from "../../hooks/useIsPhone";
+import { useAuth } from "../../auth/AuthProvider";
 import { formatDuration, pluralize } from "../../utils/format";
 
 interface Props {
@@ -37,6 +38,7 @@ type Pane = "sequence" | "library";
  */
 export default function PlaylistEditor({ playlist, mediaLibrary, saving, onClose, onSave }: Props) {
   const { enqueueSnackbar } = useSnackbar();
+  const { isAdmin } = useAuth();
   const compact = useIsCompact();
   const [pane, setPane] = useState<Pane>("sequence");
   const [name, setName] = useState(playlist?.name ?? "");
@@ -250,10 +252,10 @@ export default function PlaylistEditor({ playlist, mediaLibrary, saving, onClose
                         <MediaThumb media={media} width={56} height={34} />
                         <Box sx={{ flex: 1, minWidth: 0 }}>
                           <Typography sx={{ fontSize: 13, fontWeight: 600 }} noWrap>
-                            {media?.name ?? `Missing media ${item.mediaId}`}
+                            {media?.name ?? (isAdmin ? `Media outside this view (${item.mediaId})` : "Provided by your operator")}
                           </Typography>
-                          <Typography variant="caption" color={media ? "text.secondary" : "error.main"}>
-                            {media ? `${media.type} · ${media.category}` : "This file no longer exists; remove it before saving"}
+                          <Typography variant="caption" color="text.secondary">
+                            {media ? `${media.type} · ${media.category}` : isAdmin ? "Belongs to the operator or another client; it still plays" : "It still plays; once removed you cannot add it back"}
                           </Typography>
                         </Box>
                       </Box>

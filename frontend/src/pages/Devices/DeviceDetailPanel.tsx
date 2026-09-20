@@ -221,7 +221,7 @@ export default function DeviceDetailPanel({ device, playback, playlists, schedul
         )}
       </Section>
 
-      <OwnerSection kind="screen" id={device.id} clientId={device.clientId} />
+      <OwnerSection kind="screen" id={device.id} clientId={device.clientId} name={device.name} />
     </DetailPanel>
   );
 }

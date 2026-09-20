@@ -1,5 +1,5 @@
 import { API_BASE, api } from "../api/client";
-import type { Client, LoginResponse, User, UserCreatePayload, UserUpdatePayload } from "../types/account";
+import type { Client, HandoverRequest, HandoverResponse, LoginResponse, User, UserCreatePayload, UserUpdatePayload } from "../types/account";
 
 export const AuthService = {
   /**
@@ -35,4 +35,9 @@ export const ClientService = {
   create: (name: string) => api.post<Client>("/clients", { name }),
   update: (id: string, name: string) => api.put<Client>(`/clients/${encodeURIComponent(id)}`, { name }),
   remove: (id: string) => api.delete(`/clients/${encodeURIComponent(id)}`),
+};
+
+export const HandoverService = {
+  /** Moves screens to a client along with whatever only they play; `dryRun` previews it. */
+  run: (data: HandoverRequest) => api.post<HandoverResponse>("/handover", data),
 };

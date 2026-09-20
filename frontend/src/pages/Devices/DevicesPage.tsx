@@ -19,13 +19,15 @@ import DataTable, { type Column, type SortState } from "../../components/ui/Data
 import EmptyState from "../../components/ui/EmptyState";
 import ConfirmDialog from "../../components/ui/ConfirmDialog";
 import BulkBar from "../../components/ui/BulkBar";
+import HandoverDialog from "../../components/ui/HandoverDialog";
 import StatusChip from "../../components/ui/StatusChip";
 import RowLead from "../../components/ui/RowLead";
 import { deviceTone } from "../../components/ui/tone";
 import DeviceDetailPanel from "./DeviceDetailPanel";
 import DeviceFormDialog, { type DeviceFormValues } from "./DeviceFormDialog";
 
-import { useAssignPlaylistToDevices, useCreateDevice, useDeleteDevices, useDevices, usePlaylists, useSchedules, useUpdateDevice } from "../../hooks/queries";
+import { useAssignPlaylistToDevices, useClients, useCreateDevice, useDeleteDevices, useDevices, usePlaylists, useSchedules, useUpdateDevice } from "../../hooks/queries";
+import { useAuth } from "../../auth/AuthProvider";
 import { useFilterParam, useSelectParam } from "../../hooks/useSelectParam";
 import { useNow } from "../../hooks/useNow";
 import { usePlaybackMap } from "../../hooks/usePlayback";
@@ -39,6 +41,8 @@ const STATUS_RANK: Record<DeviceStatus, number> = { Online: 0, Idle: 1, Offline:
 export default function DevicesPage() {
   const { enqueueSnackbar } = useSnackbar();
   const now = useNow(15_000);
+  const { isAdmin } = useAuth();
+  const { data: clients = [] } = useClients(isAdmin);
 
   const { data: devices = [], isLoading, error, refetch } = useDevices();
   const { data: playlists = [] } = usePlaylists();
@@ -66,6 +70,7 @@ export default function DevicesPage() {
   const [assignValue, setAssignValue] = useState("");
   const [locationOpen, setLocationOpen] = useState(false);
   const [locationValue, setLocationValue] = useState("");
+  const [handoverOpen, setHandoverOpen] = useState(false);
   const [menu, setMenu] = useState<{ anchor: HTMLElement; device: Device } | null>(null);
 
   const locations = useMemo(() => [...new Set(devices.map((d) => d.location))].sort(), [devices]);
@@ -426,6 +431,11 @@ export default function DevicesPage() {
             >
               Set location
             </Button>
+            {isAdmin && clients.length > 0 && (
+              <Button variant="outlined" onClick={() => setHandoverOpen(true)}>
+                Hand over
+              </Button>
+            )}
             <Button variant="outlined" color="error" startIcon={<DeleteOutlineRoundedIcon />} onClick={() => setDeleteIds([...selected])}>
               Delete
             </Button>
@@ -501,6 +511,15 @@ export default function DevicesPage() {
       </Menu>
 
       <DeviceFormDialog open={formOpen} device={editing} saving={createDevice.isPending || updateDevice.isPending} onClose={() => setFormOpen(false)} onSubmit={submitForm} />
+
+      {handoverOpen && (
+        <HandoverDialog
+          open
+          devices={devices.filter((d) => selected.has(d.id)).map((d) => ({ id: d.id, name: d.name }))}
+          onClose={() => setHandoverOpen(false)}
+          onDone={() => setSelected(new Set())}
+        />
+      )}
 
       <ConfirmDialog
         open={Boolean(deleteIds)}

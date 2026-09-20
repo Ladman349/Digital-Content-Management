@@ -13,6 +13,7 @@ import StatusChip from "../../components/ui/StatusChip";
 import OwnerSection from "../../components/ui/OwnerSection";
 import MediaThumb from "../../components/ui/MediaThumb";
 import { useUpdatePlaylist } from "../../hooks/queries";
+import { useAuth } from "../../auth/AuthProvider";
 import { formatDateTime, formatDuration, pluralize } from "../../utils/format";
 
 interface Props {
@@ -31,6 +32,7 @@ interface Props {
 
 export default function PlaylistDetailPanel({ playlist, media, devices, schedules, onClose, onPrev, onNext, position, onEdit, onDelete, onAssign }: Props) {
   const { enqueueSnackbar } = useSnackbar();
+  const { isAdmin } = useAuth();
   const update = useUpdatePlaylist();
 
   if (!playlist) return null;
@@ -98,8 +100,11 @@ export default function PlaylistDetailPanel({ playlist, media, devices, schedule
 
       <Section title={`Sequence (${playlist.items.length})`}>
         {missing > 0 && (
-          <Typography variant="body2" color="error.main" sx={{ mb: 1 }}>
-            {missing} item{missing === 1 ? "" : "s"} reference deleted media. Edit the playlist to remove them.
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            {/* Media in use cannot be deleted, so a file missing from the list is one this view does not include. */}
+            {isAdmin
+              ? `${missing} item${missing === 1 ? " uses" : "s use"} media outside this view (the operator's or another client's). ${missing === 1 ? "It still plays" : "They still play"}.`
+              : `${missing} item${missing === 1 ? " was" : "s were"} added by your operator. ${missing === 1 ? "It still plays" : "They still play"}, and you can reorder or remove ${missing === 1 ? "it" : "them"}.`}
           </Typography>
         )}
         <Box sx={{ display: "grid", gap: "2px" }}>
@@ -124,7 +129,7 @@ export default function PlaylistDetailPanel({ playlist, media, devices, schedule
                 </Typography>
                 <MediaThumb media={m} width={44} height={26} />
                 <Typography sx={{ fontSize: 12.5, fontWeight: 500 }} noWrap title={m?.name}>
-                  {m?.name ?? `Missing (${item.mediaId})`}
+                  {m?.name ?? (isAdmin ? `Outside this view (${item.mediaId})` : "Provided by your operator")}
                 </Typography>
                 <Typography variant="caption" sx={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
                   {formatDuration(item.duration)}

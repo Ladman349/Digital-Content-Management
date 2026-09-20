@@ -47,3 +47,29 @@ export interface Client {
 }
 
 export const PASSWORD_MIN_LENGTH = 8;
+
+export type HandoverKind = "screen" | "playlist" | "media" | "schedule";
+
+export interface HandoverRequest {
+  deviceIds: string[];
+  /** The client receiving the screens; null hands them back to the operator. */
+  clientId: string | null;
+  /** False moves the screens alone. */
+  includeContent?: boolean;
+  /** True reports what would happen and changes nothing. */
+  dryRun?: boolean;
+}
+
+export interface HandoverItem {
+  kind: HandoverKind;
+  id: string;
+  name: string;
+}
+
+export interface HandoverResponse {
+  clientId: string | null;
+  clientName: string | null;
+  applied: boolean;
+  moved: HandoverItem[];
+  left: (HandoverItem & { reason: string })[];
+}

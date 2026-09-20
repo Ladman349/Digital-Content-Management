@@ -246,10 +246,14 @@ ways to create it; pick one:
 Screens are untouched throughout: players authenticate with their device token, never a user
 account, so turning sign-in on cannot take a screen dark.
 
-**Then, for each client:** Accounts → Clients → **New client**; on the Screens page open each of
-their screens and set **Client → Belongs to**; do the same for the media, playlists and schedules
-that are theirs (the same control is in each inspector); finally Accounts → Users → **New user**
-with the role *Client user*. New screens always register belonging to nobody, so handing a screen
+**Then, for each client:** Accounts → Clients → **New client**; on the Screens page tick their
+screens and press **Hand over** (or open one screen and change **Client → Belongs to**). The dialog
+lists what will travel with the screens — the playlists, media and schedules only they use — and
+what has to stay because a screen that is not being handed over still uses it, with the reason.
+Nothing stops playing either way. Handing over all of a client's screens together moves what they
+share between them. Anything that stayed can still be moved by hand with the same **Belongs to**
+control in the media, playlist and schedule inspectors. Finally Accounts → Users → **New user** with
+the role *Client user*. New screens always register belonging to nobody, so handing a screen
 over is a deliberate step by an administrator. The **Client** control in the top bar lets an
 administrator work *as* one client: every board narrows to that client and anything created
 belongs to them.

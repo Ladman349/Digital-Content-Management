@@ -10,6 +10,8 @@ from app.schemas.account import (
     ClientCreate,
     ClientResponse,
     ClientUpdate,
+    HandoverRequest,
+    HandoverResponse,
     LoginRequest,
     LoginResponse,
     PasswordChangeRequest,
@@ -18,6 +20,7 @@ from app.schemas.account import (
     UserUpdate,
 )
 from app.services.account_service import AccountService
+from app.services.handover_service import HandoverService
 
 # ── Sign-in ─────────────────────────────────────────────────────────────────────────────
 auth_router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -132,3 +135,11 @@ def delete_client(client_id: str, db: Session = Depends(get_db)):
     return None
 
 
+# ── Handing screens over ────────────────────────────────────────────────────────────────
+handover_router = APIRouter(prefix="/handover", tags=["Clients"], dependencies=[Depends(require_admin)])
+
+
+@handover_router.post("", response_model=HandoverResponse)
+def hand_over_screens(payload: HandoverRequest, db: Session = Depends(get_db)):
+    """Moves screens to a client (or back to the operator) along with whatever only they play."""
+    return HandoverService.handover(db, payload)

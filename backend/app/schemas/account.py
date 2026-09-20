@@ -1,5 +1,5 @@
 import re
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
@@ -141,3 +141,32 @@ class ClientResponse(BaseModel):
     mediaCount: int = 0
     playlistCount: int = 0
     scheduleCount: int = 0
+
+
+# ── Handing screens over ────────────────────────────────────────────────────────────────
+class HandoverRequest(BaseModel):
+    deviceIds: List[str]
+    # The client receiving the screens; null hands them back to the operator.
+    clientId: Optional[str] = None
+    # False moves the screens alone and leaves everything they play where it is.
+    includeContent: bool = True
+    # True reports what would happen and changes nothing.
+    dryRun: bool = False
+
+
+class HandoverItem(BaseModel):
+    kind: str  # "screen", "playlist", "media" or "schedule"
+    id: str
+    name: str
+
+
+class HandoverLeftItem(HandoverItem):
+    reason: str
+
+
+class HandoverResponse(BaseModel):
+    clientId: Optional[str] = None
+    clientName: Optional[str] = None
+    applied: bool
+    moved: List[HandoverItem] = []
+    left: List[HandoverLeftItem] = []

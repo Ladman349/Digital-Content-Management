@@ -4,8 +4,8 @@ import { MediaService } from "../services/MediaService";
 import { PlaylistService } from "../services/PlaylistService";
 import { ScheduleService } from "../services/ScheduleService";
 import { AppUpdateService } from "../services/AppUpdateService";
-import { ClientService, UserService } from "../services/AccountService";
-import type { UserCreatePayload, UserUpdatePayload } from "../types/account";
+import { ClientService, HandoverService, UserService } from "../services/AccountService";
+import type { HandoverRequest, UserCreatePayload, UserUpdatePayload } from "../types/account";
 import type { DeviceCreatePayload, DeviceUpdatePayload } from "../types/device";
 import type { MediaUpdatePayload } from "../types/media";
 import type { PlaylistCreatePayload, PlaylistUpdatePayload } from "../types/playlist";
@@ -191,6 +191,20 @@ export function useRenameClient() {
 export function useDeleteClient() {
   const invalidate = useInvalidator(queryKeys.clients);
   return useMutation({ mutationFn: (id: string) => ClientService.remove(id), onSuccess: invalidate });
+}
+/** What a handover would move and leave, without doing it. Never cached: ownership changes under it. */
+export function useHandoverPreview(request: Omit<HandoverRequest, "dryRun"> | null) {
+  return useQuery({
+    queryKey: ["handover-preview", request],
+    queryFn: () => HandoverService.run({ ...request!, dryRun: true }),
+    enabled: request !== null,
+    staleTime: 0,
+    gcTime: 0,
+  });
+}
+export function useHandover() {
+  const invalidate = useInvalidator(queryKeys.devices, queryKeys.media, queryKeys.playlists, queryKeys.schedules, queryKeys.clients);
+  return useMutation({ mutationFn: (d: Omit<HandoverRequest, "dryRun">) => HandoverService.run({ ...d, dryRun: false }), onSuccess: invalidate });
 }
 
 // ── helpers ────────────────────────────────────────────────────────────────
