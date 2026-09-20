@@ -8,8 +8,8 @@ from app.models.schedule import Schedule
 from app.models.schedule_device import ScheduleDevice
 from app.models.playlist import Playlist
 from app.models.device import Device
-from app.schemas.schedule import ScheduleCreate, ScheduleUpdate
-from app.core.tenancy import apply_owner_change, ensure_referable, owner_for_new, scope_query, visible
+from app.schemas.schedule import ScheduleCreate, ScheduleResponse, ScheduleUpdate
+from app.core.tenancy import apply_owner_change, ensure_referable, hidden_device_ids, owner_for_new, scope_query, visible
 
 PRIORITY_LEVELS = {
     "Emergency": 4,
@@ -33,7 +33,7 @@ class ScheduleService:
             raise HTTPException(status_code=400, detail="Start time must be before end time.")
 
     @staticmethod
-    def _check_conflicts(db: Session, device_ids: List[str], start_date: datetime.date, end_date: datetime.date, start_time: datetime.time, end_time: datetime.time, priority: str, exclude_schedule_id: str = None):
+    def _check_conflicts(db: Session, device_ids: List[str], start_date: datetime.date, end_date: datetime.date, start_time: datetime.time, end_time: datetime.time, priority: str, exclude_schedule_id: str = None, hidden_ids=frozenset()):
         new_priority_level = PRIORITY_LEVELS.get(priority, 0)
         
         # Get all schedules that target these devices
@@ -54,16 +54,25 @@ class ScheduleService:
                 if date_overlap and time_overlap:
                     existing_priority_level = PRIORITY_LEVELS.get(existing.priority, 0)
                     if new_priority_level <= existing_priority_level:
+                        if device_id in hidden_ids:
+                            # A screen the caller cannot see: say that there is a clash, not where.
+                            raise HTTPException(
+                                status_code=400,
+                                detail="This schedule also runs on a screen managed by your operator, and the new times clash with another schedule there. Ask your operator to change it."
+                            )
                         raise HTTPException(
                             status_code=400, 
                             detail=f"Schedule conflict on device {device_id} with schedule '{existing.name}'. Your priority ({priority}) must be higher than the existing schedule's priority ({existing.priority}) to overlap."
                         )
 
     @staticmethod
-    def _validate_schedule(db: Session, data: dict, exclude_schedule_id: str = None, principal=None):
+    def _validate_schedule(db: Session, data: dict, exclude_schedule_id: str = None, principal=None, current: Schedule = None):
         if "playlistId" in data:
             playlist = db.query(Playlist).filter(Playlist.id == data["playlistId"]).first()
-            ensure_referable(playlist, principal, "Referenced Playlist does not exist.")
+            # The playlist a schedule already points at is tolerated whoever owns it, so one an
+            # administrator chose never makes the schedule uneditable for its client.
+            unchanged = current is not None and current.playlistId == data["playlistId"]
+            ensure_referable(playlist, None if unchanged else principal, "Referenced Playlist does not exist.")
             if playlist.status != "Published":
                 raise HTTPException(status_code=400, detail="Only Published playlists can be scheduled.")
         
@@ -80,6 +89,22 @@ class ScheduleService:
 
         # For create, all date/time fields exist. For update, we only check if they are provided, but ideally we check the merged state.
         # This function handles the conflict check separately in create/update.
+
+    @staticmethod
+    def to_responses(db: Session, schedules, principal=None) -> List[ScheduleResponse]:
+        """Serialises schedules, leaving out screens the caller may not see."""
+        hidden = hidden_device_ids(db, {d.deviceId for s in schedules for d in s.devices}, principal)
+        responses = []
+        for schedule in schedules:
+            response = ScheduleResponse.model_validate(schedule)
+            if hidden:
+                response.deviceIds = [d for d in response.deviceIds if d not in hidden]
+            responses.append(response)
+        return responses
+
+    @staticmethod
+    def to_response(db: Session, schedule: Schedule, principal=None) -> ScheduleResponse:
+        return ScheduleService.to_responses(db, [schedule], principal)[0]
 
     @staticmethod
     def get_schedules(db: Session, principal=None) -> List[Schedule]:
@@ -114,9 +139,9 @@ class ScheduleService:
         db.add(schedule)
         db.commit()
 
-        for device_id in payload.deviceIds:
+        for device_id in dict.fromkeys(payload.deviceIds):
             db.add(ScheduleDevice(scheduleId=new_id, deviceId=device_id))
-        
+
         db.commit()
         db.refresh(schedule)
         from app.core.cache import PlayerCache
@@ -131,18 +156,24 @@ class ScheduleService:
 
         update_data = payload.model_dump(exclude_unset=True)
         apply_owner_change(schedule, update_data, principal, db)
-        ScheduleService._validate_schedule(db, update_data, exclude_schedule_id=schedule_id, principal=principal)
-        
+        ScheduleService._validate_schedule(db, update_data, exclude_schedule_id=schedule_id, principal=principal, current=schedule)
+
+        # A client user's list only ever held the screens they can see, so it replaces only those;
+        # screens an administrator added from outside their view stay on the schedule.
+        hidden = hidden_device_ids(db, schedule.deviceIds, principal)
+
         # Merge data for validation
         new_start_date = update_data.get("startDate", schedule.startDate)
         new_end_date = update_data.get("endDate", schedule.endDate)
         new_start_time = update_data.get("startTime", schedule.startTime)
         new_end_time = update_data.get("endTime", schedule.endTime)
         new_priority = update_data.get("priority", schedule.priority)
-        new_device_ids = update_data.get("deviceIds", schedule.deviceIds)
+        new_device_ids = schedule.deviceIds
+        if "deviceIds" in update_data:
+            new_device_ids = list(dict.fromkeys(update_data["deviceIds"])) + sorted(hidden)
 
         ScheduleService._validate_dates_and_times(new_start_date, new_end_date, new_start_time, new_end_time)
-        ScheduleService._check_conflicts(db, new_device_ids, new_start_date, new_end_date, new_start_time, new_end_time, new_priority, exclude_schedule_id=schedule_id)
+        ScheduleService._check_conflicts(db, new_device_ids, new_start_date, new_end_date, new_start_time, new_end_time, new_priority, exclude_schedule_id=schedule_id, hidden_ids=hidden)
 
         for key, value in update_data.items():
             if key != "deviceIds":
@@ -151,8 +182,11 @@ class ScheduleService:
         schedule.updatedAt = int(time.time() * 1000)
 
         if "deviceIds" in update_data:
-            db.query(ScheduleDevice).filter(ScheduleDevice.scheduleId == schedule_id).delete()
-            for device_id in update_data["deviceIds"]:
+            stale = db.query(ScheduleDevice).filter(ScheduleDevice.scheduleId == schedule_id)
+            if hidden:
+                stale = stale.filter(ScheduleDevice.deviceId.notin_(hidden))
+            stale.delete(synchronize_session="fetch")
+            for device_id in dict.fromkeys(update_data["deviceIds"]):
                 db.add(ScheduleDevice(scheduleId=schedule_id, deviceId=device_id))
 
         db.commit()

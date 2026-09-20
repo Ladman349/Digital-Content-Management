@@ -15,25 +15,25 @@ router = APIRouter(
 
 @router.get("", response_model=List[PlaylistResponse])
 def get_playlists(db: Session = Depends(get_db), principal: Principal = Depends(get_principal)):
-    return PlaylistService.get_playlists(db, principal)
+    return PlaylistService.to_responses(db, PlaylistService.get_playlists(db, principal), principal)
 
 @router.get("/{playlist_id}", response_model=PlaylistResponse)
 def get_playlist(playlist_id: str, db: Session = Depends(get_db), principal: Principal = Depends(get_principal)):
     playlist = PlaylistService.get_playlist(db, playlist_id, principal)
     if not playlist:
         raise HTTPException(status_code=404, detail="Playlist not found")
-    return playlist
+    return PlaylistService.to_response(db, playlist, principal)
 
 @router.post("", response_model=PlaylistResponse, status_code=status.HTTP_201_CREATED)
 def create_playlist(payload: PlaylistCreate, db: Session = Depends(get_db), principal: Principal = Depends(get_principal)):
-    return PlaylistService.create_playlist(db, payload, principal)
+    return PlaylistService.to_response(db, PlaylistService.create_playlist(db, payload, principal), principal)
 
 @router.put("/{playlist_id}", response_model=PlaylistResponse)
 def update_playlist(playlist_id: str, payload: PlaylistUpdate, db: Session = Depends(get_db), principal: Principal = Depends(get_principal)):
     playlist = PlaylistService.update_playlist(db, playlist_id, payload, principal)
     if not playlist:
         raise HTTPException(status_code=404, detail="Playlist not found")
-    return playlist
+    return PlaylistService.to_response(db, playlist, principal)
 
 @router.delete("/{playlist_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_playlist(playlist_id: str, db: Session = Depends(get_db), principal: Principal = Depends(get_principal)):

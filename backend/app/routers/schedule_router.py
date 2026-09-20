@@ -15,25 +15,25 @@ router = APIRouter(
 
 @router.get("", response_model=List[ScheduleResponse])
 def get_schedules(db: Session = Depends(get_db), principal: Principal = Depends(get_principal)):
-    return ScheduleService.get_schedules(db, principal)
+    return ScheduleService.to_responses(db, ScheduleService.get_schedules(db, principal), principal)
 
 @router.get("/{schedule_id}", response_model=ScheduleResponse)
 def get_schedule(schedule_id: str, db: Session = Depends(get_db), principal: Principal = Depends(get_principal)):
     schedule = ScheduleService.get_schedule(db, schedule_id, principal)
     if not schedule:
         raise HTTPException(status_code=404, detail="Schedule not found")
-    return schedule
+    return ScheduleService.to_response(db, schedule, principal)
 
 @router.post("", response_model=ScheduleResponse, status_code=status.HTTP_201_CREATED)
 def create_schedule(payload: ScheduleCreate, db: Session = Depends(get_db), principal: Principal = Depends(get_principal)):
-    return ScheduleService.create_schedule(db, payload, principal)
+    return ScheduleService.to_response(db, ScheduleService.create_schedule(db, payload, principal), principal)
 
 @router.put("/{schedule_id}", response_model=ScheduleResponse)
 def update_schedule(schedule_id: str, payload: ScheduleUpdate, db: Session = Depends(get_db), principal: Principal = Depends(get_principal)):
     schedule = ScheduleService.update_schedule(db, schedule_id, payload, principal)
     if not schedule:
         raise HTTPException(status_code=404, detail="Schedule not found")
-    return schedule
+    return ScheduleService.to_response(db, schedule, principal)
 
 @router.delete("/{schedule_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_schedule(schedule_id: str, db: Session = Depends(get_db), principal: Principal = Depends(get_principal)):

@@ -265,6 +265,15 @@ How it is built, for whoever maintains it:
 * The last active administrator cannot be deleted, disabled or demoted, and nobody can remove their
   own access.
 * A user's sessions end immediately when they are disabled, deleted, or given a new password.
+* Separation between clients is decided in one file, `backend/app/core/tenancy.py`, and attacked by
+  `backend/tests/test_tenant_isolation.py`, which plays a client user reaching for another client's
+  and the operator's rows through every route. Links follow the same rule as rows: when an
+  administrator puts a client's playlist or schedule on a screen the client does not own, the client
+  is never shown that screen and saving does not remove it; media or a playlist an administrator
+  attached stays editable around, but the client cannot attach more that is not theirs.
+* What accounts do **not** cover: a screen fetches its playlist and media knowing only its id until
+  Step 2 below is enabled, and media files sit in a public storage bucket under unguessable names.
+  Neither lets one client browse another's content, but treat media as unlisted rather than secret.
 * `migrate_accounts.py` adds the schema (also applied at startup). It enables row-level security on
   `users`, `user_sessions` and `clients`: without that, Supabase's auto-generated REST API would
   serve password hashes to anyone holding the project's public anon key.

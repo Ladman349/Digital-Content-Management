@@ -10,18 +10,31 @@ single place that decides what a caller may see and touch:
 * an **administrator** sees everything. When the CMS client switcher is set, lists narrow to that
   client and new rows are stamped with it, but lookups by id stay unrestricted.
 
+Links between rows follow the same rule. An administrator can put a client's playlist on a screen
+the client does not own; the client is never shown that screen, and saving the playlist leaves the
+link alone (`hidden_device_ids`).
+
 Every service method takes ``principal`` as an optional last argument. ``None`` means "trusted
 internal caller" (the player endpoints, scripts, older tests) and applies no restriction.
 """
 
 from fastapi import HTTPException
+from sqlalchemy import false
 
 from app.core.auth import Principal
 
 
 def scope_query(query, model, principal: Principal | None):
     """Narrows a list query to what the caller should see."""
-    if principal is not None and principal.scope_client_id is not None:
+    if principal is None:
+        return query
+    if principal.restricted:
+        # Decided from the user's own client and nothing else. A client user with no client cannot
+        # be created through the API; if one appears anyway it sees nothing rather than everything.
+        if principal.client_id is None:
+            return query.filter(false())
+        return query.filter(model.clientId == principal.client_id)
+    if principal.scope_client_id is not None:
         return query.filter(model.clientId == principal.scope_client_id)
     return query
 
@@ -41,7 +54,13 @@ def visible(obj, principal: Principal | None):
 
 def owner_for_new(principal: Principal | None) -> str | None:
     """The clientId a newly created row receives."""
-    return principal.scope_client_id if principal is not None else None
+    if principal is None:
+        return None
+    if principal.restricted:
+        if principal.client_id is None:
+            raise HTTPException(status_code=403, detail="This account is not linked to a client. Ask your administrator.")
+        return principal.client_id
+    return principal.scope_client_id
 
 
 def ensure_referable(obj, principal: Principal | None, missing_detail: str) -> None:
@@ -51,6 +70,24 @@ def ensure_referable(obj, principal: Principal | None, missing_detail: str) -> N
     """
     if obj is None or not can_access(obj, principal):
         raise HTTPException(status_code=400, detail=missing_detail)
+
+
+def hidden_device_ids(db, device_ids, principal: Principal | None) -> set[str]:
+    """
+    Which of these screens the caller may not see. Always empty for administrators.
+
+    Used twice over: responses leave these ids out, and an update from a client user replaces only
+    the screens they can see, so a link an administrator made is neither revealed nor removed.
+    """
+    ids = set(device_ids)
+    if not ids or principal is None or not principal.restricted:
+        return set()
+    if principal.client_id is None:
+        return ids
+    from app.models.device import Device
+
+    own = db.query(Device.id).filter(Device.id.in_(ids), Device.clientId == principal.client_id).all()
+    return ids - {row[0] for row in own}
 
 
 def apply_owner_change(obj, update_data: dict, principal: Principal | None, db=None) -> None:
