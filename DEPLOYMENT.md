@@ -69,6 +69,7 @@ graph TD
    python migrate_fk_rules.py       # aligns foreign-key delete rules with the API's 409 guards
    python migrate_accounts.py       # adds users, clients, sessions and per-client ownership
    python migrate_reports.py        # adds the proof-of-play tables
+   python migrate_health.py         # adds the screen-health columns to devices
    ```
    `migrate_fk_rules.py --check` reports without changing anything, so it is safe to run in CI.
 
@@ -344,6 +345,41 @@ export for invoicing or for sending to an advertiser.
 
 ---
 
+## 6b. Activity log
+
+The **Activity** page records who changed what and when: every change to a screen, media file,
+playlist or schedule, every handover, every user, client and player-release change, and every
+sign-in. Each entry names the person (or "Admin key", or "Anyone (sign-in was off)" for changes made
+before Step 1 of Section 6), the row, and a short summary such as `name → Lobby, status → Published`.
+
+* A client user sees what happened to **their own client's** screens and content, whoever did it,
+  the operator included. Account and player-release entries are for administrators only.
+* A password never reaches the log; a reset reads "password reset". Refused requests leave nothing.
+* Entries are kept for 400 days and outlive the user and the row they describe.
+* Writing the log can never fail the request it describes; a failure is logged and the change stands.
+
+## 6c. Screen health and screenshots
+
+From **player 1.4.0** each heartbeat also carries the player's most recent error and how many plays
+are still waiting to be reported. The screen's panel shows both, and **Needs attention** on the Now
+page flags an error reported in the last day and an online screen whose reports are backing up.
+
+**Screenshot** on a screen's panel asks the screen what it is showing. The screen sees the request
+in the reply to its next heartbeat (up to a minute), captures its own window, and uploads a small
+JPEG, which appears in the panel. Nothing is captured unless someone presses the button; a request
+nobody answers expires after ten minutes; and the picture is stored as one file per screen on the
+`/data` volume, replaced each time and deleted with the screen.
+
+The five new `devices` columns are selected by every device query, so they are added by
+`migrate_health.py` in the **pre-deploy step**, where a failure aborts the deploy and leaves the
+running version alone. The pre-deploy command on Railway is:
+
+```text
+python migrate_ota_storage.py && python migrate_accounts.py && python migrate_reports.py && python migrate_fk_rules.py && python migrate_health.py
+```
+
+---
+
 ## 7. Security Roadmap
 
 Section 6 covers what is implemented. What remains:
@@ -367,6 +403,26 @@ Section 6 covers what is implemented. What remains:
 ---
 
 ## 8. Troubleshooting
+
+### Railway does not deploy when you push
+
+The Railway project is owned by the Railway account `grovitclaude-blip`, and the repository by the
+GitHub account `Ladman349`, which has no other collaborators. Because the repository is public
+Railway can still *build* from it, which is why a manual deploy works, but Railway's own rule is
+that "public repositories where no project member has contributor access cannot use autodeploy": it
+is never told about a push. Until this is fixed a deploy is triggered by re-attaching the source
+(Service → Settings → Source → Disconnect, then connect the same repository and branch `main`).
+
+To fix it for good, signed in to GitHub as `Ladman349`:
+
+1. Repository → Settings → Collaborators → **Add people** → the GitHub account the Railway login
+   uses → role **Write**. Accept the invitation from that account.
+2. <https://github.com/settings/installations> → **Railway** → Configure → give it access to
+   `Digital-Content-Management` (install the Railway app first if it is not listed).
+3. Railway → the service → Settings → Source → **Enable** autodeploy (or disconnect and reconnect).
+
+Do this **before** making the repository private. A private repository that the Railway app cannot
+read cannot be built at all, and the next deploy would fail.
 
 * **Device is not registering:**
   * Verify the TV can reach the backend. Open a browser on the device and navigate to `https://[your-api-domain]/ready` to confirm.

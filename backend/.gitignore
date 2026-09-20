@@ -3,6 +3,8 @@ __pycache__/
 *.pyc
 .env
 media/
+# Proxied media downloads and on-demand screenshots; a volume in production.
+media_cache/
 *.db
 uploads/
 .venv/
