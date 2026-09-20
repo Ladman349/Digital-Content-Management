@@ -36,6 +36,28 @@ Install on a phone: copy the APK over (Drive, WhatsApp, USB), open it, allow "in
 apps" for that source once. Or with a cable: `adb install -r app-release.apk`. Because the
 package is `com.grovitai.signage`, it never collides with the TV player.
 
+### Or build both APKs on GitHub
+
+`.github/workflows/android-release.yml` builds the signed player and controller APKs on GitHub's
+runners, so a release does not depend on this PC. It is started by hand (Actions → **Android ·
+Release APKs** → Run workflow) and attaches the APKs, named after their version, to the run for 30
+days. It needs four repository secrets, which you set yourself in PowerShell from the repository
+folder; they are the same values as in `android/local.properties`:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("androidapp<your-keystore>.jks")) | gh secret set ANDROID_KEYSTORE_BASE64
+gh secret set RELEASE_STORE_PASSWORD
+gh secret set RELEASE_KEY_ALIAS
+gh secret set RELEASE_KEY_PASSWORD
+```
+
+The last three prompt for the value, so it is never written to a file or a command history. The
+repository is public, so anyone signed in to GitHub can download a run's artifacts: fine for an APK
+you hand out anyway, but the link is not private.
+
+Every push also runs `.github/workflows/ci.yml`: the backend tests, the CMS type-check, lint and
+build, and the player's unit tests, each only when its part of the repository changed.
+
 ## iOS — TestFlight from GitHub Actions
 
 Building for iOS needs macOS, so `.github/workflows/ios-testflight.yml` does it on GitHub's

@@ -1,0 +1,148 @@
+# Builds the signed Android APKs on GitHub, so a release no longer depends on one PC:
+#   player      android/            com.digitalsignage.player   (the TV app; publish it on the Updates page)
+#   controller  frontend/android/   com.grovitai.signage        (the phone app that controls the screens)
+#
+# Started by hand from the Actions tab. The APKs are attached to the run as artifacts for 30 days.
+# This repository is public, so anyone signed in to GitHub can download a run's artifacts; an APK is
+# something that gets handed out anyway, but do not treat the link as private.
+#
+# Required repository secrets (set them yourself with `gh secret set`; they never pass through chat):
+#   ANDROID_KEYSTORE_BASE64   the release keystore, base64-encoded:
+#                             [Convert]::ToBase64String([IO.File]::ReadAllBytes("android\app\<keystore>.jks"))
+#   RELEASE_STORE_PASSWORD    same value as in android/local.properties
+#   RELEASE_KEY_ALIAS         same value as in android/local.properties
+#   RELEASE_KEY_PASSWORD      same value as in android/local.properties
+#
+# Both apps are signed with the same key, which must be the one already on the screens and phones:
+# Android refuses to install an update signed with a different key.
+
+name: Android · Release APKs
+
+on:
+  workflow_dispatch:
+    inputs:
+      app:
+        description: Which app to build
+        type: choice
+        options: [both, player, controller]
+        default: both
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-release
+  cancel-in-progress: false
+
+env:
+  RELEASE_STORE_FILE: ${{ github.workspace }}/../release.jks
+  RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+  RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+  RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+
+jobs:
+  player:
+    name: TV player APK
+    if: inputs.app == 'both' || inputs.app == 'player'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore the signing key
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE" ] || [ -z "$RELEASE_STORE_PASSWORD" ] || [ -z "$RELEASE_KEY_ALIAS" ] || [ -z "$RELEASE_KEY_PASSWORD" ]; then
+            echo "::error::The four signing secrets are not set. See the header of .github/workflows/android-release.yml."
+            exit 1
+          fi
+          echo "$KEYSTORE" | base64 --decode > "$RELEASE_STORE_FILE"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Test and build
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew testProdReleaseUnitTest assembleProdRelease --console=plain
+      - name: Name the APK after its version
+        id: apk
+        working-directory: android
+        run: |
+          version="$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts | head -1)"
+          code="$(grep -oP 'versionCode = \K[0-9]+' app/build.gradle.kts | head -1)"
+          out="signage-player-${version}-${code}.apk"
+          cp app/build/outputs/apk/prod/release/app-prod-release.apk "$RUNNER_TEMP/$out"
+          sha256sum "$RUNNER_TEMP/$out" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "path=$RUNNER_TEMP/$out" >> "$GITHUB_OUTPUT"
+          echo "name=$out" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.apk.outputs.name }}
+          path: ${{ steps.apk.outputs.path }}
+          retention-days: 30
+          if-no-files-found: error
+      - name: Remove the signing key
+        if: always()
+        run: rm -f "$RELEASE_STORE_FILE"
+
+  controller:
+    name: Controller APK
+    if: inputs.app == 'both' || inputs.app == 'controller'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore the signing key
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE" ] || [ -z "$RELEASE_STORE_PASSWORD" ] || [ -z "$RELEASE_KEY_ALIAS" ] || [ -z "$RELEASE_KEY_PASSWORD" ]; then
+            echo "::error::The four signing secrets are not set. See the header of .github/workflows/android-release.yml."
+            exit 1
+          fi
+          echo "$KEYSTORE" | base64 --decode > "$RELEASE_STORE_FILE"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+      # The API address comes from the tracked frontend/.env, exactly as it does for the Vercel build.
+      - name: Build the CMS bundle and sync it into the shell
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+          npx cap sync android
+      - name: Build
+        working-directory: frontend/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --console=plain
+      - name: Name the APK after its version
+        id: apk
+        working-directory: frontend/android
+        run: |
+          version="$(grep -oP 'versionName "\K[^"]+' app/build.gradle | head -1)"
+          code="$(grep -oP 'versionCode \K[0-9]+' app/build.gradle | head -1)"
+          out="signage-controller-${version}-${code}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/$out"
+          sha256sum "$RUNNER_TEMP/$out" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "path=$RUNNER_TEMP/$out" >> "$GITHUB_OUTPUT"
+          echo "name=$out" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.apk.outputs.name }}
+          path: ${{ steps.apk.outputs.path }}
+          retention-days: 30
+          if-no-files-found: error
+      - name: Remove the signing key
+        if: always()
+        run: rm -f "$RELEASE_STORE_FILE"
