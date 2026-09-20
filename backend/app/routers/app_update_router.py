@@ -10,7 +10,8 @@ from app.database.database import get_db
 
 logger = logging.getLogger("api")
 from app.schemas.app_update import AppUpdateResponse, AppUpdateCheckResponse
-from app.core.auth import require_admin, require_any_device
+from app.core.auth import Principal, require_admin, require_any_device
+from app.services.audit_service import AuditService
 from app.services.app_update_service import AppUpdateService
 
 router = APIRouter(
@@ -26,9 +27,10 @@ def create_update(
     mandatory: bool = Form(default=False),
     is_active: bool = Form(default=False),
     release_notes: Optional[str] = Form(default=None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_admin),
 ):
-    return AppUpdateService.create_update(
+    update = AppUpdateService.create_update(
         db=db,
         file=file,
         version_name=version_name,
@@ -37,6 +39,8 @@ def create_update(
         is_active=is_active,
         release_notes=release_notes
     )
+    AuditService.record(db, principal, "uploaded", "release", str(update.id), f"{update.version_name} ({update.version_code})", None, "active" if update.is_active else "not active yet")
+    return update
 
 @router.get("/", response_model=List[AppUpdateResponse], dependencies=[Depends(require_admin)])
 def get_all_updates(db: Session = Depends(get_db)):
@@ -129,14 +133,19 @@ def download_update(filename: str, db: Session = Depends(get_db)):
     )
 
 @router.put("/{id}/activate", response_model=AppUpdateResponse, dependencies=[Depends(require_admin)])
-def activate_update(id: UUID, db: Session = Depends(get_db)):
-    return AppUpdateService.activate_update(db, id)
+def activate_update(id: UUID, db: Session = Depends(get_db), principal: Principal = Depends(require_admin)):
+    update = AppUpdateService.activate_update(db, id)
+    AuditService.record(db, principal, "activated", "release", str(update.id), f"{update.version_name} ({update.version_code})")
+    return update
 
 @router.put("/{id}/deactivate", response_model=AppUpdateResponse, dependencies=[Depends(require_admin)])
-def deactivate_update(id: UUID, db: Session = Depends(get_db)):
-    return AppUpdateService.deactivate_update(db, id)
+def deactivate_update(id: UUID, db: Session = Depends(get_db), principal: Principal = Depends(require_admin)):
+    update = AppUpdateService.deactivate_update(db, id)
+    AuditService.record(db, principal, "deactivated", "release", str(update.id), f"{update.version_name} ({update.version_code})")
+    return update
 
 @router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_admin)])
-def delete_update(id: UUID, db: Session = Depends(get_db)):
+def delete_update(id: UUID, db: Session = Depends(get_db), principal: Principal = Depends(require_admin)):
     AppUpdateService.delete_update(db, id)
+    AuditService.record(db, principal, "deleted", "release", str(id))
     return None

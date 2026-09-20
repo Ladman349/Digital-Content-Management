@@ -12,6 +12,7 @@ from app.schemas.device import DeviceCreate, DeviceUpdate, DeviceResponse, Heart
 from app.core.auth import Principal, get_principal, require_device, require_device_body
 from app.services.device_service import DeviceService
 from app.services.player_service import PlayerService
+from app.services.audit_service import AuditService, describe_changes
 from app.services.report_service import ReportService
 from app.schemas.report import PlayBatchRequest, PlayBatchResponse
 from app.models.device import Device
@@ -27,7 +28,9 @@ def get_devices(db: Session = Depends(get_db), principal: Principal = Depends(ge
 
 @router.post("", response_model=DeviceResponse, status_code=status.HTTP_201_CREATED)
 def create_device(payload: DeviceCreate, db: Session = Depends(get_db), principal: Principal = Depends(get_principal)):
-    return DeviceService.create_device(db, payload, principal)
+    device = DeviceService.create_device(db, payload, principal)
+    AuditService.record(db, principal, "created", "screen", device.id, device.name, device.clientId)
+    return device
 
 # Deliberately unauthenticated: this is how a player obtains its token in the first place.
 @router.post("/register", response_model=DeviceRegisterResponse, status_code=status.HTTP_201_CREATED)
@@ -150,12 +153,16 @@ def update_device(device_id: str, payload: DeviceUpdate, db: Session = Depends(g
     device = DeviceService.update_device(db, device_id, payload, principal)
     if not device:
         raise HTTPException(status_code=404, detail="Device not found")
+    AuditService.record(db, principal, "updated", "screen", device.id, device.name, device.clientId, describe_changes(payload.model_dump(exclude_unset=True)))
     return device
 
 @router.delete("/{device_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_device(device_id: str, db: Session = Depends(get_db), principal: Principal = Depends(get_principal)):
+    doomed = DeviceService.get_device(db, device_id, principal)
+    label = (doomed.name, doomed.clientId) if doomed else (None, None)
     success = DeviceService.delete_device(db, device_id, principal)
     if not success:
         raise HTTPException(status_code=404, detail="Device not found")
     _forget_last_seen(device_id)
+    AuditService.record(db, principal, "deleted", "screen", device_id, label[0], label[1])
     return None

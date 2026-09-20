@@ -72,6 +72,8 @@ class Principal:
     kind: str  # "user" (signed in), "key" (ADMIN_API_KEY) or "open" (no accounts configured yet)
     is_admin: bool
     user_id: str | None = None
+    # Display name of the signed-in user, for the activity log.
+    user_name: str | None = None
     # The client a client-user belongs to. Always None for administrators.
     client_id: str | None = None
     # What list endpoints filter to and what new rows are stamped with. A client user's own client;
@@ -171,9 +173,9 @@ def get_principal(request: Request, db: Session = Depends(get_db)) -> Principal:
         user = user_for_token(bearer, db)
         if user:
             if user.role == ROLE_ADMIN:
-                return Principal(kind="user", is_admin=True, user_id=user.id, scope_client_id=_admin_scope(request, db))
+                return Principal(kind="user", is_admin=True, user_id=user.id, user_name=user.name, scope_client_id=_admin_scope(request, db))
             return Principal(
-                kind="user", is_admin=False, user_id=user.id, client_id=user.clientId, scope_client_id=user.clientId
+                kind="user", is_admin=False, user_id=user.id, user_name=user.name, client_id=user.clientId, scope_client_id=user.clientId
             )
 
     supplied_key = request.headers.get("x-admin-key") or bearer

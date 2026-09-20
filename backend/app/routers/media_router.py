@@ -16,6 +16,7 @@ from app.core.config import settings
 from app.core.auth import Principal, get_principal, require_any_device
 from app.models.user import User
 from app.core.storage import get_storage_provider
+from app.services.audit_service import AuditService, describe_changes
 
 import threading
 
@@ -153,6 +154,7 @@ def upload_media(file: UploadFile = File(...), db: Session = Depends(get_db), pr
     # accounts yet) keep the historical "Admin" label.
     uploader = db.query(User).filter(User.id == principal.user_id).first() if principal.user_id else None
     media = MediaService.upload_media(file, db, principal, uploaded_by=uploader.name if uploader else "Admin")
+    AuditService.record(db, principal, "uploaded", "media", media.id, media.name, media.clientId, f"{media.type}, {round(media.size / 1024 / 1024, 1)} MB")
     return MediaService.to_response(media)
 
 @router.put("/{media_id}", response_model=MediaResponse)
@@ -160,11 +162,15 @@ def update_media(media_id: str, payload: MediaUpdate, db: Session = Depends(get_
     media = MediaService.update_media(db, media_id, payload, principal)
     if not media:
         raise HTTPException(status_code=404, detail="Media not found")
+    AuditService.record(db, principal, "updated", "media", media.id, media.name, media.clientId, describe_changes(payload.model_dump(exclude_unset=True)))
     return MediaService.to_response(media)
 
 @router.delete("/{media_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_media(media_id: str, db: Session = Depends(get_db), principal: Principal = Depends(get_principal)):
+    doomed = MediaService.get_media(db, media_id, principal)
+    label = (doomed.name, doomed.clientId) if doomed else (None, None)
     success = MediaService.delete_media(db, media_id, principal)
     if not success:
         raise HTTPException(status_code=404, detail="Media not found")
+    AuditService.record(db, principal, "deleted", "media", media_id, label[0], label[1])
     return None
