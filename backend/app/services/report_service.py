@@ -18,7 +18,7 @@ import time
 from typing import List, Optional
 
 from fastapi import HTTPException
-from sqlalchemy import and_, false, func, literal_column, or_
+from sqlalchemy import BigInteger, and_, false, func, literal_column, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -56,7 +56,10 @@ MAX_REPORT_DAYS = 366
 
 # Inlined rather than bound: PostgreSQL only accepts a GROUP BY expression as matching the SELECT one
 # when the two are textually identical, which separate bind parameters are not under every driver.
-_OFFSET, _HOUR, _DAY, _24 = (literal_column(str(v)) for v in (TZ_OFFSET_MS, HOUR_MS, DAY_MS, 24))
+# Typed as integers so that `//` renders as plain integer division; untyped, SQLAlchemy wraps it in
+# FLOOR(), which yields a double on PostgreSQL and then has no `%` operator. SQLite hides this, so
+# tests/test_reports_postgres_sql.py pins the rendered SQL.
+_OFFSET, _HOUR, _DAY, _24 = (literal_column(str(v), type_=BigInteger) for v in (TZ_OFFSET_MS, HOUR_MS, DAY_MS, 24))
 
 
 def _now_ms() -> int:
