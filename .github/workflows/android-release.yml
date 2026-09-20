@@ -39,6 +39,10 @@ env:
   RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
   RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
   RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+  # Gradle configures every flavour even when building one, and the player's dev flavour refuses to
+  # configure without an API address. Only the prod flavour is built; this value is never used.
+  DEV_API_HOST: 127.0.0.1
+  DEV_API_PORT: "8000"
 
 jobs:
   player:

@@ -79,8 +79,9 @@ test("the administrator signs in and sets up two clients", async ({ page, reques
     await page.getByRole("button", { name: "New client" }).first().click();
     await page.getByLabel("Client name").fill(name);
     await page.getByRole("button", { name: "Add client" }).click();
-    await expect(page.getByText("Client added")).toBeVisible();
     await expect(page.getByRole("dialog")).toHaveCount(0);
+    // Not the toast: the first one can still be on screen when the second appears.
+    await expect(page.getByRole("tab", { name: new RegExp(`clients ${["Acme", "Bolt"].indexOf(name) + 1}`, "i") })).toBeVisible();
   }
 
   const clients: { id: string; name: string }[] = await (await request.get(`${API}/clients`, as(world.ownerToken))).json();
@@ -130,7 +131,7 @@ test("handing a screen over shows what travels with it, and then does it", async
   await expect(dialog.getByText("lobby-poster.png")).toBeVisible();
 
   await dialog.getByRole("button", { name: "Hand over" }).click();
-  await expect(page.getByText(/now with Acme/)).toBeVisible();
+  await expect(page.getByText(/now with Acme/).first()).toBeVisible();
 });
 
 test("a client sees only their own screens and content, and no operator pages", async ({ page }) => {
@@ -195,7 +196,7 @@ test("signed-in devices lists sessions and can sign another one out", async ({ p
   await expect(dialog.getByText("Current")).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Sign out", exact: true })).toHaveCount(1);
   await dialog.getByRole("button", { name: "Sign out", exact: true }).click();
-  await expect(page.getByText("Signed out on that device")).toBeVisible();
+  await expect(page.getByText("Signed out on that device").first()).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Sign out", exact: true })).toHaveCount(0);
 
   // The other browser is back at the sign-in screen the next time it asks for anything.

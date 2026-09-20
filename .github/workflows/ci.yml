@@ -104,7 +104,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - run: chmod +x gradlew
       # The debug variant: unit tests never package an APK, so no signing key is involved.
+      # Gradle configures every flavour even when building one, and the dev flavour refuses to
+      # configure without an API address. It is not built here; the value is never used.
       - run: ./gradlew testProdDebugUnitTest --console=plain
+        env:
+          DEV_API_HOST: 127.0.0.1
+          DEV_API_PORT: "8000"
 
   e2e:
     name: CMS browser tests

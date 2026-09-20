@@ -22,7 +22,9 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   forbidOnly: Boolean(process.env.CI),
-  retries: process.env.CI ? 1 : 0,
+  // No retries: the tests share one database, so re-running an early one after later ones have
+  // changed it (the first administrator already exists) can only fail for the wrong reason.
+  retries: 0,
   timeout: 45_000,
   expect: { timeout: 10_000 },
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : [["list"]],
