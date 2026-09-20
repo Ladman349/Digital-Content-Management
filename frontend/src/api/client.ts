@@ -117,6 +117,33 @@ export const api = {
   delete: (url: string) => request<void>("DELETE", url),
 };
 
+/**
+ * Fetches a file with the session attached and hands it to the browser to save. A plain link cannot
+ * be used: it would not carry the Authorization header.
+ */
+export async function download(url: string, fallbackName: string): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${url}`, { headers: authHeaders(url), cache: "no-store" });
+  } catch {
+    throw new ApiError("Cannot reach the API server", 0);
+  }
+  if (res.status === 401) {
+    notifyUnauthorized();
+    throw new ApiError("Your session has ended. Sign in again.", 401);
+  }
+  if (!res.ok) throw await errorFromResponse(res, `Download failed (${res.status})`);
+  const name = /filename="?([^";]+)"?/i.exec(res.headers.get("content-disposition") || "")?.[1] || fallbackName;
+  const href = URL.createObjectURL(await res.blob());
+  const link = document.createElement("a");
+  link.href = href;
+  link.download = name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(href), 10_000);
+}
+
 export interface UploadHandle<T> {
   promise: Promise<T>;
   abort: () => void;

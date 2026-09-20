@@ -3,6 +3,7 @@ import TvRoundedIcon from "@mui/icons-material/TvRounded";
 import PermMediaRoundedIcon from "@mui/icons-material/PermMediaRounded";
 import PlaylistPlayRoundedIcon from "@mui/icons-material/PlaylistPlayRounded";
 import EventRoundedIcon from "@mui/icons-material/EventRounded";
+import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
 import SystemUpdateAltRoundedIcon from "@mui/icons-material/SystemUpdateAltRounded";
 import ManageAccountsRoundedIcon from "@mui/icons-material/ManageAccountsRounded";
 import type { SvgIconComponent } from "@mui/icons-material";
@@ -22,6 +23,7 @@ export const navigationItems: NavigationItem[] = [
   { title: "Media", path: "/media", icon: PermMediaRoundedIcon },
   { title: "Playlists", path: "/playlists", icon: PlaylistPlayRoundedIcon },
   { title: "Schedule", path: "/schedule", icon: EventRoundedIcon },
+  { title: "Reports", path: "/reports", icon: InsightsRoundedIcon },
   { title: "Updates", path: "/updates", icon: SystemUpdateAltRoundedIcon, adminOnly: true },
   { title: "Accounts", path: "/accounts", icon: ManageAccountsRoundedIcon, adminOnly: true },
 ];

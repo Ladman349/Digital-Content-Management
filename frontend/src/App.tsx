@@ -12,6 +12,7 @@ const DevicesPage = lazy(() => import("./pages/Devices/DevicesPage"));
 const MediaPage = lazy(() => import("./pages/Media/MediaPage"));
 const PlaylistsPage = lazy(() => import("./pages/Playlists/PlaylistsPage"));
 const SchedulePage = lazy(() => import("./pages/Schedule/SchedulePage"));
+const ReportsPage = lazy(() => import("./pages/Reports/ReportsPage"));
 const UpdatesPage = lazy(() => import("./pages/Updates/UpdatesPage"));
 const AccountsPage = lazy(() => import("./pages/Accounts/AccountsPage"));
 
@@ -55,6 +56,7 @@ export default function App() {
           <Route path="/media" element={<Page><MediaPage /></Page>} />
           <Route path="/playlists" element={<Page><PlaylistsPage /></Page>} />
           <Route path="/schedule" element={<Page><SchedulePage /></Page>} />
+          <Route path="/reports" element={<Page><ReportsPage /></Page>} />
           <Route path="/updates" element={<AdminOnly><UpdatesPage /></AdminOnly>} />
           <Route path="/accounts" element={<AdminOnly><AccountsPage /></AdminOnly>} />
           <Route path="*" element={<Navigate to="/" replace />} />

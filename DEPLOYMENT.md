@@ -68,6 +68,7 @@ graph TD
    python migrate_ota_storage.py    # adds app_updates.storage_uri (OTA durability)
    python migrate_fk_rules.py       # aligns foreign-key delete rules with the API's 409 guards
    python migrate_accounts.py       # adds users, clients, sessions and per-client ownership
+   python migrate_reports.py        # adds the proof-of-play tables
    ```
    `migrate_fk_rules.py --check` reports without changing anything, so it is safe to run in CI.
 
@@ -315,6 +316,31 @@ worth rate-limiting at the edge.
 | `GET /devices/{id}/current-playlist`, `GET /devices/{id}/status`, `POST /devices/heartbeat` | That device's token |
 | `GET /media/{id}/download`, `GET /app-updates/check`, `GET /app-updates/download/...` | Any valid device token, or the admin key |
 | `POST /devices/register`, `GET /app-updates/ping`, `/health`, `/ready` | Open by design |
+
+---
+
+## 6a. Proof-of-play reports
+
+The **Reports** page answers "what played, on which screen, when, and how many times", with a CSV
+export for invoicing or for sending to an advertiser.
+
+* **It starts with player 1.3.0.** From that build each screen records every item it shows and
+  delivers the record every five minutes. Publish 1.3.0 on the Updates page; a screen begins counting
+  as soon as it has updated, and earlier builds simply report nothing. A screen that is offline keeps
+  up to about six days of plays on disk and delivers them when it is back.
+* **What is kept** is one counter per screen, file, playlist and hour, not a row per play: a
+  ten-second item plays 8,640 times a day, and hourly counters answer every question the page asks at
+  a few hundred rows per screen per day. Times are Indian time. A TV with a wrong clock is corrected
+  on arrival, and a batch that is sent twice is counted once.
+* **Who sees what.** An administrator sees everything, or one client with the top-bar Client control.
+  A client sees plays **on their screens** and plays **of their media wherever it ran**, which is what
+  an advertiser on the operator's screens needs. History follows a handover, and survives deleting
+  the screen or the file.
+* **How far to trust it.** Until Step 2 of Section 6 (`REQUIRE_DEVICE_AUTH`) is on, a screen is
+  identified by its id alone, so someone who knew a screen's id could post plays that never happened.
+  Turn device tokens on before the numbers are used for billing.
+* The tables (`play_stats`, `play_batches`) are added at startup; `python migrate_reports.py --check`
+  confirms they exist.
 
 ---
 

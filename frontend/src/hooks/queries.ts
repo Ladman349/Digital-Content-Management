@@ -6,6 +6,8 @@ import { ScheduleService } from "../services/ScheduleService";
 import { AppUpdateService } from "../services/AppUpdateService";
 import { ClientService, HandoverService, UserService } from "../services/AccountService";
 import type { HandoverRequest, UserCreatePayload, UserUpdatePayload } from "../types/account";
+import { ReportService } from "../services/ReportService";
+import type { PlayReportQuery } from "../types/report";
 import type { DeviceCreatePayload, DeviceUpdatePayload } from "../types/device";
 import type { MediaUpdatePayload } from "../types/media";
 import type { PlaylistCreatePayload, PlaylistUpdatePayload } from "../types/playlist";
@@ -205,6 +207,16 @@ export function useHandoverPreview(request: Omit<HandoverRequest, "dryRun"> | nu
 export function useHandover() {
   const invalidate = useInvalidator(queryKeys.devices, queryKeys.media, queryKeys.playlists, queryKeys.schedules, queryKeys.clients);
   return useMutation({ mutationFn: (d: Omit<HandoverRequest, "dryRun">) => HandoverService.run({ ...d, dryRun: false }), onSuccess: invalidate });
+}
+// ── Reports ────────────────────────────────────────────────────────────────
+/** Proof of play. Screens deliver in batches every few minutes, so a slow refresh is plenty. */
+export function usePlayReport(query: PlayReportQuery) {
+  return useQuery({
+    queryKey: ["reports", "plays", query],
+    queryFn: () => ReportService.plays(query),
+    refetchInterval: 5 * 60_000,
+    placeholderData: (previous) => previous,
+  });
 }
 
 // ── helpers ────────────────────────────────────────────────────────────────
