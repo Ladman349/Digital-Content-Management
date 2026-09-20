@@ -24,6 +24,13 @@ interface ApiService {
     @POST("devices/heartbeat")
     suspend fun postHeartbeat(@Body payload: com.digitalsignage.player.data.remote.dto.HeartbeatPayload): Response<Unit>
 
+    /** Proof of play: a batch of items this screen has shown. Safe to resend; the server de-duplicates by batch id. */
+    @POST("devices/{deviceId}/plays")
+    suspend fun postPlays(
+        @Path("deviceId") deviceId: String,
+        @Body payload: com.digitalsignage.player.data.remote.dto.PlayBatchPayload
+    ): Response<Unit>
+
     @GET("app-updates/check")
     suspend fun checkForUpdate(
         @Query("version_code") versionCode: Int

@@ -21,6 +21,7 @@ import javax.inject.Singleton
 class PlaylistExecutorImpl @Inject constructor(
     private val playbackController: PlaybackController,
     private val eventBus: PlayerEventBus,
+    private val playRecorder: com.digitalsignage.player.domain.playback.PlayRecorder,
     private val logger: Logger
 ) : PlaylistExecutor {
 
@@ -90,10 +91,17 @@ class PlaylistExecutorImpl @Inject constructor(
                 //     playbackController.preloadItem(nextItem)
                 // }
                 
+                // Proof of play: wall clock says when, the monotonic clock says for how long (it
+                // cannot jump when the device's time is corrected mid-item).
+                val startedAt = System.currentTimeMillis()
+                val startedTick = System.nanoTime()
                 try {
                     playbackController.playItem(item)
                     consecutiveErrors = 0
+                    playRecorder.record(item.mediaId, playlist.playlistId, startedAt, (System.nanoTime() - startedTick) / 1_000_000, completed = true)
                 } catch (e: CancellationException) {
+                    // Cut short by a stop or a new playlist. It was still on screen for this long.
+                    playRecorder.record(item.mediaId, playlist.playlistId, startedAt, (System.nanoTime() - startedTick) / 1_000_000, completed = false)
                     throw e
                 } catch (e: Exception) {
                     logger.e("PlaylistExecutor", "Error playing media ${item.mediaId}, skipping", e)

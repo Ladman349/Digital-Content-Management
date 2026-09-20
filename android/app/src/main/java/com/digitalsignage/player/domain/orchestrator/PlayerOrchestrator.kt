@@ -50,6 +50,7 @@ class PlayerOrchestratorImpl @Inject constructor(
     private val downloadManager: com.digitalsignage.player.workers.download.DownloadManager,
     private val playlistExecutor: com.digitalsignage.player.domain.playback.PlaylistExecutor,
     private val heartbeatManager: com.digitalsignage.player.workers.heartbeat.HeartbeatManager,
+    private val playLogger: com.digitalsignage.player.core.proofofplay.PlayLogger,
     private val startupValidator: com.digitalsignage.player.core.recovery.StartupValidator,
     private val crashRecoveryManager: com.digitalsignage.player.core.recovery.CrashRecoveryManager,
     private val kioskManager: KioskManager,
@@ -502,6 +503,8 @@ class PlayerOrchestratorImpl @Inject constructor(
                 try {
                     if (stateMachine.currentState.value != PlayerState.REGISTERING) {
                         heartbeatManager.sendHeartbeatNow()
+                        // Proof of play rides the same loop; it sends at most every five minutes.
+                        playLogger.flushIfDue()
                     }
                 } catch (e: Exception) {
                     logger.w("Heartbeat", "Heartbeat loop iteration failed: ${e.message}")

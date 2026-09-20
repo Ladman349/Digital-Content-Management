@@ -9,6 +9,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 import com.digitalsignage.player.data.local.AppDatabase
+import com.digitalsignage.player.data.local.playlog.PlayLogDao
+import com.digitalsignage.player.data.local.playlog.PlayLogDatabase
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -23,4 +25,17 @@ object DatabaseModule {
             .fallbackToDestructiveMigration()
             .build()
     }
+
+    /**
+     * Plays not yet reported to the server. A separate file so that wiping the cache database
+     * above never loses them; no destructive fallback here for the same reason.
+     */
+    @Provides
+    @Singleton
+    fun providePlayLogDatabase(@ApplicationContext context: Context): PlayLogDatabase {
+        return Room.databaseBuilder(context, PlayLogDatabase::class.java, "play_log.db").build()
+    }
+
+    @Provides
+    fun providePlayLogDao(database: PlayLogDatabase): PlayLogDao = database.playLogDao()
 }

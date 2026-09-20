@@ -17,6 +17,7 @@ abstract class RepositoryModule {
     @Binds abstract fun bindPlaylistRepository(impl: PlaylistRepositoryImpl): PlaylistRepository
     // @Binds abstract fun bindMediaRepository(impl: MediaRepositoryImpl): MediaRepository
     @Binds abstract fun bindHeartbeatRepository(impl: HeartbeatRepositoryImpl): HeartbeatRepository
+    @Binds abstract fun bindPlayRecorder(impl: com.digitalsignage.player.core.proofofplay.PlayLogger): com.digitalsignage.player.domain.playback.PlayRecorder
     // @Binds abstract fun bindSettingsRepository(impl: SettingsRepositoryImpl): SettingsRepository
 }
 

@@ -8,6 +8,11 @@ interface PlaylistExecutor {
     suspend fun stop()
 }
 
+/** Proof of play: told about every item the executor has shown. Must return immediately and never throw. */
+interface PlayRecorder {
+    fun record(mediaId: String, playlistId: String?, startedAt: Long, durationMs: Long, completed: Boolean)
+}
+
 // Hardware-agnostic Engine Contract (Player layer contract exposed to Domain)
 // Moving the interface back to domain/playback to respect Dependency Inversion.
 // The concrete ExoPlayer implementation remains in the player package.
