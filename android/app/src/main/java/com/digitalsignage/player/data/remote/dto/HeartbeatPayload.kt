@@ -12,6 +12,16 @@ data class HeartbeatPayload(
     @Json(name = "appVersion") val appVersion: String? = null,
     @Json(name = "uptimeSeconds") val uptimeSeconds: Long? = null,
     @Json(name = "ipAddress") val ipAddress: String? = null,
-    @Json(name = "firmwareVersion") val firmwareVersion: String? = null
+    @Json(name = "firmwareVersion") val firmwareVersion: String? = null,
+    // Health, from 1.4.0. An older backend ignores fields it does not know.
+    @Json(name = "lastError") val lastError: String? = null,
+    @Json(name = "lastErrorAt") val lastErrorAt: Long? = null,
+    @Json(name = "pendingPlays") val pendingPlays: Int? = null
+)
+
+/** The part of the heartbeat reply the player acts on. Everything else in the body is ignored. */
+@com.squareup.moshi.JsonClass(generateAdapter = true)
+data class HeartbeatReply(
+    @Json(name = "screenshotRequested") val screenshotRequested: Boolean = false
 )
 

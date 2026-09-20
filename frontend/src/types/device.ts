@@ -22,6 +22,13 @@ export interface Device {
   orientation?: DeviceOrientation | null;
   /** Owning client; null or absent means the screen belongs to the operator. */
   clientId?: string | null;
+  /** Health, reported by player 1.4.0 and later. */
+  lastError?: string | null;
+  lastErrorAt?: number | null;
+  /** Plays recorded on the screen and not yet delivered for the reports. */
+  pendingPlays?: number | null;
+  screenshotRequestedAt?: number | null;
+  screenshotAt?: number | null;
 }
 
 export interface DeviceCreatePayload {

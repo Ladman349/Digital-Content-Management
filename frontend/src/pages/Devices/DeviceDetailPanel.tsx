@@ -15,6 +15,7 @@ import DetailPanel from "../../components/ui/DetailPanel";
 import Field, { FieldGrid, Section } from "../../components/ui/Field";
 import StatusChip from "../../components/ui/StatusChip";
 import OwnerSection from "../../components/ui/OwnerSection";
+import ScreenshotSection from "./ScreenshotSection";
 import { formatDateTime, formatMegabytes, formatUptime, relativeTime } from "../../utils/format";
 
 interface Props {
@@ -171,7 +172,18 @@ export default function DeviceDetailPanel({ device, playback, playlists, schedul
             {device.resolution}
             {device.orientation && device.orientation !== "LANDSCAPE" ? ` · ${ORIENTATION_LABELS[device.orientation]}` : ""}
           </Field>
+          {device.pendingPlays != null && (
+            <Field label="Plays waiting to report">{device.pendingPlays.toLocaleString("en-IN")}</Field>
+          )}
         </FieldGrid>
+        {device.lastError && (
+          <Box sx={{ mt: 1.5, p: 1.25, borderLeft: 3, borderColor: "warning.main", bgcolor: "action.hover" }}>
+            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: "block" }}>
+              Last error · first reported {relativeTime(device.lastErrorAt, now)}
+            </Typography>
+            <Typography sx={{ fontSize: 12, mt: 0.25, overflowWrap: "anywhere" }}>{device.lastError}</Typography>
+          </Box>
+        )}
         <Box sx={{ mt: 1.5 }}>
           <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
             <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
@@ -184,6 +196,8 @@ export default function DeviceDetailPanel({ device, playback, playlists, schedul
           <LinearProgress variant="determinate" value={storagePct ?? 0} color={storagePct !== null && storagePct > 90 ? "error" : "primary"} />
         </Box>
       </Section>
+
+      <ScreenshotSection device={device} now={now} />
 
       <Section
         title={`Schedules targeting this screen (${targeting.length})`}

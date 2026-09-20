@@ -20,6 +20,7 @@ import javax.inject.Singleton
 class DeviceHealthCollector @Inject constructor(
     @ApplicationContext private val context: Context,
     private val database: AppDatabase,
+    private val playLogDao: com.digitalsignage.player.data.local.playlog.PlayLogDao,
     private val playbackController: PlaybackController
 ) {
 
@@ -57,7 +58,10 @@ class DeviceHealthCollector @Inject constructor(
             appVersion = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
             uptimeSeconds = SystemClock.elapsedRealtime() / 1000,
             ipAddress = null,
-            firmwareVersion = Build.VERSION.RELEASE
+            firmwareVersion = Build.VERSION.RELEASE,
+            lastError = LastErrorStore.message,
+            lastErrorAt = LastErrorStore.at,
+            pendingPlays = try { playLogDao.count() } catch (e: Exception) { null }
         )
     }
 }

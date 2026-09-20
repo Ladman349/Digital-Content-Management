@@ -104,6 +104,26 @@ export default function DashboardPage() {
           when: "now",
           to: `/devices?select=${encodeURIComponent(d.id)}`,
         });
+      // An error is news for a day; after that it is history, and stays on the screen's own panel.
+      if (d.lastError && d.lastErrorAt && now - d.lastErrorAt < 24 * 60 * 60_000)
+        items.push({
+          key: `err-${d.id}`,
+          severity: "warning",
+          tag: "Error",
+          text: `${d.name}: ${d.lastError.length > 110 ? `${d.lastError.slice(0, 110)}…` : d.lastError}`,
+          when: relativeTime(d.lastErrorAt, now),
+          to: `/devices?select=${encodeURIComponent(d.id)}`,
+        });
+      // A day's worth of plays still on the screen means its reports are not getting through.
+      if (d.status !== "Offline" && (d.pendingPlays ?? 0) > 8000)
+        items.push({
+          key: `pend-${d.id}`,
+          severity: "warning",
+          tag: "Reports stuck",
+          text: `${d.name} is online but has ${(d.pendingPlays ?? 0).toLocaleString("en-IN")} plays it has not been able to report`,
+          when: "now",
+          to: `/devices?select=${encodeURIComponent(d.id)}`,
+        });
     });
     const active = schedules.filter((s) => s.status === "Active");
     active.forEach((s) => {

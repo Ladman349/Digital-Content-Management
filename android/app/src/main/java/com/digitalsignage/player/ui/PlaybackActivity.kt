@@ -50,6 +50,7 @@ class PlaybackActivity : AppCompatActivity() {
     @Inject lateinit var otaCoordinator: com.digitalsignage.player.core.ota.manager.OtaCoordinator
     @Inject lateinit var networkMonitor: NetworkMonitor
     @Inject lateinit var deviceIdentityManager: DeviceIdentityManager
+    @Inject lateinit var screenshotReporter: com.digitalsignage.player.core.health.ScreenshotReporter
 
     private val viewModel: PlaybackViewModel by viewModels()
 
@@ -261,6 +262,7 @@ class PlaybackActivity : AppCompatActivity() {
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         binding.root.keepScreenOn = true
         hideSystemUI()
+        screenshotReporter.attach(this)
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -292,6 +294,7 @@ class PlaybackActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        screenshotReporter.detach(this)
         try {
             unregisterReceiver(screenEventsReceiver)
         } catch (e: Exception) {

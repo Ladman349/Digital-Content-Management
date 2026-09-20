@@ -22,7 +22,15 @@ interface ApiService {
     ): Response<okhttp3.ResponseBody>
 
     @POST("devices/heartbeat")
-    suspend fun postHeartbeat(@Body payload: com.digitalsignage.player.data.remote.dto.HeartbeatPayload): Response<Unit>
+    suspend fun postHeartbeat(@Body payload: com.digitalsignage.player.data.remote.dto.HeartbeatPayload): Response<com.digitalsignage.player.data.remote.dto.HeartbeatReply>
+
+    /** Answers a screenshot request from the CMS. The server refuses one it did not ask for. */
+    @retrofit2.http.Multipart
+    @POST("devices/{deviceId}/screenshot")
+    suspend fun uploadScreenshot(
+        @Path("deviceId") deviceId: String,
+        @retrofit2.http.Part file: okhttp3.MultipartBody.Part
+    ): Response<Unit>
 
     /** Proof of play: a batch of items this screen has shown. Safe to resend; the server de-duplicates by batch id. */
     @POST("devices/{deviceId}/plays")

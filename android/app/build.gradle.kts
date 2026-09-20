@@ -26,8 +26,8 @@ android {
         // The version code must rise with every build: the OTA check only offers a release whose code
         // is strictly higher than what the screen runs. 4 / 1.1.0 was the first build on the rotated
         // key; 5 / 1.2.0 restyles the player and scales its layout for phones and tablets.
-        versionCode = 6
-        versionName = "1.3.0"
+        versionCode = 7
+        versionName = "1.4.0"
     }
 
     flavorDimensions += "environment"

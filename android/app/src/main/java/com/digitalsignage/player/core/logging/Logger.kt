@@ -34,6 +34,7 @@ class AndroidLogger @javax.inject.Inject constructor() : Logger {
     }
     
     override fun e(tag: String, message: String, throwable: Throwable?) {
+        com.digitalsignage.player.core.health.LastErrorStore.record(tag, message, throwable)
         if (throwable != null) android.util.Log.e(tag, message, throwable) else android.util.Log.e(tag, message)
     }
     

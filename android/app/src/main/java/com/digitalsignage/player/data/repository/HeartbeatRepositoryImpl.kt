@@ -8,6 +8,7 @@ import com.digitalsignage.player.data.remote.ApiService
 import com.digitalsignage.player.domain.repository.HeartbeatRepository
 import com.digitalsignage.player.domain.repository.Result
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -16,6 +17,8 @@ class HeartbeatRepositoryImpl @Inject constructor(
     private val apiService: ApiService,
     private val healthCollector: DeviceHealthCollector,
     private val configStore: RuntimeConfigStoreImpl,
+    private val screenshotReporter: com.digitalsignage.player.core.health.ScreenshotReporter,
+    @com.digitalsignage.player.di.ApplicationScope private val applicationScope: kotlinx.coroutines.CoroutineScope,
     private val logger: Logger
 ) : HeartbeatRepository {
 
@@ -34,6 +37,11 @@ class HeartbeatRepositoryImpl @Inject constructor(
 
             if (response.isSuccessful) {
                 logger.d("HeartbeatRepository", "Heartbeat sent successfully.")
+                // The CMS is waiting for a screenshot. Off this coroutine: the heartbeat is done.
+                val wantsScreenshot = try { response.body()?.screenshotRequested == true } catch (e: Exception) { false }
+                if (wantsScreenshot) {
+                    applicationScope.launch { screenshotReporter.captureAndUpload(deviceId) }
+                }
                 Result.Success(Unit)
             } else if (response.code() == 401 || response.code() == 404) {
                 logger.e("HeartbeatRepository", "Device not found or unauthorized on heartbeat: ${response.code()}")

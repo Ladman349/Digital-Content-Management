@@ -144,6 +144,22 @@ export async function download(url: string, fallbackName: string): Promise<void>
   setTimeout(() => URL.revokeObjectURL(href), 10_000);
 }
 
+/** Fetches a binary resource that needs the session, such as a screenshot. */
+export async function fetchBlob(url: string): Promise<Blob> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${url}`, { headers: authHeaders(url), cache: "no-store" });
+  } catch {
+    throw new ApiError("Cannot reach the API server", 0);
+  }
+  if (res.status === 401) {
+    notifyUnauthorized();
+    throw new ApiError("Your session has ended. Sign in again.", 401);
+  }
+  if (!res.ok) throw await errorFromResponse(res, `Request failed (${res.status})`);
+  return res.blob();
+}
+
 export interface UploadHandle<T> {
   promise: Promise<T>;
   abort: () => void;
