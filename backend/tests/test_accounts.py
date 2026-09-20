@@ -403,3 +403,41 @@ def test_bootstrap_ignores_a_weak_password(client, db_session, monkeypatch):
     monkeypatch.setattr(settings, "BOOTSTRAP_ADMIN_PASSWORD", "short")
     AccountService.bootstrap_admin(db_session)
     assert client.get("/auth/status").json() == {"loginRequired": False}
+
+
+# ── Where a user is signed in ───────────────────────────────────────────────────────────
+def test_sessions_are_listed_without_revealing_tokens(client, admin):
+    phone = client.post("/auth/login", json={"email": ADMIN["email"], "password": ADMIN["password"]}, headers={"User-Agent": "SignageCMS/1.1 (Android 14)"}).json()
+    sessions = client.get("/auth/sessions", headers=admin).json()
+    assert len(sessions) == 2
+    assert [s["current"] for s in sessions].count(True) == 1
+    assert any(s["userAgent"] == "SignageCMS/1.1 (Android 14)" and not s["current"] for s in sessions)
+    raw = str(sessions)
+    assert phone["token"] not in raw and admin["Authorization"].split(" ", 1)[1] not in raw
+    assert all(len(s["id"]) == 16 for s in sessions)
+
+
+def test_one_session_can_be_signed_out_from_another(client, admin):
+    phone = _bearer(_login(client, ADMIN["email"], ADMIN["password"])["token"])
+    other = next(s for s in client.get("/auth/sessions", headers=admin).json() if not s["current"])
+    assert client.delete(f"/auth/sessions/{other['id']}", headers=admin).status_code == 204
+    assert client.get("/auth/me", headers=phone).status_code == 401
+    assert client.get("/auth/me", headers=admin).status_code == 200
+    assert client.delete(f"/auth/sessions/{other['id']}", headers=admin).status_code == 404
+
+
+def test_sign_out_everywhere_else_keeps_this_session(client, admin):
+    others = [_bearer(_login(client, ADMIN["email"], ADMIN["password"])["token"]) for _ in range(2)]
+    assert client.post("/auth/sessions/end-others", headers=admin).status_code == 204
+    assert all(client.get("/auth/me", headers=h).status_code == 401 for h in others)
+    assert [s["current"] for s in client.get("/auth/sessions", headers=admin).json()] == [True]
+
+
+def test_a_user_cannot_see_or_end_someone_elses_session(client, admin, two_clients):
+    admin_session = client.get("/auth/sessions", headers=admin).json()[0]
+    acme = two_clients["acme"]
+    assert [s["id"] for s in client.get("/auth/sessions", headers=acme).json()] != [admin_session["id"]]
+    assert client.delete(f"/auth/sessions/{admin_session['id']}", headers=acme).status_code == 404
+    assert client.delete("/auth/sessions/%25%25%25%25%25%25%25%25%25%25%25%25%25%25%25%25", headers=acme).status_code == 404
+    assert client.get("/auth/me", headers=admin).status_code == 200
+    assert client.get("/auth/sessions").status_code == 401

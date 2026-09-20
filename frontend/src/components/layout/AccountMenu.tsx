@@ -2,12 +2,14 @@ import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Divider
 import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
 import KeyRoundedIcon from "@mui/icons-material/KeyRounded";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
+import DevicesOtherRoundedIcon from "@mui/icons-material/DevicesOtherRounded";
 import { useSnackbar } from "notistack";
 import { useState, type FormEvent } from "react";
 import { useAuth } from "../../auth/AuthProvider";
 import { AuthService } from "../../services/AccountService";
 import { PASSWORD_MIN_LENGTH } from "../../types/account";
 import { MONO } from "../../app/theme";
+import SessionsDialog from "./SessionsDialog";
 
 function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
   const { enqueueSnackbar } = useSnackbar();
@@ -86,6 +88,7 @@ export default function AccountMenu() {
   const { user, logout } = useAuth();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const [changing, setChanging] = useState(false);
+  const [showingSessions, setShowingSessions] = useState(false);
 
   if (!user) return null;
 
@@ -147,6 +150,17 @@ export default function AccountMenu() {
         <MenuItem
           onClick={() => {
             setAnchor(null);
+            setShowingSessions(true);
+          }}
+        >
+          <ListItemIcon>
+            <DevicesOtherRoundedIcon fontSize="small" />
+          </ListItemIcon>
+          Signed-in devices
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            setAnchor(null);
             void logout();
           }}
         >
@@ -158,6 +172,7 @@ export default function AccountMenu() {
       </Menu>
 
       {changing && <ChangePasswordDialog onClose={() => setChanging(false)} />}
+      {showingSessions && <SessionsDialog onClose={() => setShowingSessions(false)} />}
     </>
   );
 }

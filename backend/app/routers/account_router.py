@@ -15,6 +15,7 @@ from app.schemas.account import (
     LoginRequest,
     LoginResponse,
     PasswordChangeRequest,
+    SessionResponse,
     UserCreate,
     UserResponse,
     UserUpdate,
@@ -74,6 +75,28 @@ def change_password(
 ):
     user = _signed_in_user(principal, db)
     AccountService.change_password(db, user.id, payload.currentPassword, payload.newPassword, _bearer_token(request))
+    return None
+
+
+@auth_router.get("/sessions", response_model=List[SessionResponse])
+def my_sessions(request: Request, principal: Principal = Depends(get_principal), db: Session = Depends(get_db)):
+    """Everywhere the caller is signed in: their browsers and the phone apps."""
+    user = _signed_in_user(principal, db)
+    return AccountService.list_sessions(db, user.id, _bearer_token(request))
+
+
+@auth_router.post("/sessions/end-others", status_code=status.HTTP_204_NO_CONTENT)
+def end_my_other_sessions(request: Request, principal: Principal = Depends(get_principal), db: Session = Depends(get_db)):
+    user = _signed_in_user(principal, db)
+    AccountService.end_other_sessions(db, user.id, _bearer_token(request))
+    return None
+
+
+@auth_router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+def end_my_session(session_id: str, principal: Principal = Depends(get_principal), db: Session = Depends(get_db)):
+    user = _signed_in_user(principal, db)
+    if not AccountService.end_session(db, user.id, session_id):
+        raise HTTPException(status_code=404, detail="Session not found")
     return None
 
 

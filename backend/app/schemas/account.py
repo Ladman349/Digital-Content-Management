@@ -119,6 +119,17 @@ class UserUpdate(BaseModel):
         return value
 
 
+class SessionResponse(BaseModel):
+    """One place the user is signed in. `id` is a handle for signing it out, never the token."""
+    id: str
+    createdAt: int
+    lastUsedAt: int
+    expiresAt: int
+    userAgent: Optional[str] = None
+    # The session making this request.
+    current: bool = False
+
+
 # ── Clients ─────────────────────────────────────────────────────────────────────────────
 class ClientCreate(BaseModel):
     name: str

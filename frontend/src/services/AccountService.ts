@@ -1,5 +1,5 @@
 import { API_BASE, api } from "../api/client";
-import type { Client, HandoverRequest, HandoverResponse, LoginResponse, User, UserCreatePayload, UserUpdatePayload } from "../types/account";
+import type { Client, HandoverRequest, HandoverResponse, LoginResponse, User, UserCreatePayload, UserSessionInfo, UserUpdatePayload } from "../types/account";
 
 export const AuthService = {
   /**
@@ -21,6 +21,9 @@ export const AuthService = {
   logout: () => api.post<void>("/auth/logout"),
   me: () => api.get<User>("/auth/me"),
   changePassword: (currentPassword: string, newPassword: string) => api.post<void>("/auth/password", { currentPassword, newPassword }),
+  sessions: () => api.get<UserSessionInfo[]>("/auth/sessions"),
+  endSession: (id: string) => api.delete(`/auth/sessions/${encodeURIComponent(id)}`),
+  endOtherSessions: () => api.post<void>("/auth/sessions/end-others"),
 };
 
 export const UserService = {

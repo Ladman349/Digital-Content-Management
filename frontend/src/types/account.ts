@@ -18,6 +18,16 @@ export interface LoginResponse {
   user: User;
 }
 
+/** One place the user is signed in. `id` is a handle for signing it out, never the token. */
+export interface UserSessionInfo {
+  id: string;
+  createdAt: number;
+  lastUsedAt: number;
+  expiresAt: number;
+  userAgent?: string | null;
+  current: boolean;
+}
+
 export interface UserCreatePayload {
   email: string;
   name: string;

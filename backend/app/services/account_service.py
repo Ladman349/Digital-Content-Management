@@ -167,6 +167,54 @@ class AccountService:
         stale.delete(synchronize_session=False)
         db.commit()
 
+    # ── Where a user is signed in ───────────────────────────────────────────────────────
+    # A session is identified to the CMS by the first characters of its token hash. The hash is
+    # already one-way, and a prefix of it is no use for signing in, so nothing secret leaves.
+    SESSION_HANDLE_LENGTH = 16
+
+    @staticmethod
+    def list_sessions(db: Session, user_id: str, current_token: Optional[str]) -> list:
+        now = _now_ms()
+        current_hash = hash_token(current_token) if current_token else None
+        sessions = (
+            db.query(UserSession)
+            .filter(UserSession.userId == user_id, UserSession.expiresAt > now)
+            .order_by(UserSession.lastUsedAt.desc())
+            .all()
+        )
+        return [
+            {
+                "id": s.tokenHash[: AccountService.SESSION_HANDLE_LENGTH],
+                "createdAt": s.createdAt,
+                "lastUsedAt": s.lastUsedAt,
+                "expiresAt": s.expiresAt,
+                "userAgent": s.userAgent,
+                "current": s.tokenHash == current_hash,
+            }
+            for s in sessions
+        ]
+
+    @staticmethod
+    def end_session(db: Session, user_id: str, handle: str) -> bool:
+        """Signs out one of the user's own sessions. Another user's handle is simply not found."""
+        if len(handle) != AccountService.SESSION_HANDLE_LENGTH or not handle.isalnum():
+            return False
+        matches = db.query(UserSession).filter(UserSession.userId == user_id, UserSession.tokenHash.like(f"{handle}%")).all()
+        if len(matches) != 1:
+            return False
+        db.delete(matches[0])
+        db.commit()
+        return True
+
+    @staticmethod
+    def end_other_sessions(db: Session, user_id: str, keep_token: Optional[str]) -> int:
+        stale = db.query(UserSession).filter(UserSession.userId == user_id)
+        if keep_token:
+            stale = stale.filter(UserSession.tokenHash != hash_token(keep_token))
+        ended = stale.delete(synchronize_session=False)
+        db.commit()
+        return ended
+
     # ── Users ───────────────────────────────────────────────────────────────────────────
     @staticmethod
     def list_users(db: Session) -> List[User]:
