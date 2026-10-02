@@ -159,4 +159,59 @@ class DownloadManagerTest {
 
         assertTrue(fakeDownloadSessionDao.updatedStates.any { it.first == "M1" && it.second == DownloadState.FAILED })
     }
+
+    private val mb = 1024L * 1024L
+
+    private fun queued(mediaId: String, size: Long) = DownloadSessionEntity(
+        mediaId = mediaId,
+        url = "http://example.com/$mediaId.mp4",
+        downloadState = DownloadState.QUEUED,
+        expectedSize = size,
+        expectedChecksumMd5 = null,
+        expectedChecksumSha256 = null,
+        destinationPath = "",
+        createdAt = 0L,
+        updatedAt = 0L
+    )
+
+    @Test
+    fun `a small playlist downloads on a screen with little free storage`() = runTest {
+        // The Mi TV that sat on "Downloading": 340 MB free, two videos of 33 and 24 MB.
+        storageManager.freeBytesProvider = { 340 * mb }
+
+        assertTrue(downloadManager.ensureSpaceFor(listOf(queued("M1", 33 * mb), queued("M2", 24 * mb))))
+        assertTrue(fakeDownloadSessionDao.updatedStates.isEmpty())
+    }
+
+    @Test
+    fun `media no playlist uses is deleted to make room before giving up`() = runTest {
+        val mediaDir = storageManager.getMediaDirectory()
+        val leftover = File(mediaDir, "OLD_video.mp4").apply { writeText("from a playlist that is gone") }
+        storageManager.freeBytesProvider = { if (leftover.exists()) 60 * mb else 200 * mb }
+
+        assertTrue(downloadManager.ensureSpaceFor(listOf(queued("M1", 100 * mb))))
+        assertTrue(!leftover.exists())
+    }
+
+    @Test
+    fun `a playlist that does not fit is reported and left queued`() = runTest {
+        storageManager.freeBytesProvider = { 80 * mb }
+
+        val fits = downloadManager.ensureSpaceFor(listOf(queued("M1", 60 * mb)))
+
+        assertTrue(!fits)
+        // 60 MB to download plus the 50 MB kept free.
+        org.mockito.Mockito.verify(mockEventBus)
+            .publish(com.digitalsignage.player.core.event.PlayerEvent.StorageInsufficient(110 * mb, 80 * mb))
+        // Not paused: a paused session is never picked up again, a queued one is retried.
+        assertTrue(fakeDownloadSessionDao.updatedStates.isEmpty())
+    }
+
+    @Test
+    fun `a half-finished download only needs room for the rest`() = runTest {
+        storageManager.freeBytesProvider = { 100 * mb }
+        val resumed = queued("M1", 120 * mb).copy(currentByteOffset = 90 * mb)
+
+        assertTrue(downloadManager.ensureSpaceFor(listOf(resumed)))
+    }
 }

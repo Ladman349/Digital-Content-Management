@@ -404,6 +404,25 @@ Section 6 covers what is implemented. What remains:
 
 ## 8. Troubleshooting
 
+### A screen is online and has a playlist, but shows nothing
+
+Look at the screen's panel in the CMS first. If **Now playing** is empty while the screen is Online,
+the screen has received the playlist and has not been able to download it. The usual reasons:
+
+* **Storage.** A player before 1.4.1 refuses every download when the device has less than 500 MB
+  free, whatever the playlist needs, and sits on "Downloading media" for ever. TVs with a 4 GB data
+  partition are often below that out of the box. The Now page flags such a screen as
+  **Low storage**. From 1.4.1 the player needs only the size of the files plus 50 MB, deletes media
+  no playlist uses any more before giving up, and when the files really do not fit it says so on
+  the TV ("Not enough storage on this screen", with the numbers) and in **Last error** in the CMS.
+  It tries again by itself every 30 seconds, so freeing space on the TV is enough.
+* **The player is not open.** A screen whose heartbeats arrive every 15 minutes instead of every
+  minute is running only its background worker: the app is not on screen (the TV is on another
+  input or app, or asleep). Open the player on the TV.
+* **A file the TV cannot decode.** The player skips an item it cannot play; a playlist made only of
+  such items shows nothing. Phone recordings (`.MOV`, HEVC/HDR) are the usual case on older TVs:
+  convert them to H.264 MP4.
+
 ### Railway does not deploy when you push
 
 The Railway project is owned by the Railway account `grovitclaude-blip`, and the repository by the

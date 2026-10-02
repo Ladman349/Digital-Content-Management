@@ -190,7 +190,9 @@ export default function DeviceDetailPanel({ device, playback, playlists, schedul
               Storage
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              {storagePct !== null ? `${formatMegabytes(device.storageUsed)} of ${formatMegabytes(device.storageTotal)} used` : "Not reported"}
+              {storagePct !== null
+                ? `${formatMegabytes(Math.max(0, (device.storageTotal ?? 0) - (device.storageUsed ?? 0)))} free of ${formatMegabytes(device.storageTotal)}`
+                : "Not reported"}
             </Typography>
           </Box>
           <LinearProgress variant="determinate" value={storagePct ?? 0} color={storagePct !== null && storagePct > 90 ? "error" : "primary"} />

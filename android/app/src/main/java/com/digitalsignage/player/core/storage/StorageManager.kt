@@ -13,7 +13,17 @@ import javax.inject.Singleton
 class StorageManager @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
-    private val MIN_AVAILABLE_BYTES = 500L * 1024L * 1024L // 500MB
+    // Left free once a download has finished, so the system and this app's own databases never
+    // hit zero. It used to be a flat 500 MB whatever the download needed, which a TV with a 4 GB
+    // data partition can rarely spare: such a screen refused every download and sat on
+    // "Downloading" for ever.
+    val reserveBytes = 50L * 1024L * 1024L
+
+    /** Replaced in unit tests, where StatFs is not available. */
+    internal var freeBytesProvider: () -> Long = {
+        val stat = StatFs(getMediaDirectory().path)
+        stat.availableBlocksLong * stat.blockSizeLong
+    }
     
     fun getMediaDirectory(): File {
         val dir = File(context.filesDir, "media")
@@ -21,11 +31,11 @@ class StorageManager @Inject constructor(
         return dir
     }
     
-    fun isStorageAvailable(requiredBytes: Long = 0): Boolean {
-        val stat = StatFs(getMediaDirectory().path)
-        val availableBytes = stat.availableBlocksLong * stat.blockSizeLong
-        return (availableBytes - requiredBytes) > MIN_AVAILABLE_BYTES
-    }
+    fun availableBytes(): Long = freeBytesProvider()
+
+    /** True when [requiredBytes] can be written and the reserve is still free afterwards. */
+    fun isStorageAvailable(requiredBytes: Long = 0): Boolean =
+        availableBytes() - requiredBytes.coerceAtLeast(0L) >= reserveBytes
 
     /**
      * Canonical media filename generator. Single source of truth for media filenames.

@@ -11,6 +11,7 @@
     <string name="status_syncing_title">Checking for updates</string>
     <string name="status_downloading_title">Downloading media %1$d of %2$d</string>
     <string name="status_downloading_title_unknown">Downloading media</string>
+    <string name="status_storage_full_title">Not enough storage on this screen</string>
     <string name="status_offline_title">No network connection</string>
     <string name="status_error_title">Something went wrong</string>
     <string name="status_no_content_title">Waiting for content</string>
@@ -21,6 +22,7 @@
     <string name="status_registering_subtitle">This device is requesting credentials from the management server.</string>
     <string name="status_syncing_subtitle">Asking the server whether a newer playlist is available.</string>
     <string name="status_downloading_subtitle">Media is being cached locally so playback keeps working offline.</string>
+    <string name="status_storage_full_subtitle">The playlist needs %1$d MB free and only %2$d MB is available. Free up space on this device; the download then starts by itself.</string>
     <string name="status_offline_subtitle">Check the network cable or Wi‑Fi. Cached content resumes automatically.</string>
     <string name="status_no_content_subtitle">No playlist is assigned to this device yet. Assign one from the dashboard.</string>
     <string name="status_loading_subtitle">The next item is being prepared.</string>

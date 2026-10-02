@@ -501,6 +501,13 @@ class PlaybackActivity : AppCompatActivity() {
                 progressPercent = state.percent
             )
 
+            is PresentationState.StorageFull -> showStatus(
+                busy = false,
+                iconRes = R.drawable.ic_status_error,
+                primary = getString(R.string.status_storage_full_title),
+                secondary = getString(R.string.status_storage_full_subtitle, state.neededMb, state.freeMb)
+            )
+
             is PresentationState.Offline -> showStatus(
                 busy = false,
                 iconRes = R.drawable.ic_status_offline,

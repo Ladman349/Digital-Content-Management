@@ -221,7 +221,7 @@ class PlaylistRepositoryImpl @Inject constructor(
                             android.util.Log.i("SyncTrace", "3. itemEntities size: ${itemEntities.size}")
                             android.util.Log.i("SyncTrace", "4. itemsToDownload size: ${itemsToDownload.size}")
                             eventBus.publish(PlayerEvent.DebugStage("About to call enqueueDownloads() for ${itemsToDownload.size} items"))
-                            enqueueDownloads(itemsToDownload)
+                            enqueueDownloads(itemsToDownload, syncData.items.associate { it.media.mediaId to it.media.size })
                             eventBus.publish(PlayerEvent.DebugStage("enqueueDownloads() returned successfully"))
                         } else {
                             logger.i("PlaylistRepository", "No network downloads needed. All media items are already present on local disk.")
@@ -282,13 +282,15 @@ class PlaylistRepositoryImpl @Inject constructor(
         }
     }
     
-    private suspend fun enqueueDownloads(itemsToDownload: List<MediaItemEntity>) {
+    private suspend fun enqueueDownloads(itemsToDownload: List<MediaItemEntity>, sizes: Map<String, Long>) {
         if (itemsToDownload.isNotEmpty()) {
             val tasks = itemsToDownload.map { item ->
                 DownloadSessionEntity(
                     mediaId = item.mediaId,
                     url = item.url,
                     downloadState = DownloadState.QUEUED,
+                    // Lets the download queue check that the files fit before it starts.
+                    expectedSize = (sizes[item.mediaId] ?: 0L).coerceAtLeast(0L),
                     retryCount = 0,
                     priority = 10,
                     expectedChecksumMd5 = null,

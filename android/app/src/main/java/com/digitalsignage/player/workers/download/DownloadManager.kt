@@ -79,12 +79,10 @@ class DownloadManager @Inject constructor(
                     break
                 }
 
-                if (!storageManager.isStorageAvailable()) {
+                if (!ensureSpaceFor(pendingSessions)) {
                     eventBus.publish(PlayerEvent.DebugStage("3h. Storage full. Returning early."))
-                    logger.e("DownloadManager", "Storage full. Pausing downloads.")
-                    pendingSessions.forEach {
-                        database.downloadSessionDao().updateSessionState(it.mediaId, DownloadState.PAUSED, System.currentTimeMillis())
-                    }
+                    // The sessions stay QUEUED: the next playlist check runs the queue again, so
+                    // the download starts by itself once space has been freed on the device.
                     break
                 }
 
@@ -108,6 +106,32 @@ class DownloadManager @Inject constructor(
         }
     }
     
+    /**
+     * True when the queued downloads fit on the device. Before giving up it deletes media that no
+     * playlist on this device uses any more, which is often what filled the storage.
+     */
+    internal suspend fun ensureSpaceFor(sessions: List<DownloadSessionEntity>): Boolean {
+        val toDownload = sessions.sumOf { (it.expectedSize - it.currentByteOffset).coerceAtLeast(0L) }
+        if (storageManager.isStorageAvailable(toDownload)) return true
+
+        val inUse = listOfNotNull(
+            database.playlistDao().getPlaylistByState(PlaylistState.ACTIVE),
+            database.playlistDao().getPlaylistByState(PlaylistState.PENDING)
+        ).flatMap { database.playlistDao().getMediaItemsForPlaylist(it.playlistId) }.map { it.mediaId }
+        storageManager.cleanupOrphans(inUse + sessions.map { it.mediaId })
+        if (storageManager.isStorageAvailable(toDownload)) return true
+
+        val needed = toDownload + storageManager.reserveBytes
+        val free = storageManager.availableBytes()
+        val mb = 1024L * 1024L
+        logger.e(
+            "DownloadManager",
+            "Not enough free storage to download the playlist: needs ${(needed + mb - 1) / mb} MB, ${free / mb} MB free"
+        )
+        eventBus.publish(PlayerEvent.StorageInsufficient(needed, free))
+        return false
+    }
+
     internal suspend fun attemptDownload(session: DownloadSessionEntity) {
         android.util.Log.i("SyncTrace", "Entered attemptDownload() mediaId=${session.mediaId}")
         android.util.Log.i("DownloadTrace", "Entering attemptDownload URL=${session.url}")

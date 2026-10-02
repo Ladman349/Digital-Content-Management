@@ -36,6 +36,8 @@ sealed class PlayerEvent {
     /** Aggregate progress of the pending playlist: how many of its items are on disk. */
     data class DownloadQueueProgress(val completed: Int, val total: Int) : PlayerEvent()
     data class DownloadFailed(val mediaId: String, val error: Exception) : PlayerEvent()
+    /** The queued downloads do not fit: [neededBytes] must be free and only [freeBytes] are. */
+    data class StorageInsufficient(val neededBytes: Long, val freeBytes: Long) : PlayerEvent()
     object PlaylistReady : PlayerEvent()
     object HeartbeatStarted : PlayerEvent()
     object HeartbeatSucceeded : PlayerEvent()

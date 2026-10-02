@@ -86,6 +86,10 @@ class PlayerOrchestratorImpl @Inject constructor(
     private var downloadsTotal = 0
     private var currentItemPercent = 0
 
+    /** Set while the playlist cannot be downloaded for lack of space; shown instead of progress. */
+    @Volatile
+    private var storageShortfall: PlayerEvent.StorageInsufficient? = null
+
     @Volatile
     private var isOnline = true
 
@@ -163,7 +167,16 @@ class PlayerOrchestratorImpl @Inject constructor(
                         stateMachine.transitionTo(PlayerState.DOWNLOADING)
                     }
 
+                    is PlayerEvent.StorageInsufficient -> {
+                        storageShortfall = event
+                        publishStatus()
+                    }
+
                     is PlayerEvent.DownloadStarted -> {
+                        if (storageShortfall != null) {
+                            storageShortfall = null
+                            publishStatus()
+                        }
                         currentItemPercent = 0
                         logger.i("PlayerFlow", "[TRANSITION] DOWNLOAD_STARTED - Media: ${event.mediaId}")
                     }
@@ -186,6 +199,7 @@ class PlayerOrchestratorImpl @Inject constructor(
 
                     is PlayerEvent.PlaylistReady -> {
                         logger.i("PlayerFlow", "[TRANSITION] DOWNLOAD_COMPLETED / PLAYLIST_ACTIVATED")
+                        storageShortfall = null
                         stateMachine.transitionTo(PlayerState.READY)
                         if (stateMachine.targetState.value == PlayerState.PLAYING) {
                             stateMachine.transitionTo(PlayerState.PLAYING)
@@ -271,7 +285,10 @@ class PlayerOrchestratorImpl @Inject constructor(
                 PlayerState.BOOTING, PlayerState.RECOVERING -> PresentationState.Booting
                 PlayerState.REGISTERING -> PresentationState.Registering
                 PlayerState.SYNCING -> PresentationState.Syncing
-                PlayerState.DOWNLOADING -> {
+                PlayerState.DOWNLOADING -> storageShortfall?.let {
+                    val mb = 1024L * 1024L
+                    PresentationState.StorageFull(((it.neededBytes + mb - 1) / mb).toInt(), (it.freeBytes / mb).toInt())
+                } ?: run {
                     val total = downloadsTotal
                     val completed = downloadsCompleted.coerceAtMost(total)
                     val percent = if (total <= 0) 0 else {
@@ -483,6 +500,9 @@ class PlayerOrchestratorImpl @Inject constructor(
                     logger.d("SyncTrace", "Periodic sync in state ${currentState.name}")
                     executeCommand(PlayerCommand.SyncPlaylist)
                 }
+                // A sync answered "nothing new" does not restart the queue, so a download that is
+                // waiting for space is tried again here.
+                if (storageShortfall != null) downloadManager.startProcessing()
             }
         }
     }

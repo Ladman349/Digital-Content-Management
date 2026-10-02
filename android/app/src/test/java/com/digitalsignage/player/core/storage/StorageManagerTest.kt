@@ -37,6 +37,26 @@ class StorageManagerTest {
     }
 
     @Test
+    fun `storage is available when the download fits with the reserve to spare`() {
+        val mb = 1024L * 1024L
+        storageManager.freeBytesProvider = { 340 * mb }
+
+        assertEquals(true, storageManager.isStorageAvailable(60 * mb))
+        assertEquals(true, storageManager.isStorageAvailable(290 * mb))
+        assertEquals(false, storageManager.isStorageAvailable(291 * mb))
+    }
+
+    @Test
+    fun `an unknown download size still needs the reserve to be free`() {
+        val mb = 1024L * 1024L
+        storageManager.freeBytesProvider = { 49 * mb }
+        assertEquals(false, storageManager.isStorageAvailable())
+
+        storageManager.freeBytesProvider = { 50 * mb }
+        assertEquals(true, storageManager.isStorageAvailable())
+    }
+
+    @Test
     fun `getCanonicalFileName formats mediaId and sanitized filename from URL`() {
         val url = "http://example.com/media/test_video.mp4?token=123"
         val canonicalName = storageManager.getCanonicalFileName("MEDIA-123", url)

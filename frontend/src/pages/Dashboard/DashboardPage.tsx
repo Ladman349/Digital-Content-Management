@@ -18,7 +18,7 @@ import { useNow } from "../../hooks/useNow";
 import { useAuth } from "../../auth/AuthProvider";
 import { usePlaybackMap } from "../../hooks/usePlayback";
 import { findConflicts, isScheduleExpired, isScheduleLiveNow } from "../../utils/schedule";
-import { formatBytes, formatDuration, relativeTime } from "../../utils/format";
+import { formatBytes, formatDuration, formatMegabytes, relativeTime } from "../../utils/format";
 
 interface Attention {
   key: string;
@@ -95,12 +95,13 @@ export default function DashboardPage() {
           when: relativeTime(d.heartbeatAt ?? d.lastSeenMs, now),
           to: `/devices?select=${encodeURIComponent(d.id)}`,
         });
-      if (d.storageUsed && d.storageTotal && d.storageUsed / d.storageTotal > 0.9)
+      // Under 500 MB free matters by itself: players before 1.4.1 refuse to download below it.
+      if (d.storageUsed && d.storageTotal && (d.storageUsed / d.storageTotal > 0.9 || d.storageTotal - d.storageUsed < 500))
         items.push({
           key: `sto-${d.id}`,
           severity: "warning",
-          tag: "Disk full",
-          text: `${d.name} storage is ${Math.round((d.storageUsed / d.storageTotal) * 100)}% full`,
+          tag: "Low storage",
+          text: `${d.name} has only ${formatMegabytes(Math.max(0, d.storageTotal - d.storageUsed))} of storage free; new content may not download`,
           when: "now",
           to: `/devices?select=${encodeURIComponent(d.id)}`,
         });

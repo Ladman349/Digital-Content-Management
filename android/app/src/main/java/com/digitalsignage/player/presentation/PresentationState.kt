@@ -21,6 +21,8 @@ sealed class PresentationState {
     object Registering : PresentationState()
     object Syncing : PresentationState()
     data class Downloading(val completed: Int, val total: Int, val percent: Int) : PresentationState()
+    /** The playlist cannot be downloaded: it needs [neededMb] free and the device has [freeMb]. */
+    data class StorageFull(val neededMb: Int, val freeMb: Int) : PresentationState()
     object Offline : PresentationState()
     data class Error(val message: String) : PresentationState()
     object NoContent : PresentationState()
